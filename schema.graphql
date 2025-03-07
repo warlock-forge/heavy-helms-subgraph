@@ -1,0 +1,215 @@
+type AttributeSwapAwarded @entity(immutable: true) {
+  id: Bytes!
+  to: Bytes! # address
+  totalCharges: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type CreatePlayerFeeUpdated @entity(immutable: true) {
+  id: Bytes!
+  oldFee: BigInt! # uint256
+  newFee: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type EquipmentRequirementsUpdated @entity(immutable: true) {
+  id: Bytes!
+  oldAddress: Bytes! # address
+  newAddress: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type GameContractPermissionsUpdated @entity(immutable: true) {
+  id: Bytes!
+  gameContract: Bytes! # address
+  permissions_record: Boolean! # bool
+  permissions_retire: Boolean! # bool
+  permissions_name: Boolean! # bool
+  permissions_attributes: Boolean! # bool
+  permissions_immortal: Boolean! # bool
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type NameChangeAwarded @entity(immutable: true) {
+  id: Bytes!
+  to: Bytes! # address
+  totalCharges: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OwnershipTransferred @entity(immutable: true) {
+  id: Bytes!
+  user: Bytes! # address
+  newOwner: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PausedStateChanged @entity(immutable: true) {
+  id: Bytes!
+  isPaused: Boolean! # bool
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerAttributesSwapped @entity(immutable: true) {
+  id: Bytes!
+  playerId: BigInt! # uint32
+  decreaseAttribute: Int! # uint8
+  increaseAttribute: Int! # uint8
+  newDecreaseValue: Int! # uint8
+  newIncreaseValue: Int! # uint8
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerAttributesUpdated @entity(immutable: true) {
+  id: Bytes!
+  playerId: BigInt! # uint32
+  strength: Int! # uint8
+  constitution: Int! # uint8
+  size: Int! # uint8
+  agility: Int! # uint8
+  stamina: Int! # uint8
+  luck: Int! # uint8
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerCreated @entity(immutable: true) {
+  id: Bytes!
+  playerId: BigInt! # uint32
+  firstNameIndex: Int! # uint16
+  surnameIndex: Int! # uint16
+  strength: Int! # uint8
+  constitution: Int! # uint8
+  size: Int! # uint8
+  agility: Int! # uint8
+  stamina: Int! # uint8
+  luck: Int! # uint8
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerCreationFulfilled @entity(immutable: true) {
+  id: Bytes!
+  requestId: BigInt! # uint256
+  playerId: BigInt! # uint32
+  owner: Bytes! # address
+  randomness: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerCreationRequested @entity(immutable: true) {
+  id: Bytes!
+  requestId: BigInt! # uint256
+  requester: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerImmortalityChanged @entity(immutable: true) {
+  id: Bytes!
+  playerId: BigInt! # uint32
+  caller: Bytes! # address
+  immortal: Boolean! # bool
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerKillUpdated @entity(immutable: true) {
+  id: Bytes!
+  playerId: BigInt! # uint32
+  kills: Int! # uint16
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerNameUpdated @entity(immutable: true) {
+  id: Bytes!
+  playerId: BigInt! # uint32
+  firstNameIndex: Int! # uint16
+  surnameIndex: Int! # uint16
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerRetired @entity(immutable: true) {
+  id: Bytes!
+  playerId: BigInt! # uint32
+  caller: Bytes! # address
+  retired: Boolean! # bool
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerSkinEquipped @entity(immutable: true) {
+  id: Bytes!
+  playerId: BigInt! # uint32
+  skinIndex: BigInt! # uint32
+  tokenId: Int! # uint16
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerSlotsPurchased @entity(immutable: true) {
+  id: Bytes!
+  user: Bytes! # address
+  slotsAdded: Int! # uint8
+  totalSlots: Int! # uint8
+  amountPaid: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerWinLossUpdated @entity(immutable: true) {
+  id: Bytes!
+  playerId: BigInt! # uint32
+  wins: Int! # uint16
+  losses: Int! # uint16
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type RequestedRandomness @entity(immutable: true) {
+  id: Bytes!
+  round: BigInt! # uint256
+  data: Bytes! # bytes
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type SlotBatchCostUpdated @entity(immutable: true) {
+  id: Bytes!
+  oldCost: BigInt! # uint256
+  newCost: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}

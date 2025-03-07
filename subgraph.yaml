@@ -1,0 +1,86 @@
+specVersion: 1.2.0
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: Player
+    network: base-sepolia
+    source:
+      address: "0xc8dfCC2cD565bcA732C25F9a5A86625AABd63E80"
+      abi: Player
+      startBlock: 22736199
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - AttributeSwapAwarded
+        - CreatePlayerFeeUpdated
+        - EquipmentRequirementsUpdated
+        - GameContractPermissionsUpdated
+        - NameChangeAwarded
+        - OwnershipTransferred
+        - PausedStateChanged
+        - PlayerAttributesSwapped
+        - PlayerAttributesUpdated
+        - PlayerCreated
+        - PlayerCreationFulfilled
+        - PlayerCreationRequested
+        - PlayerImmortalityChanged
+        - PlayerKillUpdated
+        - PlayerNameUpdated
+        - PlayerRetired
+        - PlayerSkinEquipped
+        - PlayerSlotsPurchased
+        - PlayerWinLossUpdated
+        - RequestedRandomness
+        - SlotBatchCostUpdated
+      abis:
+        - name: Player
+          file: ./abis/Player.json
+      eventHandlers:
+        - event: AttributeSwapAwarded(indexed address,uint256)
+          handler: handleAttributeSwapAwarded
+        - event: CreatePlayerFeeUpdated(uint256,uint256)
+          handler: handleCreatePlayerFeeUpdated
+        - event: EquipmentRequirementsUpdated(indexed address,indexed address)
+          handler: handleEquipmentRequirementsUpdated
+        - event: GameContractPermissionsUpdated(indexed address,(bool,bool,bool,bool,bool))
+          handler: handleGameContractPermissionsUpdated
+        - event: NameChangeAwarded(indexed address,uint256)
+          handler: handleNameChangeAwarded
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+        - event: PausedStateChanged(bool)
+          handler: handlePausedStateChanged
+        - event: PlayerAttributesSwapped(indexed uint32,uint8,uint8,uint8,uint8)
+          handler: handlePlayerAttributesSwapped
+        - event: PlayerAttributesUpdated(indexed uint32,uint8,uint8,uint8,uint8,uint8,uint8)
+          handler: handlePlayerAttributesUpdated
+        - event: PlayerCreated(indexed uint32,indexed uint16,indexed uint16,uint8,uint8,uint8,uint8,uint8,uint8)
+          handler: handlePlayerCreated
+        - event: PlayerCreationFulfilled(indexed uint256,indexed uint32,indexed address,uint256)
+          handler: handlePlayerCreationFulfilled
+        - event: PlayerCreationRequested(indexed uint256,indexed address)
+          handler: handlePlayerCreationRequested
+        - event: PlayerImmortalityChanged(indexed uint32,indexed address,bool)
+          handler: handlePlayerImmortalityChanged
+        - event: PlayerKillUpdated(indexed uint32,uint16)
+          handler: handlePlayerKillUpdated
+        - event: PlayerNameUpdated(indexed uint32,uint16,uint16)
+          handler: handlePlayerNameUpdated
+        - event: PlayerRetired(indexed uint32,indexed address,bool)
+          handler: handlePlayerRetired
+        - event: PlayerSkinEquipped(indexed uint32,indexed uint32,uint16)
+          handler: handlePlayerSkinEquipped
+        - event: PlayerSlotsPurchased(indexed address,uint8,uint8,uint256)
+          handler: handlePlayerSlotsPurchased
+        - event: PlayerWinLossUpdated(indexed uint32,uint16,uint16)
+          handler: handlePlayerWinLossUpdated
+        - event: RequestedRandomness(uint256,bytes)
+          handler: handleRequestedRandomness
+        - event: SlotBatchCostUpdated(uint256,uint256)
+          handler: handleSlotBatchCostUpdated
+      file: ./src/player.ts
