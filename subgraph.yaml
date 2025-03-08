@@ -8,9 +8,9 @@ dataSources:
     name: Player
     network: base-sepolia
     source:
-      address: "0xc8dfCC2cD565bcA732C25F9a5A86625AABd63E80"
+      address: "0x896F68Cbf2E8c56fE919B70495F58dc7d649E596"
       abi: Player
-      startBlock: 22736199
+      startBlock: 22735872
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -25,8 +25,6 @@ dataSources:
         - PausedStateChanged
         - PlayerAttributesSwapped
         - PlayerAttributesUpdated
-        - PlayerCreated
-        - PlayerCreationFulfilled
         - PlayerCreationRequested
         - PlayerImmortalityChanged
         - PlayerKillUpdated
@@ -37,6 +35,10 @@ dataSources:
         - PlayerWinLossUpdated
         - RequestedRandomness
         - SlotBatchCostUpdated
+        # Add our custom entities
+        - Player
+        - Owner
+        - Skin
       abis:
         - name: Player
           file: ./abis/Player.json
@@ -59,10 +61,6 @@ dataSources:
           handler: handlePlayerAttributesSwapped
         - event: PlayerAttributesUpdated(indexed uint32,uint8,uint8,uint8,uint8,uint8,uint8)
           handler: handlePlayerAttributesUpdated
-        - event: PlayerCreated(indexed uint32,indexed uint16,indexed uint16,uint8,uint8,uint8,uint8,uint8,uint8)
-          handler: handlePlayerCreated
-        - event: PlayerCreationFulfilled(indexed uint256,indexed uint32,indexed address,uint256)
-          handler: handlePlayerCreationFulfilled
         - event: PlayerCreationRequested(indexed uint256,indexed address)
           handler: handlePlayerCreationRequested
         - event: PlayerImmortalityChanged(indexed uint32,indexed address,bool)
@@ -83,4 +81,61 @@ dataSources:
           handler: handleRequestedRandomness
         - event: SlotBatchCostUpdated(uint256,uint256)
           handler: handleSlotBatchCostUpdated
+        - event: PlayerCreationComplete(indexed uint256,indexed uint32,indexed address,uint256,uint16,uint16,uint8,uint8,uint8,uint8,uint8,uint8)
+          handler: handlePlayerCreationComplete
       file: ./src/player.ts
+
+  - kind: ethereum
+    name: PlayerNameRegistry
+    network: base-sepolia
+    source:
+      address: "0x34f3DFbb2EB8DAa9ba9EB75264B9305d62a28dA5"
+      abi: PlayerNameRegistry
+      startBlock: 22735872
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - NameAdded
+        - Name
+      abis:
+        - name: PlayerNameRegistry
+          file: ./abis/PlayerNameRegistry.json
+      eventHandlers:
+        - event: NameAdded(uint8,uint16,string)
+          handler: handleNameAdded
+      file: ./src/name-registry.ts
+
+  - kind: ethereum
+    name: PlayerSkinRegistry
+    network: base-sepolia
+    source:
+      address: "0x4075FeBBd453fFE7B6c8bfa54a2E2Fa22e5bB800"
+      abi: PlayerSkinRegistry
+      startBlock: 22735872
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - SkinRegistered
+        - SkinVerificationUpdated
+        - SkinTypeUpdated
+        - RequiredNFTUpdated
+        - SkinCollection
+      abis:
+        - name: PlayerSkinRegistry
+          file: ./abis/PlayerSkinRegistry.json
+        - name: IPlayerSkinNFT
+          file: ./abis/IPlayerSkinNFT.json
+      eventHandlers:
+        - event: SkinRegistered(indexed uint32,indexed address)
+          handler: handleSkinRegistered
+        - event: SkinVerificationUpdated(indexed uint32,bool)
+          handler: handleSkinVerificationUpdated
+        - event: SkinTypeUpdated(indexed uint32,uint8)
+          handler: handleSkinTypeUpdated
+        - event: RequiredNFTUpdated(indexed uint32,address)
+          handler: handleRequiredNFTUpdated
+      file: ./src/skin-registry.ts

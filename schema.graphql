@@ -1,3 +1,4 @@
+# Existing event entities (keep all of these)
 type AttributeSwapAwarded @entity(immutable: true) {
   id: Bytes!
   to: Bytes! # address
@@ -85,33 +86,6 @@ type PlayerAttributesUpdated @entity(immutable: true) {
   agility: Int! # uint8
   stamina: Int! # uint8
   luck: Int! # uint8
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type PlayerCreated @entity(immutable: true) {
-  id: Bytes!
-  playerId: BigInt! # uint32
-  firstNameIndex: Int! # uint16
-  surnameIndex: Int! # uint16
-  strength: Int! # uint8
-  constitution: Int! # uint8
-  size: Int! # uint8
-  agility: Int! # uint8
-  stamina: Int! # uint8
-  luck: Int! # uint8
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type PlayerCreationFulfilled @entity(immutable: true) {
-  id: Bytes!
-  requestId: BigInt! # uint256
-  playerId: BigInt! # uint32
-  owner: Bytes! # address
-  randomness: BigInt! # uint256
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -209,6 +183,161 @@ type SlotBatchCostUpdated @entity(immutable: true) {
   id: Bytes!
   oldCost: BigInt! # uint256
   newCost: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+# Custom state-tracking entities
+type Player @entity {
+  id: ID!
+  playerId: BigInt!
+  owner: Owner!
+  isRetired: Boolean!
+  isImmortal: Boolean!
+  firstNameIndex: Int!
+  surnameIndex: Int!
+  firstName: String
+  surname: String
+  fullName: String
+  strength: Int!
+  constitution: Int!
+  size: Int!
+  agility: Int!
+  stamina: Int!
+  luck: Int!
+  currentSkin: Skin
+  wins: Int!
+  losses: Int!
+  kills: Int!
+  createdAt: BigInt!
+  lastUpdatedAt: BigInt!
+  creationTx: Bytes!
+}
+
+type Owner @entity {
+  id: ID!
+  address: Bytes!
+  totalPlayers: Int!
+  activePlayers: [Player!]! @derivedFrom(field: "owner")
+  players: [Player!]! @derivedFrom(field: "owner")
+  nameChangeCharges: BigInt!
+  attributeSwapCharges: BigInt!
+}
+
+# Entity to track pending player creation requests
+type PendingPlayerCreation @entity {
+  id: ID! # requestId
+  requester: Bytes! # address of the requester (future owner)
+  fulfilled: Boolean!
+  playerId: BigInt # set when fulfilled
+  createdAt: BigInt!
+}
+
+# Entity to store player attributes temporarily between handlers
+type PlayerAttributes @entity {
+  id: ID! # playerId
+  firstNameIndex: Int!
+  surnameIndex: Int!
+  strength: Int!
+  constitution: Int!
+  size: Int!
+  agility: Int!
+  stamina: Int!
+  luck: Int!
+}
+
+type Name @entity {
+  id: ID!
+  index: Int!
+  nameType: Int!  # 0: nameSetA, 1: nameSetB, 2: surname
+  value: String!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+}
+
+type SkinCollection @entity {
+  id: ID!
+  registryId: BigInt!
+  contractAddress: Bytes!
+  isVerified: Boolean!
+  skinType: Int!  # 0: Player, 1: DefaultPlayer, 2: Monster
+  requiredNFTAddress: Bytes
+  skins: [Skin!]! @derivedFrom(field: "collection")
+}
+
+type Skin @entity {
+  id: ID!
+  collection: SkinCollection!
+  tokenId: Int!
+  metadataURI: String
+  equippedBy: [Player!]! @derivedFrom(field: "currentSkin")
+  weapon: Int
+  armor: Int
+}
+
+# Events from PlayerNameRegistry
+type NameAdded @entity(immutable: true) {
+  id: Bytes!
+  nameType: Int! # uint8
+  index: Int! # uint16
+  name: String! # string
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+# Events from PlayerSkinRegistry
+type SkinRegistered @entity(immutable: true) {
+  id: Bytes!
+  registryId: BigInt! # uint32
+  skinContract: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type SkinVerificationUpdated @entity(immutable: true) {
+  id: Bytes!
+  registryId: BigInt! # uint32
+  isVerified: Boolean! # bool
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type SkinTypeUpdated @entity(immutable: true) {
+  id: Bytes!
+  registryId: BigInt! # uint32
+  skinType: Int! # uint8
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type RequiredNFTUpdated @entity(immutable: true) {
+  id: Bytes!
+  registryId: BigInt! # uint32
+  requiredNFTAddress: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerCreationComplete @entity(immutable: true) {
+  id: Bytes!
+  requestId: BigInt! # uint256
+  playerId: BigInt! # uint32
+  owner: Bytes! # address
+  randomness: BigInt! # uint256
+  firstNameIndex: Int! # uint16
+  surnameIndex: Int! # uint16
+  strength: Int! # uint8
+  constitution: Int! # uint8
+  size: Int! # uint8
+  agility: Int! # uint8
+  stamina: Int! # uint8
+  luck: Int! # uint8
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
