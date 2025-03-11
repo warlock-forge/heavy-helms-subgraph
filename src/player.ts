@@ -341,6 +341,15 @@ export function handlePlayerCreationComplete(
     player.fullName = firstNameStr + " " + surnameStr;
   }
   
+  // Set default skin (ID 0, token ID 1)
+  let defaultSkinId = createOrUpdateSkin(BigInt.fromI32(0), 1);
+  if (defaultSkinId) {
+    player.currentSkin = defaultSkinId;
+    log.info("Set default skin for new player: {}", [player.id]);
+  } else {
+    log.warning("Failed to set default skin for new player: {}", [player.id]);
+  }
+  
   // Save the player with all data set
   player.save();
 
@@ -533,8 +542,18 @@ export function handlePlayerSkinEquipped(
 
   entity.save();
 
-  // Get or create skin entity
+  // Use tokenId directly without conversion
   let skinId = createOrUpdateSkin(event.params.skinIndex, event.params.tokenId);
+  
+  // Add detailed logging without using tokenId.toString()
+  log.info(
+    "PlayerSkinEquipped - PlayerId: {}, SkinIndex: {}, SkinId: {}",
+    [
+      event.params.playerId.toString(),
+      event.params.skinIndex.toString(),
+      skinId ? skinId : "null"
+    ]
+  );
   
   // Update player's skin reference
   let player = Player.load(event.params.playerId.toString());
@@ -542,6 +561,14 @@ export function handlePlayerSkinEquipped(
     player.currentSkin = skinId;
     player.lastUpdatedAt = event.block.timestamp;
     player.save();
+    log.info("Updated player skin: {} -> {}", [player.id, skinId]);
+  } else {
+    if (!player) {
+      log.warning("Player not found: {}", [event.params.playerId.toString()]);
+    }
+    if (!skinId) {
+      log.warning("Failed to create/update skin", []);
+    }
   }
 }
 

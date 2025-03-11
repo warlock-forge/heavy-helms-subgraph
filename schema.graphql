@@ -274,6 +274,7 @@ type Skin @entity {
   equippedBy: [Player!]! @derivedFrom(field: "currentSkin")
   weapon: Int
   armor: Int
+  stance: Int
 }
 
 # Events from PlayerNameRegistry

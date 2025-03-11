@@ -42,6 +42,8 @@ dataSources:
       abis:
         - name: Player
           file: ./abis/Player.json
+        - name: PlayerSkinNFT
+          file: ./abis/PlayerSkinNFT.json
       eventHandlers:
         - event: AttributeSwapAwarded(indexed address,uint256)
           handler: handleAttributeSwapAwarded
@@ -127,8 +129,8 @@ dataSources:
       abis:
         - name: PlayerSkinRegistry
           file: ./abis/PlayerSkinRegistry.json
-        - name: IPlayerSkinNFT
-          file: ./abis/IPlayerSkinNFT.json
+        - name: PlayerSkinNFT
+          file: ./abis/PlayerSkinNFT.json
       eventHandlers:
         - event: SkinRegistered(indexed uint32,indexed address)
           handler: handleSkinRegistered
