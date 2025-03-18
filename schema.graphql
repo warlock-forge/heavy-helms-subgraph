@@ -188,31 +188,144 @@ type SlotBatchCostUpdated @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
-# Custom state-tracking entities
-type Player @entity {
-  id: ID!
-  playerId: BigInt!
-  owner: Owner!
-  isRetired: Boolean!
-  isImmortal: Boolean!
-  firstNameIndex: Int!
-  surnameIndex: Int!
-  firstName: String
-  surname: String
-  fullName: String
+# Add a Fighter interface that represents common properties
+interface Fighter {
+  id: ID!                  # Unique identifier
+  fighterId: BigInt!       # Numeric ID from contract
+  fighterType: String!     # "Player", "DefaultPlayer", or "Monster"
+  isRetired: Boolean!      # Whether the fighter is retired
+  
+  # Common attributes
   strength: Int!
   constitution: Int!
   size: Int!
   agility: Int!
   stamina: Int!
   luck: Int!
+  
+  # Name fields
+  firstNameIndex: Int!
+  surnameIndex: Int!
+  firstName: String
+  surname: String
+  fullName: String
+  
+  # Skin information
   currentSkin: Skin
+  
+  # These can be 0 for DefaultPlayer
   wins: Int!
   losses: Int!
   kills: Int!
+  
+  createdAt: BigInt!
+  lastUpdatedAt: BigInt!
+}
+
+# Keep your existing Player entity but implement the Fighter interface
+type Player implements Fighter @entity {
+  id: ID!
+  fighterId: BigInt!
+  fighterType: String!    # Will always be "Player"
+  owner: Owner!
+  isRetired: Boolean!
+  isImmortal: Boolean!    # Only players have this
+  
+  # Common attributes from Fighter
+  strength: Int!
+  constitution: Int!
+  size: Int!
+  agility: Int!
+  stamina: Int!
+  luck: Int!
+  
+  # Name fields
+  firstNameIndex: Int!
+  surnameIndex: Int!
+  firstName: String
+  surname: String
+  fullName: String
+  
+  # Skin information
+  currentSkin: Skin
+  
+  # Record fields
+  wins: Int!
+  losses: Int!
+  kills: Int!
+  
   createdAt: BigInt!
   lastUpdatedAt: BigInt!
   creationTx: Bytes!
+}
+
+# New type for default players
+type DefaultPlayer implements Fighter @entity {
+  id: ID!
+  fighterId: BigInt!      # The playerId from the contract
+  fighterType: String!    # Will always be "DefaultPlayer"
+  isRetired: Boolean!     # Should always be false
+  
+  # Common attributes from Fighter
+  strength: Int!
+  constitution: Int!
+  size: Int!
+  agility: Int!
+  stamina: Int!
+  luck: Int!
+  
+  # Name fields
+  firstNameIndex: Int!
+  surnameIndex: Int!
+  firstName: String
+  surname: String
+  fullName: String
+  
+  # Skin information
+  currentSkin: Skin
+  
+  # Record fields (always 0)
+  wins: Int!
+  losses: Int!
+  kills: Int!
+  
+  createdAt: BigInt!
+  lastUpdatedAt: BigInt!
+}
+
+# New type for monsters
+type Monster implements Fighter @entity {
+  id: ID!
+  fighterId: BigInt!      # The monsterId from the contract
+  fighterType: String!    # Will always be "Monster"
+  isRetired: Boolean!
+  tier: Int!              # Monster-specific field
+  
+  # Common attributes from Fighter
+  strength: Int!
+  constitution: Int!
+  size: Int!
+  agility: Int!
+  stamina: Int!
+  luck: Int!
+  
+  # Name fields
+  firstNameIndex: Int!    # Might not be used for monsters
+  surnameIndex: Int!      # Might not be used for monsters
+  firstName: String       # Could be monster type name
+  surname: String         # Could be empty
+  fullName: String        # Could be monster type name
+  
+  # Skin information
+  currentSkin: Skin
+  
+  # Record fields
+  wins: Int!
+  losses: Int!
+  kills: Int!
+  
+  createdAt: BigInt!
+  lastUpdatedAt: BigInt!
 }
 
 type Owner @entity {
