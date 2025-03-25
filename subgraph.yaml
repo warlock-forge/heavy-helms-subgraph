@@ -8,9 +8,9 @@ dataSources:
     name: Player
     network: base-sepolia
     source:
-      address: "0x896F68Cbf2E8c56fE919B70495F58dc7d649E596"
+      address: "0x42c94bBe06fb620CBcef7b98D9Cb9d2E5bf4A4C9"
       abi: Player
-      startBlock: 22735872
+      startBlock: 23512444
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -91,9 +91,9 @@ dataSources:
     name: PlayerNameRegistry
     network: base-sepolia
     source:
-      address: "0x34f3DFbb2EB8DAa9ba9EB75264B9305d62a28dA5"
+      address: "0x85238DEcfd0fa39ec9433aAEF961d01570dB99d2"
       abi: PlayerNameRegistry
-      startBlock: 22735872
+      startBlock: 23512444
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -113,9 +113,9 @@ dataSources:
     name: PlayerSkinRegistry
     network: base-sepolia
     source:
-      address: "0x4075FeBBd453fFE7B6c8bfa54a2E2Fa22e5bB800"
+      address: "0x0FD36c5176E0FF0Fc16248279B786643AcC9BC82"
       abi: PlayerSkinRegistry
-      startBlock: 22735872
+      startBlock: 23512444
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -141,3 +141,156 @@ dataSources:
         - event: RequiredNFTUpdated(indexed uint32,address)
           handler: handleRequiredNFTUpdated
       file: ./src/skin-registry.ts
+
+  # Add DefaultPlayer data source
+  - kind: ethereum
+    name: DefaultPlayer
+    network: base-sepolia
+    source:
+      address: "0x85925244EE2464170570ad2C7d99027C114Db3DF"
+      abi: DefaultPlayer
+      startBlock: 23512444
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - DefaultPlayer
+        - DefaultPlayerCreated
+        - DefaultPlayerStatsUpdated
+      abis:
+        - name: DefaultPlayer
+          file: ./abis/DefaultPlayer.json
+        - name: PlayerSkinNFT
+          file: ./abis/PlayerSkinNFT.json
+      eventHandlers:
+        - event: DefaultPlayerCreated(indexed uint32,((uint8,uint8,uint8,uint8,uint8,uint8),(uint32,uint16),(uint16,uint16),(uint16,uint16,uint16)))
+          handler: handleDefaultPlayerCreated
+        - event: DefaultPlayerStatsUpdated(indexed uint32,((uint8,uint8,uint8,uint8,uint8,uint8),(uint32,uint16),(uint16,uint16),(uint16,uint16,uint16)))
+          handler: handleDefaultPlayerStatsUpdated
+      file: ./src/default-player.ts
+
+  # Add Monster data source
+  - kind: ethereum
+    name: Monster
+    network: base-sepolia
+    source:
+      address: "0xf11C1F375E0928aad3D8bAE174F07B9055bf938E"
+      abi: Monster
+      startBlock: 23512444
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Monster
+        - MonsterCreated
+        - MonsterStatsUpdated
+        - MonsterWinLossUpdated
+        - MonsterKillsUpdated
+        - MonsterImmortalStatusUpdated
+        - MonsterRetired
+      abis:
+        - name: Monster
+          file: ./abis/Monster.json
+        - name: PlayerSkinNFT
+          file: ./abis/PlayerSkinNFT.json
+      eventHandlers:
+        - event: MonsterCreated(indexed uint32,((uint8,uint8,uint8,uint8,uint8,uint8),(uint32,uint16),(uint16),(uint16,uint16,uint16),uint8))
+          handler: handleMonsterCreated
+        - event: MonsterStatsUpdated(indexed uint32,((uint8,uint8,uint8,uint8,uint8,uint8),(uint32,uint16),(uint16),(uint16,uint16,uint16),uint8))
+          handler: handleMonsterStatsUpdated
+        - event: MonsterWinLossUpdated(indexed uint32,uint16,uint16)
+          handler: handleMonsterWinLossUpdated
+        - event: MonsterKillsUpdated(indexed uint32,uint16)
+          handler: handleMonsterKillsUpdated
+        - event: MonsterImmortalStatusUpdated(indexed uint32,bool)
+          handler: handleMonsterImmortalStatusUpdated
+        - event: MonsterRetired(indexed uint32,bool)
+          handler: handleMonsterRetired
+      file: ./src/monster.ts
+
+  # Add MonsterNameRegistry data source if needed
+  - kind: ethereum
+    name: MonsterNameRegistry
+    network: base-sepolia
+    source:
+      address: "0x9fFBA433Ac78DBEA1122f3EBc4A0D460a68C0107"
+      abi: MonsterNameRegistry
+      startBlock: 23512444
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - NameAdded
+        - Name
+      abis:
+        - name: MonsterNameRegistry
+          file: ./abis/MonsterNameRegistry.json
+      eventHandlers:
+        - event: NameAdded(indexed uint16,string)
+          handler: handleMonsterNameAdded
+      file: ./src/monster-name-registry.ts
+
+  # Add DuelGame data source
+  - kind: ethereum
+    name: DuelGame
+    network: base-sepolia
+    source:
+      address: "0x8d554a7b50bf9f241806De4382FC8eFF130166d1"
+      abi: DuelGame
+      startBlock: 23512444
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - DuelChallenge
+        - ChallengeCreated
+        - ChallengeAccepted
+        - ChallengeCancelled
+        - ChallengeForfeited
+        - DuelComplete
+        - CombatResult
+        - FeesWithdrawn
+        - MinDuelFeeUpdated
+        - MinWagerAmountUpdated
+        - GameEnabledUpdated
+        - WagerFeePercentageUpdated
+        - WagersEnabledUpdated
+        - BlocksUntilExpireUpdated
+        - BlocksUntilWithdrawUpdated
+      abis:
+        - name: DuelGame
+          file: ./abis/DuelGame.json
+      eventHandlers:
+        - event: ChallengeCreated(indexed uint256,indexed uint32,indexed uint32,uint256,uint256)
+          handler: handleChallengeCreated
+        - event: ChallengeAccepted(indexed uint256,uint32)
+          handler: handleChallengeAccepted
+        - event: ChallengeCancelled(indexed uint256)
+          handler: handleChallengeCancelled
+        - event: ChallengeForfeited(indexed uint256,uint256)
+          handler: handleChallengeForfeited
+        - event: DuelComplete(indexed uint256,indexed uint32,uint256,uint256)
+          handler: handleDuelComplete
+        - event: CombatResult(indexed bytes32,indexed bytes32,indexed uint32,bytes)
+          handler: handleCombatResult
+        - event: FeesWithdrawn(uint256)
+          handler: handleFeesWithdrawn
+        - event: MinDuelFeeUpdated(uint256,uint256)
+          handler: handleMinDuelFeeUpdated
+        - event: MinWagerAmountUpdated(uint256)
+          handler: handleMinWagerAmountUpdated
+        - event: GameEnabledUpdated(bool)
+          handler: handleGameEnabledUpdated
+        - event: WagerFeePercentageUpdated(uint256,uint256)
+          handler: handleWagerFeePercentageUpdated
+        - event: WagersEnabledUpdated(bool)
+          handler: handleWagersEnabledUpdated
+        - event: BlocksUntilExpireUpdated(uint256,uint256)
+          handler: handleBlocksUntilExpireUpdated
+        - event: BlocksUntilWithdrawUpdated(uint256,uint256)
+          handler: handleBlocksUntilWithdrawUpdated
+      file: ./src/duel-game.ts

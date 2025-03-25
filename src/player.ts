@@ -1,4 +1,4 @@
-import { BigInt, Bytes } from "@graphprotocol/graph-ts";
+import { BigInt, Bytes, log } from "@graphprotocol/graph-ts";
 import {
   AttributeSwapAwarded as AttributeSwapAwardedEvent,
   CreatePlayerFeeUpdated as CreatePlayerFeeUpdatedEvent,
@@ -45,14 +45,9 @@ import {
   SlotBatchCostUpdated,
   Player,
   Owner,
-  PendingPlayerCreation,
-  Name
+  PendingPlayerCreation
 } from "../generated/schema";
-
-// Import helper functions from other mapping files
-import { updatePlayerNames } from "./name-registry";
-import { createOrUpdateSkin } from "./skin-registry";
-import { log } from "@graphprotocol/graph-ts";
+import { loadFirstName, loadSurname, createFullName, loadSkinId } from "./utils/fighter-utils";
 
 export function handleAttributeSwapAwarded(
   event: AttributeSwapAwardedEvent
@@ -289,7 +284,7 @@ export function handlePlayerCreationComplete(
 
   // Create the Player entity
   let player = new Player(event.params.playerId.toString());
-  player.playerId = event.params.playerId;
+  player.fighterId = event.params.playerId;
   player.owner = owner.id;
   player.firstNameIndex = event.params.firstNameIndex;
   player.surnameIndex = event.params.surnameIndex;
@@ -307,44 +302,20 @@ export function handlePlayerCreationComplete(
   player.createdAt = event.block.timestamp;
   player.lastUpdatedAt = event.block.timestamp;
   player.creationTx = event.transaction.hash;
+  player.fighterType = "Player"; // Make sure to set the fighter type
   
-  // Set names directly
-  let firstNameIndex = event.params.firstNameIndex;
-  let surnameIndex = event.params.surnameIndex;
+  // Load and set names using utility functions
+  const firstName = loadFirstName(event.params.firstNameIndex);
+  const surname = loadSurname(event.params.surnameIndex);
+
+  player.firstName = firstName;
+  player.surname = surname;
+  player.fullName = createFullName(firstName, surname);
   
-  // Determine the correct name type based on index
-  let nameType = firstNameIndex >= 1000 ? 0 : 1;
-  let firstNameId = nameType.toString() + "-" + firstNameIndex.toString();
-  let surnameId = "2-" + surnameIndex.toString();
-  
-  log.info("Looking for names - FirstNameId: {} (type: {}), SurnameId: {}", 
-    [firstNameId, nameType.toString(), surnameId]);
-  
-  // Load the names
-  let firstName = Name.load(firstNameId);
-  let surname = Name.load(surnameId);
-  
-  if (firstName) {
-    player.firstName = firstName.value;
-    log.info("Set player first name (type {}): {} -> {}", [nameType.toString(), player.id, firstName.value]);
-  }
-  
-  if (surname) {
-    player.surname = surname.value;
-    log.info("Set player surname: {} -> {}", [player.id, surname.value]);
-  }
-  
-  // Create full name if both parts are available
-  if (player.firstName && player.surname) {
-    let firstNameStr = player.firstName as string;
-    let surnameStr = player.surname as string;
-    player.fullName = firstNameStr + " " + surnameStr;
-  }
-  
-  // Set default skin (ID 0, token ID 1)
-  let defaultSkinId = createOrUpdateSkin(BigInt.fromI32(0), 1);
-  if (defaultSkinId) {
-    player.currentSkin = defaultSkinId;
+  // Set default skin using utility function
+  const skinId = loadSkinId(BigInt.fromI32(0), 1);
+  if (skinId) {
+    player.currentSkin = skinId;
     log.info("Set default skin for new player: {}", [player.id]);
   } else {
     log.warning("Failed to set default skin for new player: {}", [player.id]);
@@ -466,38 +437,13 @@ export function handlePlayerNameUpdated(
     player.surnameIndex = event.params.surnameIndex;
     player.lastUpdatedAt = event.block.timestamp;
     
-    // Set names directly
-    let firstNameIndex = event.params.firstNameIndex;
-    let surnameIndex = event.params.surnameIndex;
-    
-    // Determine the correct name type based on index
-    let nameType = firstNameIndex >= 1000 ? 0 : 1;
-    let firstNameId = nameType.toString() + "-" + firstNameIndex.toString();
-    let surnameId = "2-" + surnameIndex.toString();
-    
-    log.info("Looking for names - FirstNameId: {} (type: {}), SurnameId: {}", 
-      [firstNameId, nameType.toString(), surnameId]);
-    
-    // Load the names
-    let firstName = Name.load(firstNameId);
-    let surname = Name.load(surnameId);
-    
-    if (firstName) {
-      player.firstName = firstName.value;
-      log.info("Updated player first name (type {}): {} -> {}", [nameType.toString(), player.id, firstName.value]);
-    }
-    
-    if (surname) {
-      player.surname = surname.value;
-      log.info("Updated player surname: {} -> {}", [player.id, surname.value]);
-    }
-    
-    // Create full name if both parts are available
-    if (player.firstName && player.surname) {
-      let firstNameStr = player.firstName as string;
-      let surnameStr = player.surname as string;
-      player.fullName = firstNameStr + " " + surnameStr;
-    }
+    // Update name fields using utility functions
+    const firstName = loadFirstName(event.params.firstNameIndex);
+    const surname = loadSurname(event.params.surnameIndex);
+
+    player.firstName = firstName;
+    player.surname = surname;
+    player.fullName = createFullName(firstName, surname);
     
     player.save();
   }
@@ -542,33 +488,20 @@ export function handlePlayerSkinEquipped(
 
   entity.save();
 
-  // Use tokenId directly without conversion
-  let skinId = createOrUpdateSkin(event.params.skinIndex, event.params.tokenId);
-  
-  // Add detailed logging without using tokenId.toString()
-  log.info(
-    "PlayerSkinEquipped - PlayerId: {}, SkinIndex: {}, SkinId: {}",
-    [
-      event.params.playerId.toString(),
-      event.params.skinIndex.toString(),
-      skinId ? skinId : "null"
-    ]
-  );
-  
   // Update player's skin reference
   let player = Player.load(event.params.playerId.toString());
-  if (player && skinId) {
-    player.currentSkin = skinId;
+  if (player) {
+    // Update skin using utility function
+    const skinId = loadSkinId(event.params.skinIndex, event.params.tokenId);
+    if (skinId) {
+      player.currentSkin = skinId;
+      log.info("Updated player skin: {} -> {}", [player.id, skinId]);
+    }
+    
     player.lastUpdatedAt = event.block.timestamp;
     player.save();
-    log.info("Updated player skin: {} -> {}", [player.id, skinId]);
   } else {
-    if (!player) {
-      log.warning("Player not found: {}", [event.params.playerId.toString()]);
-    }
-    if (!skinId) {
-      log.warning("Failed to create/update skin", []);
-    }
+    log.warning("Player not found: {}", [event.params.playerId.toString()]);
   }
 }
 
