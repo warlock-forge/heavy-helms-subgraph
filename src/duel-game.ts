@@ -200,8 +200,8 @@ export function handleChallengeForfeited(event: ChallengeForfeitedEvent): void {
  * Handle DuelComplete events
  */
 export function handleDuelComplete(event: DuelCompleteEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const duelComplete = new DuelComplete(eventId);
+  // Use transaction hash directly as the ID
+  const duelComplete = new DuelComplete(event.transaction.hash);
   
   duelComplete.challengeId = event.params.challengeId;
   duelComplete.winnerId = event.params.winnerId;
@@ -209,7 +209,6 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
   duelComplete.winnerPayout = event.params.winnerPayout;
   duelComplete.blockNumber = event.block.number;
   duelComplete.blockTimestamp = event.block.timestamp;
-  duelComplete.transactionHash = event.transaction.hash;
   
   // Update the DuelChallenge entity
   const challengeId = event.params.challengeId.toString();
@@ -245,8 +244,8 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
  * Handle CombatResult events
  */
 export function handleCombatResult(event: CombatResultEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const combatResult = new CombatResult(eventId);
+  // Use transaction hash directly as the ID
+  const combatResult = new CombatResult(event.transaction.hash);
   
   combatResult.player1Data = event.params.player1Data;
   combatResult.player2Data = event.params.player2Data;
@@ -254,7 +253,6 @@ export function handleCombatResult(event: CombatResultEvent): void {
   combatResult.packedResults = event.params.packedResults;
   combatResult.blockNumber = event.block.number;
   combatResult.blockTimestamp = event.block.timestamp;
-  combatResult.transactionHash = event.transaction.hash;
   
   combatResult.save();
 }

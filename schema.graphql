@@ -711,7 +711,6 @@ type DuelComplete @entity(immutable: true) {
   challenge: DuelChallenge!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
-  transactionHash: Bytes!
 }
 
 type CombatResult @entity(immutable: true) {
@@ -722,7 +721,6 @@ type CombatResult @entity(immutable: true) {
   packedResults: Bytes!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
-  transactionHash: Bytes!
 }
 
 type FeesWithdrawn @entity(immutable: true) {
