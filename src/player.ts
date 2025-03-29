@@ -48,6 +48,12 @@ import {
   PendingPlayerCreation
 } from "../generated/schema";
 import { loadFirstName, loadSurname, createFullName, loadSkinId } from "./utils/fighter-utils";
+import { 
+  updateStatsForPlayerCreation, 
+  updateStatsForPlayerRetirement, 
+  updateStatsForWinLoss, 
+  updateStatsForKills 
+} from "./utils/stats-utils";
 
 export function handleAttributeSwapAwarded(
   event: AttributeSwapAwardedEvent
@@ -331,6 +337,12 @@ export function handlePlayerCreationComplete(
     pendingCreation.playerId = event.params.playerId;
     pendingCreation.save();
   }
+
+  // Update stats
+  updateStatsForPlayerCreation(
+    event.block.timestamp,
+    event.params.owner
+  );
 }
 
 export function handlePlayerCreationRequested(
@@ -408,6 +420,14 @@ export function handlePlayerKillUpdated(
   // Update player kills
   let player = Player.load(event.params.playerId.toString());
   if (player) {
+    let killsDelta = event.params.kills - player.kills;
+    
+    // Update stats
+    updateStatsForKills(
+      event.block.timestamp,
+      killsDelta
+    );
+    
     player.kills = event.params.kills;
     player.lastUpdatedAt = event.block.timestamp;
     player.save();
@@ -470,6 +490,12 @@ export function handlePlayerRetired(event: PlayerRetiredEvent): void {
     player.lastUpdatedAt = event.block.timestamp;
     player.save();
   }
+
+  // Update stats
+  updateStatsForPlayerRetirement(
+    event.block.timestamp,
+    event.params.retired
+  );
 }
 
 export function handlePlayerSkinEquipped(
@@ -542,6 +568,16 @@ export function handlePlayerWinLossUpdated(
   // Update player win/loss record
   let player = Player.load(event.params.playerId.toString());
   if (player) {
+    let winDelta = event.params.wins - player.wins;
+    let lossDelta = event.params.losses - player.losses;
+    
+    // Update stats
+    updateStatsForWinLoss(
+      event.block.timestamp,
+      winDelta,
+      lossDelta
+    );
+    
     player.wins = event.params.wins;
     player.losses = event.params.losses;
     player.lastUpdatedAt = event.block.timestamp;

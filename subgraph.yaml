@@ -73,7 +73,7 @@ dataSources:
           handler: handlePlayerNameUpdated
         - event: PlayerRetired(indexed uint32,indexed address,bool)
           handler: handlePlayerRetired
-        - event: PlayerSkinEquipped(indexed uint32,indexed uint32,uint16)
+        - event: PlayerSkinEquipped(indexed uint32,indexed uint32,uint16,uint8)
           handler: handlePlayerSkinEquipped
         - event: PlayerSlotsPurchased(indexed address,uint8,uint8,uint256)
           handler: handlePlayerSlotsPurchased
@@ -164,9 +164,9 @@ dataSources:
         - name: PlayerSkinNFT
           file: ./abis/PlayerSkinNFT.json
       eventHandlers:
-        - event: DefaultPlayerCreated(indexed uint32,((uint8,uint8,uint8,uint8,uint8,uint8),(uint32,uint16),(uint16,uint16),(uint16,uint16,uint16)))
+        - event: DefaultPlayerCreated(indexed uint32,((uint8,uint8,uint8,uint8,uint8,uint8),(uint16,uint16),(uint32,uint16),uint8,(uint16,uint16,uint16)))
           handler: handleDefaultPlayerCreated
-        - event: DefaultPlayerStatsUpdated(indexed uint32,((uint8,uint8,uint8,uint8,uint8,uint8),(uint32,uint16),(uint16,uint16),(uint16,uint16,uint16)))
+        - event: DefaultPlayerStatsUpdated(indexed uint32,((uint8,uint8,uint8,uint8,uint8,uint8),(uint16,uint16),(uint32,uint16),uint8,(uint16,uint16,uint16)))
           handler: handleDefaultPlayerStatsUpdated
       file: ./src/default-player.ts
 
@@ -196,9 +196,9 @@ dataSources:
         - name: PlayerSkinNFT
           file: ./abis/PlayerSkinNFT.json
       eventHandlers:
-        - event: MonsterCreated(indexed uint32,((uint8,uint8,uint8,uint8,uint8,uint8),(uint32,uint16),(uint16),(uint16,uint16,uint16),uint8))
+        - event: MonsterCreated(indexed uint32,((uint8,uint8,uint8,uint8,uint8,uint8),(uint16),(uint32,uint16),uint8,(uint16,uint16,uint16),uint8))
           handler: handleMonsterCreated
-        - event: MonsterStatsUpdated(indexed uint32,((uint8,uint8,uint8,uint8,uint8,uint8),(uint32,uint16),(uint16),(uint16,uint16,uint16),uint8))
+        - event: MonsterStatsUpdated(indexed uint32,((uint8,uint8,uint8,uint8,uint8,uint8),(uint16),(uint32,uint16),uint8,(uint16,uint16,uint16),uint8))
           handler: handleMonsterStatsUpdated
         - event: MonsterWinLossUpdated(indexed uint32,uint16,uint16)
           handler: handleMonsterWinLossUpdated
@@ -259,8 +259,8 @@ dataSources:
         - GameEnabledUpdated
         - WagerFeePercentageUpdated
         - WagersEnabledUpdated
-        - BlocksUntilExpireUpdated
-        - BlocksUntilWithdrawUpdated
+        - TimeUntilExpireUpdated
+        - TimeUntilWithdrawUpdated
       abis:
         - name: DuelGame
           file: ./abis/DuelGame.json
@@ -273,7 +273,7 @@ dataSources:
           handler: handleChallengeCancelled
         - event: ChallengeForfeited(indexed uint256,uint256)
           handler: handleChallengeForfeited
-        - event: DuelComplete(indexed uint256,indexed uint32,uint256,uint256)
+        - event: DuelComplete(indexed uint256,indexed uint32,uint256,uint256,uint256)
           handler: handleDuelComplete
         - event: CombatResult(indexed bytes32,indexed bytes32,indexed uint32,bytes)
           handler: handleCombatResult
@@ -289,8 +289,28 @@ dataSources:
           handler: handleWagerFeePercentageUpdated
         - event: WagersEnabledUpdated(bool)
           handler: handleWagersEnabledUpdated
-        - event: BlocksUntilExpireUpdated(uint256,uint256)
-          handler: handleBlocksUntilExpireUpdated
-        - event: BlocksUntilWithdrawUpdated(uint256,uint256)
-          handler: handleBlocksUntilWithdrawUpdated
+        - event: TimeUntilExpireUpdated(uint256,uint256)
+          handler: handleTimeUntilExpireUpdated
+        - event: TimeUntilWithdrawUpdated(uint256,uint256)
+          handler: handleTimeUntilWithdrawUpdated
       file: ./src/duel-game.ts
+
+templates:
+  - name: PlayerSkinNFT
+    kind: ethereum/contract
+    network: base-sepolia
+    source:
+      abi: PlayerSkinNFT
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/templates/player-skin-nft.ts
+      entities:
+        - Skin
+      eventHandlers:
+        - event: SkinMinted(indexed uint16,indexed uint8,indexed uint8)
+          handler: handleSkinMinted
+      abis:
+        - name: PlayerSkinNFT
+          file: ./abis/PlayerSkinNFT.json

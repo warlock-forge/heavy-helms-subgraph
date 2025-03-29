@@ -206,7 +206,6 @@ type Skin @entity {
   equippedBy: [Player!]! @derivedFrom(field: "currentSkin")
   weapon: Int
   armor: Int
-  stance: Int
 }
 
 # ==========================================================
@@ -638,6 +637,16 @@ type DuelChallenge @entity {
   defender: Fighter
   challengerOwner: Owner
   defenderOwner: Owner
+  
+  # Change these from block-based to timestamp-based
+  createdTimestamp: BigInt!  # Already exists - keep this
+  expiresTimestamp: BigInt!  # New field replacing block-based expiry
+  withdrawableTimestamp: BigInt!  # New field replacing block-based withdrawal
+  
+  # Add fee tracking
+  feeCollected: BigInt
+  
+  # Keep existing fields
   wagerAmount: BigInt!
   createdBlock: BigInt!
   createdAt: BigInt!
@@ -646,7 +655,6 @@ type DuelChallenge @entity {
   winner: Fighter
   randomness: BigInt
   winnerPayout: BigInt
-  transactionHash: Bytes!
 }
 
 enum DuelChallengeState {
@@ -708,6 +716,7 @@ type DuelComplete @entity(immutable: true) {
   winnerId: BigInt!
   randomness: BigInt!
   winnerPayout: BigInt!
+  feeCollected: BigInt!
   challenge: DuelChallenge!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
@@ -774,7 +783,7 @@ type WagersEnabledUpdated @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
-type BlocksUntilExpireUpdated @entity(immutable: true) {
+type TimeUntilExpireUpdated @entity(immutable: true) {
   id: Bytes!
   oldValue: BigInt!
   newValue: BigInt!
@@ -783,11 +792,63 @@ type BlocksUntilExpireUpdated @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
-type BlocksUntilWithdrawUpdated @entity(immutable: true) {
+type TimeUntilWithdrawUpdated @entity(immutable: true) {
   id: Bytes!
   oldValue: BigInt!
   newValue: BigInt!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
+}
+
+type Stats @entity {
+  id: ID!  # Use "all" as the ID for a singleton
+  
+  # Fighter counts
+  playerCount: Int!
+  activePlayerCount: Int!
+  retiredPlayerCount: Int!
+  defaultPlayerCount: Int!
+  monsterCount: Int!
+  activeMonsterCount: Int!
+  retiredMonsterCount: Int!
+  totalFightersCount: Int!
+  
+  # Combat statistics
+  totalWins: Int!
+  totalLosses: Int!
+  totalKills: Int!
+  
+  # Duel statistics
+  totalDuels: Int!
+  totalWagerDuels: Int!
+  totalNonWagerDuels: Int!
+  openChallenges: Int!
+  completedDuels: Int!
+  cancelledDuels: Int!
+  forfeitedDuels: Int!
+  
+  # Wager statistics
+  totalWageredAmount: BigInt!
+  totalFeesCollected: BigInt!
+  totalWinnerPayouts: BigInt!
+  averageWagerAmount: BigInt!
+  
+  # Skin statistics
+  skinCollectionsCount: Int!
+  verifiedSkinCollectionsCount: Int!
+  totalSkinsCount: Int!
+  
+  # Owner statistics
+  uniqueOwnersCount: Int!
+  
+  # Timestamps
+  lastUpdated: BigInt!
+}
+
+# Helper entity for mapping addresses to collection IDs
+type SkinAddressMapping @entity {
+  id: ID!
+  registryId: BigInt!
+  contractAddress: Bytes!
 }

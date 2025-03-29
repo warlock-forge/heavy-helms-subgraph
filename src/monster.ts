@@ -23,6 +23,12 @@ import {
   loadSkinId 
 } from "./utils/fighter-utils";
 import { BigInt, Bytes, log } from "@graphprotocol/graph-ts";
+import { 
+  updateStatsForMonsterCreation, 
+  updateStatsForMonsterRetirement, 
+  updateStatsForWinLoss, 
+  updateStatsForKills 
+} from "./utils/stats-utils";
 
 /**
  * Handle MonsterCreated events
@@ -100,6 +106,9 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
   }
 
   monster.save();
+
+  // Update stats
+  updateStatsForMonsterCreation(event.block.timestamp);
 }
 
 /**
@@ -201,6 +210,17 @@ export function handleMonsterWinLossUpdated(event: MonsterWinLossUpdatedEvent): 
   const monsterId = event.params.monsterId.toString();
   let monster = Monster.load(monsterId);
   if (monster != null) {
+    let winDelta = event.params.wins - monster.wins;
+    let lossDelta = event.params.losses - monster.losses;
+    
+    // Update stats
+    updateStatsForWinLoss(
+      event.block.timestamp,
+      winDelta,
+      lossDelta
+    );
+    
+    // Then update the monster entity
     monster.wins = event.params.wins;
     monster.losses = event.params.losses;
     monster.lastUpdatedAt = event.block.timestamp;
@@ -225,6 +245,15 @@ export function handleMonsterKillsUpdated(event: MonsterKillsUpdatedEvent): void
   const monsterId = event.params.monsterId.toString();
   let monster = Monster.load(monsterId);
   if (monster != null) {
+    let killsDelta = event.params.kills - monster.kills;
+    
+    // Update stats
+    updateStatsForKills(
+      event.block.timestamp,
+      killsDelta
+    );
+    
+    // Then update the monster entity
     monster.kills = event.params.kills;
     monster.lastUpdatedAt = event.block.timestamp;
     monster.save();
@@ -269,4 +298,10 @@ export function handleMonsterRetired(event: MonsterRetiredEvent): void {
     monster.lastUpdatedAt = event.block.timestamp;
     monster.save();
   }
+
+  // Update stats
+  updateStatsForMonsterRetirement(
+    event.block.timestamp,
+    event.params.retired
+  );
 }

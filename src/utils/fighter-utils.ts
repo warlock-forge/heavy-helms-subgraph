@@ -1,6 +1,6 @@
 import { BigInt, log } from "@graphprotocol/graph-ts";
 import { Name } from "../../generated/schema";
-import { createOrUpdateSkin as skinRegistryCreateOrUpdateSkin } from "../skin-registry";
+import { createOrUpdateSkin as skinRegistryCreateOrUpdateSkin } from "../utils/registry-utils";
 
 /**
  * Loads a fighter's first name based on index

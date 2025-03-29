@@ -18,6 +18,8 @@ import {
   loadSkinId 
 } from "./utils/fighter-utils";
 
+import { updateStatsForDefaultPlayerCreation } from "./utils/stats-utils";
+
 /**
  * Handle DefaultPlayerCreated events
  */
@@ -95,6 +97,9 @@ export function handleDefaultPlayerCreated(event: DefaultPlayerCreatedEvent): vo
   }
   
   defaultPlayer.save();
+
+  // Update stats
+  updateStatsForDefaultPlayerCreation(event.block.timestamp);
 }
 
 /**

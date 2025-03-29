@@ -1,15 +1,19 @@
 import { BigInt, Address, log } from "@graphprotocol/graph-ts";
 import {
-  SkinRegistered,
-  SkinVerificationUpdated,
+  SkinRegistered as SkinRegisteredEvent,
+  SkinVerificationUpdated as SkinVerificationUpdatedEvent,
   SkinTypeUpdated,
-  RequiredNFTUpdated,
-  PlayerSkinRegistry
+  RequiredNFTUpdated
 } from "../generated/PlayerSkinRegistry/PlayerSkinRegistry";
 import { SkinCollection, Skin } from "../generated/schema";
-import { PlayerSkinNFT } from "../generated/PlayerSkinRegistry/PlayerSkinNFT";
+import { PlayerSkinNFT as PlayerSkinNFTTemplate } from "../generated/templates";
+import { 
+  updateStatsForSkinRegistration, 
+  updateStatsForSkinVerification,
+} from "./utils/stats-utils";
+import { storeCollectionIdForAddress } from "./utils/registry-utils";
 
-export function handleSkinRegistered(event: SkinRegistered): void {
+export function handleSkinRegistered(event: SkinRegisteredEvent): void {
   let registryId = event.params.registryId.toString();
   let collection = new SkinCollection(registryId);
   
@@ -19,15 +23,38 @@ export function handleSkinRegistered(event: SkinRegistered): void {
   collection.skinType = 0; // Default to Player type
   
   collection.save();
+  
+  // Store the mapping from address to collection ID
+  storeCollectionIdForAddress(event.params.skinContract, event.params.registryId);
+  
+  // Update stats
+  updateStatsForSkinRegistration(event.block.timestamp);
 }
 
-export function handleSkinVerificationUpdated(event: SkinVerificationUpdated): void {
+export function handleSkinVerificationUpdated(event: SkinVerificationUpdatedEvent): void {
   let registryId = event.params.registryId.toString();
   let collection = SkinCollection.load(registryId);
   
   if (collection) {
+    let wasVerified = collection.isVerified;
     collection.isVerified = event.params.isVerified;
     collection.save();
+    
+    // Only create the template if the collection is newly verified
+    if (event.params.isVerified && !wasVerified) {
+      // Create a template to start listening for events from this contract
+      PlayerSkinNFTTemplate.create(Address.fromBytes(collection.contractAddress));
+      log.info("Started tracking events from verified skin contract: {}", [
+        collection.contractAddress.toHexString()
+      ]);
+    }
+    
+    // Update stats
+    updateStatsForSkinVerification(
+      event.block.timestamp,
+      event.params.isVerified,
+      wasVerified
+    );
   }
 }
 
@@ -53,82 +80,4 @@ export function handleRequiredNFTUpdated(event: RequiredNFTUpdated): void {
     }
     collection.save();
   }
-}
-
-// Process IPFS URIs to make them more frontend-friendly
-function processMetadataURI(uri: string): string {
-  if (uri.startsWith("ipfs://")) {
-    // Convert IPFS URI to HTTP gateway URL
-    return uri.replace("ipfs://", "https://ipfs.io/ipfs/");
-  }
-  return uri;
-}
-
-/**
- * Creates or updates a skin entity when it's needed
- * Called from player.ts when a PlayerSkinEquipped event is processed
- */
-export function createOrUpdateSkin(collectionId: BigInt, tokenId: i32): string {
-  // Create a unique ID for the skin
-  let skinId = collectionId.toString() + "-" + tokenId.toString();
-  
-  // Check if the skin already exists
-  let skin = Skin.load(skinId);
-  
-  // If the skin doesn't exist, create it
-  if (!skin) {
-    skin = new Skin(skinId);
-    skin.tokenId = tokenId;
-    skin.metadataURI = ""; // Initialize to empty string
-    skin.weapon = 0;       // Initialize to 0
-    skin.armor = 0;        // Initialize to 0
-    skin.stance = 0;       // Initialize to 0
-    
-    // Get the collection
-    let collectionIdString = collectionId.toString();
-    let collection = SkinCollection.load(collectionIdString);
-    
-    if (!collection) {
-      log.warning("Skin collection not found: {}", [collectionIdString]);
-      return skinId; // Return the ID even if collection not found
-    }
-    
-    skin.collection = collectionIdString;
-    
-    // Get the NFT contract address from the collection
-    let nftContractAddress = collection.contractAddress;
-    
-    // Bind to the NFT contract using the full PlayerSkinNFT binding
-    let nftContract = PlayerSkinNFT.bind(Address.fromBytes(nftContractAddress));
-    
-    // Try to get tokenURI
-    let tokenURIResult = nftContract.try_tokenURI(BigInt.fromI32(tokenId));
-    if (!tokenURIResult.reverted) {
-      skin.metadataURI = processMetadataURI(tokenURIResult.value);
-      log.info("Set metadata URI for skin {}", [skinId]);
-    } else {
-      skin.metadataURI = "";
-      log.warning("Failed to get tokenURI for skin: {}", [skinId]);
-    }
-    
-    // Get skin attributes
-    let attributesResult = nftContract.try_getSkinAttributes(BigInt.fromI32(tokenId));
-    if (!attributesResult.reverted) {
-      let attributes = attributesResult.value;
-      skin.weapon = attributes.weapon;
-      skin.armor = attributes.armor;
-      skin.stance = attributes.stance;
-      log.info("Set attributes for skin {}: weapon={}, armor={}", [
-        skinId,
-        attributes.weapon.toString(),
-        attributes.armor.toString()
-      ]);
-    } else {
-      log.warning("Failed to get attributes for skin: {}", [skinId]);
-    }
-    
-    skin.save();
-  }
-  
-  return skinId;
 }
