@@ -14,8 +14,7 @@ import {
 import { 
   loadFirstName, 
   loadSurname, 
-  createFullName, 
-  loadSkinId 
+  createFullName,
 } from "./utils/fighter-utils";
 
 import { updateStatsForDefaultPlayerCreation } from "./utils/stats-utils";
@@ -42,6 +41,7 @@ export function handleDefaultPlayerCreated(event: DefaultPlayerCreatedEvent): vo
   createdEvent.wins = event.params.stats.record.wins;
   createdEvent.losses = event.params.stats.record.losses;
   createdEvent.kills = event.params.stats.record.kills;
+  createdEvent.stance = event.params.stats.stance;
   createdEvent.blockNumber = event.block.number;
   createdEvent.blockTimestamp = event.block.timestamp;
   createdEvent.transactionHash = event.transaction.hash;
@@ -79,21 +79,46 @@ export function handleDefaultPlayerCreated(event: DefaultPlayerCreatedEvent): vo
   defaultPlayer.losses = event.params.stats.record.losses;
   defaultPlayer.kills = event.params.stats.record.kills;
   
+  // Set stance
+  defaultPlayer.stance = event.params.stats.stance;
+  
   // Set timestamps
   defaultPlayer.createdAt = event.block.timestamp;
   defaultPlayer.lastUpdatedAt = event.block.timestamp;
   
-  // Set skin using the utility function
-  const skinId = loadSkinId(
-    event.params.stats.skin.skinIndex,
-    event.params.stats.skin.skinTokenId
-  );
+  // Directly construct the skin ID
+  const skinIndex = event.params.stats.skin.skinIndex;
+  const skinTokenId = event.params.stats.skin.skinTokenId;
+  const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
   
-  if (skinId) {
+  // Add detailed logging
+  log.info("Looking up skin with ID: '{}', skinIndex: {}, skinTokenId: {}", [
+    skinId,
+    skinIndex.toString(),
+    skinTokenId.toString()
+  ]);
+
+  // Check if the skin exists before assigning it
+  const skin = Skin.load(skinId);
+
+  // Add more logging after the lookup
+  if (skin !== null) {
     defaultPlayer.currentSkin = skinId;
     log.info("Set skin for default player: {} -> {}", [defaultPlayer.id, skinId]);
   } else {
-    log.warning("Failed to set skin for default player: {}", [defaultPlayer.id]);
+    log.warning("Skin not found: {}. Creating placeholder...", [skinId]);
+    
+    // Create a placeholder skin
+    const newSkin = new Skin(skinId);
+    newSkin.tokenId = skinTokenId;
+    newSkin.collection = skinIndex.toString();
+    newSkin.weapon = 0; 
+    newSkin.armor = 0;
+    newSkin.metadataURI = ""; // Critical: Must be empty string, not null
+    newSkin.save();
+    
+    // Now assign it
+    defaultPlayer.currentSkin = skinId;
   }
   
   defaultPlayer.save();
@@ -124,6 +149,7 @@ export function handleDefaultPlayerStatsUpdated(event: DefaultPlayerStatsUpdated
   updatedEvent.wins = event.params.stats.record.wins;
   updatedEvent.losses = event.params.stats.record.losses;
   updatedEvent.kills = event.params.stats.record.kills;
+  updatedEvent.stance = event.params.stats.stance;
   updatedEvent.blockNumber = event.block.number;
   updatedEvent.blockTimestamp = event.block.timestamp;
   updatedEvent.transactionHash = event.transaction.hash;
@@ -167,18 +193,45 @@ export function handleDefaultPlayerStatsUpdated(event: DefaultPlayerStatsUpdated
   defaultPlayer.losses = event.params.stats.record.losses;
   defaultPlayer.kills = event.params.stats.record.kills;
   
+  // Update stance
+  defaultPlayer.stance = event.params.stats.stance;
+  
   // Update timestamp
   defaultPlayer.lastUpdatedAt = event.block.timestamp;
   
-  // Set skin using the utility function
-  const skinId = loadSkinId(
-    event.params.stats.skin.skinIndex,
-    event.params.stats.skin.skinTokenId
-  );
+  // Directly construct the skin ID
+  const skinIndex = event.params.stats.skin.skinIndex;
+  const skinTokenId = event.params.stats.skin.skinTokenId;
+  const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
   
-  if (skinId) {
+  // Add detailed logging
+  log.info("Looking up skin with ID: '{}', skinIndex: {}, skinTokenId: {}", [
+    skinId,
+    skinIndex.toString(),
+    skinTokenId.toString()
+  ]);
+
+  // Check if the skin exists before assigning it
+  const skin = Skin.load(skinId);
+
+  // Add more logging after the lookup
+  if (skin !== null) {
     defaultPlayer.currentSkin = skinId;
-    log.info("Updated skin for default player: {} -> {}", [defaultPlayer.id, skinId]);
+    log.info("Set skin for default player: {} -> {}", [defaultPlayer.id, skinId]);
+  } else {
+    log.warning("Skin not found: {}. Creating placeholder...", [skinId]);
+    
+    // Create a placeholder skin
+    const newSkin = new Skin(skinId);
+    newSkin.tokenId = skinTokenId;
+    newSkin.collection = skinIndex.toString();
+    newSkin.weapon = 0; 
+    newSkin.armor = 0;
+    newSkin.metadataURI = ""; // Critical: Must be empty string, not null
+    newSkin.save();
+    
+    // Now assign it
+    defaultPlayer.currentSkin = skinId;
   }
 
   defaultPlayer.save();

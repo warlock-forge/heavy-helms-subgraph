@@ -19,7 +19,9 @@ import {
   PlayerSlotsPurchased as PlayerSlotsPurchasedEvent,
   PlayerWinLossUpdated as PlayerWinLossUpdatedEvent,
   RequestedRandomness as RequestedRandomnessEvent,
-  SlotBatchCostUpdated as SlotBatchCostUpdatedEvent
+  SlotBatchCostUpdated as SlotBatchCostUpdatedEvent,
+  StanceUpdated as StanceUpdatedEvent,
+  VrfRequestTimeoutUpdated as VrfRequestTimeoutUpdatedEvent
 } from "../generated/Player/Player";
 
 import {
@@ -45,9 +47,12 @@ import {
   SlotBatchCostUpdated,
   Player,
   Owner,
-  PendingPlayerCreation
+  PendingPlayerCreation,
+  StanceUpdated,
+  VrfRequestTimeoutUpdated,
+  Skin
 } from "../generated/schema";
-import { loadFirstName, loadSurname, createFullName, loadSkinId } from "./utils/fighter-utils";
+import { loadFirstName, loadSurname, createFullName } from "./utils/fighter-utils";
 import { 
   updateStatsForPlayerCreation, 
   updateStatsForPlayerRetirement, 
@@ -266,6 +271,8 @@ export function handlePlayerCreationComplete(
   let entity = new PlayerCreationComplete(
     event.transaction.hash.concatI32(event.logIndex.toI32())
   );
+  
+  // Set event entity properties
   entity.requestId = event.params.requestId;
   entity.playerId = event.params.playerId;
   entity.owner = event.params.owner;
@@ -308,7 +315,8 @@ export function handlePlayerCreationComplete(
   player.createdAt = event.block.timestamp;
   player.lastUpdatedAt = event.block.timestamp;
   player.creationTx = event.transaction.hash;
-  player.fighterType = "Player"; // Make sure to set the fighter type
+  player.fighterType = "Player";
+  player.stance = 1; // Set the default stance on the player entity, not on the event entity
   
   // Load and set names using utility functions
   const firstName = loadFirstName(event.params.firstNameIndex);
@@ -318,13 +326,21 @@ export function handlePlayerCreationComplete(
   player.surname = surname;
   player.fullName = createFullName(firstName, surname);
   
-  // Set default skin using utility function
-  const skinId = loadSkinId(BigInt.fromI32(0), 1);
-  if (skinId) {
+  // Set default skin using direct approach
+  const skinIndex = BigInt.fromI32(0);
+  const skinTokenId = 1;
+  const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
+
+  // Check if the skin exists before assigning it
+  const skin = Skin.load(skinId);
+  if (skin !== null) {
     player.currentSkin = skinId;
     log.info("Set default skin for new player: {}", [player.id]);
   } else {
-    log.warning("Failed to set default skin for new player: {}", [player.id]);
+    log.warning("Skin does not exist: {}. Cannot associate with new player: {}", [
+      skinId, 
+      player.id
+    ]);
   }
   
   // Save the player with all data set
@@ -507,6 +523,7 @@ export function handlePlayerSkinEquipped(
   entity.playerId = event.params.playerId;
   entity.skinIndex = event.params.skinIndex;
   entity.tokenId = event.params.tokenId;
+  entity.stance = event.params.stance; // New stance parameter
 
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
@@ -514,15 +531,29 @@ export function handlePlayerSkinEquipped(
 
   entity.save();
 
-  // Update player's skin reference
+  // Update player's skin reference and stance
   let player = Player.load(event.params.playerId.toString());
   if (player) {
-    // Update skin using utility function
-    const skinId = loadSkinId(event.params.skinIndex, event.params.tokenId);
-    if (skinId) {
+    // Update skin using direct approach
+    const skinIndex = event.params.skinIndex;
+    const skinTokenId = event.params.tokenId;
+    const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
+
+    // Check if the skin exists before assigning it
+    const skin = Skin.load(skinId);
+    if (skin !== null) {
       player.currentSkin = skinId;
       log.info("Updated player skin: {} -> {}", [player.id, skinId]);
+    } else {
+      log.warning("Skin does not exist: {}. Cannot associate with player: {}", [
+        skinId, 
+        player.id
+      ]);
     }
+    
+    // Update stance
+    player.stance = event.params.stance;
+    log.info("Updated player stance: {} -> {}", [player.id, event.params.stance.toString()]);
     
     player.lastUpdatedAt = event.block.timestamp;
     player.save();
@@ -614,6 +645,46 @@ export function handleSlotBatchCostUpdated(
   entity.blockTimestamp = event.block.timestamp;
   entity.transactionHash = event.transaction.hash;
 
+  entity.save();
+}
+
+export function handleStanceUpdated(
+  event: StanceUpdatedEvent
+): void {
+  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
+  const entity = new StanceUpdated(eventId);
+  
+  entity.playerId = event.params.playerId;
+  entity.stance = event.params.stance;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
+
+  // Update player's stance
+  let player = Player.load(event.params.playerId.toString());
+  if (player) {
+    player.stance = event.params.stance;
+    player.lastUpdatedAt = event.block.timestamp;
+    log.info("Updated player stance: {} -> {}", [player.id, event.params.stance.toString()]);
+    player.save();
+  } else {
+    log.warning("Player not found for stance update: {}", [event.params.playerId.toString()]);
+  }
+}
+
+export function handleVrfRequestTimeoutUpdated(
+  event: VrfRequestTimeoutUpdatedEvent
+): void {
+  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
+  const entity = new VrfRequestTimeoutUpdated(eventId);
+  
+  entity.oldValue = event.params.oldValue;
+  entity.newValue = event.params.newValue;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  
   entity.save();
 }
 

@@ -31,6 +31,9 @@ interface Fighter {
   losses: Int!
   kills: Int!
   
+  # Stance field (new)
+  stance: Int!            # uint8 stance value
+  
   createdAt: BigInt!
   lastUpdatedAt: BigInt!
 }
@@ -70,6 +73,9 @@ type Player implements Fighter @entity {
   losses: Int!
   kills: Int!
   
+  # Stance field (new)
+  stance: Int!            # uint8 stance value, defaults to 1
+  
   createdAt: BigInt!
   lastUpdatedAt: BigInt!
   creationTx: Bytes!
@@ -105,6 +111,9 @@ type DefaultPlayer implements Fighter @entity {
   losses: Int!
   kills: Int!
   
+  # Stance field (new)
+  stance: Int!            # uint8 stance value, set on creation
+  
   createdAt: BigInt!
   lastUpdatedAt: BigInt!
 }
@@ -139,6 +148,9 @@ type Monster implements Fighter @entity {
   wins: Int!
   losses: Int!
   kills: Int!
+  
+  # Stance field (new)
+  stance: Int!            # uint8 stance value, set on creation
   
   createdAt: BigInt!
   lastUpdatedAt: BigInt!
@@ -188,12 +200,18 @@ type Name @entity {
   blockTimestamp: BigInt!
 }
 
+enum ContractType {
+  PLAYER_OWNED
+  GAME_OWNED
+}
+
 type SkinCollection @entity {
   id: ID!
   registryId: BigInt!
   contractAddress: Bytes!
   isVerified: Boolean!
   skinType: Int!  # 0: Player, 1: DefaultPlayer, 2: Monster
+  contractType: ContractType!
   requiredNFTAddress: Bytes
   skins: [Skin!]! @derivedFrom(field: "collection")
 }
@@ -319,6 +337,7 @@ type PlayerSkinEquipped @entity(immutable: true) {
   playerId: BigInt! # uint32
   skinIndex: BigInt! # uint32
   tokenId: Int! # uint16
+  stance: Int! # uint8
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -422,6 +441,15 @@ type RequestedRandomness @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
+type StanceUpdated @entity(immutable: true) {
+  id: Bytes!
+  playerId: BigInt! # uint32
+  stance: Int! # uint8
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
 # ==========================================================
 #                   DEFAULT PLAYER EVENTS                    
 # ==========================================================
@@ -438,6 +466,7 @@ type DefaultPlayerCreated @entity(immutable: true) {
   skinTokenId: Int!
   firstNameIndex: Int!
   surnameIndex: Int!
+  stance: Int! # uint8
   wins: Int!      # From record
   losses: Int!    # From record
   kills: Int!     # From record
@@ -459,6 +488,7 @@ type DefaultPlayerStatsUpdated @entity(immutable: true) {
   skinTokenId: Int!
   firstNameIndex: Int!
   surnameIndex: Int!
+  stance: Int! # uint8
   wins: Int!      # From record
   losses: Int!    # From record
   kills: Int!     # From record
@@ -482,6 +512,7 @@ type MonsterCreated @entity(immutable: true) {
   skinIndex: BigInt!
   skinTokenId: Int!
   nameIndex: Int!
+  stance: Int! # uint8
   wins: Int!
   losses: Int!
   kills: Int!
@@ -503,6 +534,7 @@ type MonsterStatsUpdated @entity(immutable: true) {
   skinIndex: BigInt!
   skinTokenId: Int!
   nameIndex: Int!
+  stance: Int! # uint8
   wins: Int!
   losses: Int!
   kills: Int!
@@ -638,10 +670,9 @@ type DuelChallenge @entity {
   challengerOwner: Owner
   defenderOwner: Owner
   
-  # Change these from block-based to timestamp-based
-  createdTimestamp: BigInt!  # Already exists - keep this
-  expiresTimestamp: BigInt!  # New field replacing block-based expiry
-  withdrawableTimestamp: BigInt!  # New field replacing block-based withdrawal
+  # Timestamp fields - simplified to just one
+  expiresTimestamp: BigInt!  
+  withdrawableTimestamp: BigInt!  
   
   # Add fee tracking
   feeCollected: BigInt
@@ -851,4 +882,42 @@ type SkinAddressMapping @entity {
   id: ID!
   registryId: BigInt!
   contractAddress: Bytes!
+}
+
+type ChallengeRecovered @entity(immutable: true) {
+  id: Bytes!
+  challengeId: BigInt!
+  challengerRefund: BigInt!
+  defenderRefund: BigInt!
+  challenge: DuelChallenge!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type GameEngineUpdated @entity(immutable: true) {
+  id: Bytes!
+  oldEngine: Bytes!
+  newEngine: Bytes!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerContractUpdated @entity(immutable: true) {
+  id: Bytes!
+  oldContract: Bytes!
+  newContract: Bytes!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type VrfRequestTimeoutUpdated @entity(immutable: true) {
+  id: Bytes!
+  oldValue: BigInt!
+  newValue: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
 }

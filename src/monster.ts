@@ -17,12 +17,9 @@ import {
   Skin
 } from "../generated/schema";
 import { 
-  loadFirstName, 
-  loadSurname, 
-  createFullName, 
-  loadSkinId 
+  loadFirstName,
 } from "./utils/fighter-utils";
-import { BigInt, Bytes, log } from "@graphprotocol/graph-ts";
+import { log } from "@graphprotocol/graph-ts";
 import { 
   updateStatsForMonsterCreation, 
   updateStatsForMonsterRetirement, 
@@ -55,6 +52,7 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
   createdEvent.blockNumber = event.block.number;
   createdEvent.blockTimestamp = event.block.timestamp;
   createdEvent.transactionHash = event.transaction.hash;
+  createdEvent.stance = event.params.stats.stance;
   createdEvent.save();
 
   // Create the Monster entity
@@ -72,6 +70,9 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
   monster.agility = event.params.stats.attributes.agility;
   monster.stamina = event.params.stats.attributes.stamina;
   monster.luck = event.params.stats.attributes.luck;
+  
+  // Set stance
+  monster.stance = event.params.stats.stance;
   
   // Set name fields - note that monsters use a different name structure
   monster.firstNameIndex = event.params.stats.name.nameIndex;
@@ -93,16 +94,28 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
   monster.lastUpdatedAt = event.block.timestamp;
   
   // Set skin using utility function
-  const skinId = loadSkinId(
-    event.params.stats.skin.skinIndex,
-    event.params.stats.skin.skinTokenId
-  );
+  const skinIndex = event.params.stats.skin.skinIndex;
+  const skinTokenId = event.params.stats.skin.skinTokenId;
+  const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
   
-  if (skinId) {
+  const skin = Skin.load(skinId);
+  if (skin !== null) {
     monster.currentSkin = skinId;
     log.info("Set skin for monster: {} -> {}", [monster.id, skinId]);
   } else {
-    log.warning("Failed to set skin for monster: {}", [monster.id]);
+    log.warning("Skin not found: {}. Creating placeholder...", [skinId]);
+    
+    // Create a placeholder skin
+    const newSkin = new Skin(skinId);
+    newSkin.tokenId = skinTokenId;
+    newSkin.collection = skinIndex.toString();
+    newSkin.weapon = 0; // Will be updated when actual skin event arrives
+    newSkin.armor = 0;
+    newSkin.metadataURI = ""; // Empty string, not null
+    newSkin.save();
+    
+    // Now associate it
+    monster.currentSkin = skinId;
   }
 
   monster.save();
@@ -136,6 +149,7 @@ export function handleMonsterStatsUpdated(event: MonsterStatsUpdatedEvent): void
   updatedEvent.blockNumber = event.block.number;
   updatedEvent.blockTimestamp = event.block.timestamp;
   updatedEvent.transactionHash = event.transaction.hash;
+  updatedEvent.stance = event.params.stats.stance;
   updatedEvent.save();
 
   // Update the Monster entity
@@ -160,6 +174,9 @@ export function handleMonsterStatsUpdated(event: MonsterStatsUpdatedEvent): void
   monster.stamina = event.params.stats.attributes.stamina;
   monster.luck = event.params.stats.attributes.luck;
   
+  // Update stance
+  monster.stance = event.params.stats.stance;
+  
   // Update name indices
   monster.firstNameIndex = event.params.stats.name.nameIndex;
   monster.surnameIndex = 0; // Monsters typically don't have surnames
@@ -179,14 +196,28 @@ export function handleMonsterStatsUpdated(event: MonsterStatsUpdatedEvent): void
   monster.lastUpdatedAt = event.block.timestamp;
   
   // Update skin using utility function
-  const skinId = loadSkinId(
-    event.params.stats.skin.skinIndex,
-    event.params.stats.skin.skinTokenId
-  );
+  const skinIndex = event.params.stats.skin.skinIndex;
+  const skinTokenId = event.params.stats.skin.skinTokenId;
+  const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
   
-  if (skinId) {
+  const skin = Skin.load(skinId);
+  if (skin !== null) {
     monster.currentSkin = skinId;
     log.info("Updated skin for monster: {} -> {}", [monster.id, skinId]);
+  } else {
+    log.warning("Skin not found: {}. Creating placeholder...", [skinId]);
+    
+    // Create a placeholder skin
+    const newSkin = new Skin(skinId);
+    newSkin.tokenId = skinTokenId;
+    newSkin.collection = skinIndex.toString();
+    newSkin.weapon = 0; // Will be updated when actual skin event arrives
+    newSkin.armor = 0;
+    newSkin.metadataURI = ""; // Empty string, not null
+    newSkin.save();
+    
+    // Now associate it
+    monster.currentSkin = skinId;
   }
 
   monster.save();

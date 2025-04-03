@@ -8,9 +8,9 @@ dataSources:
     name: Player
     network: base-sepolia
     source:
-      address: "0x42c94bBe06fb620CBcef7b98D9Cb9d2E5bf4A4C9"
+      address: "0x45B39D08f578E555ca981A4f8E368f19Aeb89d8e"
       abi: Player
-      startBlock: 23512444
+      startBlock: 23905000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -85,15 +85,19 @@ dataSources:
           handler: handleSlotBatchCostUpdated
         - event: PlayerCreationComplete(indexed uint256,indexed uint32,indexed address,uint256,uint16,uint16,uint8,uint8,uint8,uint8,uint8,uint8)
           handler: handlePlayerCreationComplete
+        - event: StanceUpdated(indexed uint32,uint8)
+          handler: handleStanceUpdated
+        - event: VrfRequestTimeoutUpdated(uint256,uint256)
+          handler: handleVrfRequestTimeoutUpdated
       file: ./src/player.ts
 
   - kind: ethereum
     name: PlayerNameRegistry
     network: base-sepolia
     source:
-      address: "0x85238DEcfd0fa39ec9433aAEF961d01570dB99d2"
+      address: "0x50563cd3fFdcd763f03C0EFf20fB20218Cdf9AB1"
       abi: PlayerNameRegistry
-      startBlock: 23512444
+      startBlock: 23905000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -113,9 +117,9 @@ dataSources:
     name: PlayerSkinRegistry
     network: base-sepolia
     source:
-      address: "0x0FD36c5176E0FF0Fc16248279B786643AcC9BC82"
+      address: "0xc3766bFfD7ee09A6D828169b0CAB82C710B119Ef"
       abi: PlayerSkinRegistry
-      startBlock: 23512444
+      startBlock: 23905000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -147,9 +151,9 @@ dataSources:
     name: DefaultPlayer
     network: base-sepolia
     source:
-      address: "0x85925244EE2464170570ad2C7d99027C114Db3DF"
+      address: "0xbf20b57bE3ABc4d3Fdb7DA21519FdBf364447d10"
       abi: DefaultPlayer
-      startBlock: 23512444
+      startBlock: 23905000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -175,9 +179,9 @@ dataSources:
     name: Monster
     network: base-sepolia
     source:
-      address: "0xf11C1F375E0928aad3D8bAE174F07B9055bf938E"
+      address: "0x62E69D3568005241b81adA236F87B31AB201c3AF"
       abi: Monster
-      startBlock: 23512444
+      startBlock: 23905000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -215,9 +219,9 @@ dataSources:
     name: MonsterNameRegistry
     network: base-sepolia
     source:
-      address: "0x9fFBA433Ac78DBEA1122f3EBc4A0D460a68C0107"
+      address: "0xDB37E9004e9029C72ce915CDB409527c648D45E0"
       abi: MonsterNameRegistry
-      startBlock: 23512444
+      startBlock: 23905000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -238,9 +242,9 @@ dataSources:
     name: DuelGame
     network: base-sepolia
     source:
-      address: "0x8d554a7b50bf9f241806De4382FC8eFF130166d1"
+      address: "0x9f7FBCD4cC0e9E4EdD0Fd0f1397b8808E2Cc0942"
       abi: DuelGame
-      startBlock: 23512444
+      startBlock: 23905000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -293,6 +297,12 @@ dataSources:
           handler: handleTimeUntilExpireUpdated
         - event: TimeUntilWithdrawUpdated(uint256,uint256)
           handler: handleTimeUntilWithdrawUpdated
+        - event: ChallengeRecovered(indexed uint256,uint256,uint256)
+          handler: handleChallengeRecovered
+        - event: GameEngineUpdated(indexed address,indexed address)
+          handler: handleGameEngineUpdated
+        - event: PlayerContractUpdated(indexed address,indexed address)
+          handler: handlePlayerContractUpdated
       file: ./src/duel-game.ts
 
 templates:
@@ -314,3 +324,25 @@ templates:
       abis:
         - name: PlayerSkinNFT
           file: ./abis/PlayerSkinNFT.json
+  - name: GameOwnedNFT
+    kind: ethereum/contract
+    network: base-sepolia
+    source:
+      abi: GameOwnedNFT
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/templates/game-owned-nft.ts
+      entities:
+        - Skin
+      eventHandlers:
+        - event: SkinMinted(indexed uint16,indexed uint8,indexed uint8)
+          handler: handleSkinMinted
+        - event: CIDUpdated(indexed uint16,string)
+          handler: handleCIDUpdated
+        - event: SkinAttributesUpdated(indexed uint16,uint8,uint8)
+          handler: handleSkinAttributesUpdated
+      abis:
+        - name: GameOwnedNFT
+          file: ./abis/GameOwnedNFT.json

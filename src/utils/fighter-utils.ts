@@ -1,6 +1,5 @@
-import { BigInt, log } from "@graphprotocol/graph-ts";
+import { log } from "@graphprotocol/graph-ts";
 import { Name } from "../../generated/schema";
-import { createOrUpdateSkin as skinRegistryCreateOrUpdateSkin } from "../utils/registry-utils";
 
 /**
  * Loads a fighter's first name based on index
@@ -48,12 +47,4 @@ export function createFullName(firstName: string | null, surname: string | null)
   const firstNameStr = firstName as string;
   const surnameStr = surname as string;
   return firstNameStr + " " + surnameStr;
-}
-
-/**
- * Loads and returns the skin ID for a fighter
- * @returns The skin ID or null if not found
- */
-export function loadSkinId(skinIndex: BigInt, skinTokenId: i32): string | null {
-  return skinRegistryCreateOrUpdateSkin(skinIndex, skinTokenId);
 }

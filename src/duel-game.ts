@@ -13,7 +13,12 @@ import {
   WagerFeePercentageUpdated as WagerFeePercentageUpdatedEvent,
   WagersEnabledUpdated as WagersEnabledUpdatedEvent,
   TimeUntilExpireUpdated as TimeUntilExpireUpdatedEvent,
-  TimeUntilWithdrawUpdated as TimeUntilWithdrawUpdatedEvent
+  TimeUntilWithdrawUpdated as TimeUntilWithdrawUpdatedEvent,
+  ChallengeRecovered as ChallengeRecoveredEvent,
+  GameEngineUpdated as GameEngineUpdatedEvent,
+  PlayerContractUpdated as PlayerContractUpdatedEvent,
+  VrfRequestTimeoutUpdated as VrfRequestTimeoutUpdatedEvent,
+  RequestedRandomness as RequestedRandomnessEvent
 } from "../generated/DuelGame/DuelGame";
 
 import {
@@ -31,7 +36,12 @@ import {
   WagerFeePercentageUpdated,
   WagersEnabledUpdated,
   TimeUntilExpireUpdated,
-  TimeUntilWithdrawUpdated
+  TimeUntilWithdrawUpdated,
+  ChallengeRecovered,
+  GameEngineUpdated,
+  PlayerContractUpdated,
+  VrfRequestTimeoutUpdated,
+  RequestedRandomness
 } from "../generated/schema";
 
 import { log } from "@graphprotocol/graph-ts";
@@ -105,7 +115,7 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
   const timeUntilWithdraw = duelGame.try_timeUntilWithdraw();
   
   // Set timestamp fields
-  challenge.createdTimestamp = event.block.timestamp;
+  challenge.createdAt = event.block.timestamp;
   
   // Calculate expiry timestamps
   if (!timeUntilExpire.reverted) {
@@ -421,4 +431,110 @@ export function handleTimeUntilWithdrawUpdated(event: TimeUntilWithdrawUpdatedEv
   timeUntilWithdrawUpdated.transactionHash = event.transaction.hash;
   
   timeUntilWithdrawUpdated.save();
+}
+
+/**
+ * Handle ChallengeRecovered events
+ */
+export function handleChallengeRecovered(event: ChallengeRecoveredEvent): void {
+  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
+  const challengeRecovered = new ChallengeRecovered(eventId);
+  
+  challengeRecovered.challengeId = event.params.challengeId;
+  challengeRecovered.challengerRefund = event.params.challengerRefund;
+  challengeRecovered.defenderRefund = event.params.defenderRefund;
+  challengeRecovered.blockNumber = event.block.number;
+  challengeRecovered.blockTimestamp = event.block.timestamp;
+  challengeRecovered.transactionHash = event.transaction.hash;
+  
+  // Update the DuelChallenge entity
+  const challengeId = event.params.challengeId.toString();
+  const challenge = DuelChallenge.load(challengeId);
+  
+  if (challenge) {
+    // Update challenge state to indicate it was recovered
+    challenge.state = "CANCELLED"; // Or create a new state like "RECOVERED" if needed
+    challenge.save();
+    
+    // Set reference from event to challenge
+    challengeRecovered.challenge = challengeId;
+  } else {
+    log.warning("Challenge not found for recovery event: {}", [challengeId]);
+  }
+  
+  challengeRecovered.save();
+}
+
+/**
+ * Handle GameEngineUpdated events
+ */
+export function handleGameEngineUpdated(event: GameEngineUpdatedEvent): void {
+  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
+  const gameEngineUpdated = new GameEngineUpdated(eventId);
+  
+  gameEngineUpdated.oldEngine = event.params.oldEngine;
+  gameEngineUpdated.newEngine = event.params.newEngine;
+  gameEngineUpdated.blockNumber = event.block.number;
+  gameEngineUpdated.blockTimestamp = event.block.timestamp;
+  gameEngineUpdated.transactionHash = event.transaction.hash;
+  
+  gameEngineUpdated.save();
+  
+  log.info("Game engine updated from {} to {}", [
+    event.params.oldEngine.toHexString(),
+    event.params.newEngine.toHexString()
+  ]);
+}
+
+/**
+ * Handle PlayerContractUpdated events
+ */
+export function handlePlayerContractUpdated(event: PlayerContractUpdatedEvent): void {
+  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
+  const playerContractUpdated = new PlayerContractUpdated(eventId);
+  
+  playerContractUpdated.oldContract = event.params.oldContract;
+  playerContractUpdated.newContract = event.params.newContract;
+  playerContractUpdated.blockNumber = event.block.number;
+  playerContractUpdated.blockTimestamp = event.block.timestamp;
+  playerContractUpdated.transactionHash = event.transaction.hash;
+  
+  playerContractUpdated.save();
+  
+  log.info("Player contract updated from {} to {}", [
+    event.params.oldContract.toHexString(),
+    event.params.newContract.toHexString()
+  ]);
+}
+
+/**
+ * Handle VrfRequestTimeoutUpdated events
+ */
+export function handleVrfRequestTimeoutUpdated(event: VrfRequestTimeoutUpdatedEvent): void {
+  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
+  const vrfRequestTimeoutUpdated = new VrfRequestTimeoutUpdated(eventId);
+  
+  vrfRequestTimeoutUpdated.oldValue = event.params.oldValue;
+  vrfRequestTimeoutUpdated.newValue = event.params.newValue;
+  vrfRequestTimeoutUpdated.blockNumber = event.block.number;
+  vrfRequestTimeoutUpdated.blockTimestamp = event.block.timestamp;
+  vrfRequestTimeoutUpdated.transactionHash = event.transaction.hash;
+  
+  vrfRequestTimeoutUpdated.save();
+}
+
+/**
+ * Handle RequestedRandomness events
+ */
+export function handleRequestedRandomness(event: RequestedRandomnessEvent): void {
+  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
+  const requestedRandomness = new RequestedRandomness(eventId);
+  
+  requestedRandomness.round = event.params.round;
+  requestedRandomness.data = event.params.data;
+  requestedRandomness.blockNumber = event.block.number;
+  requestedRandomness.blockTimestamp = event.block.timestamp;
+  requestedRandomness.transactionHash = event.transaction.hash;
+  
+  requestedRandomness.save();
 }

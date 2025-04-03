@@ -6,7 +6,10 @@ import {
   RequiredNFTUpdated
 } from "../generated/PlayerSkinRegistry/PlayerSkinRegistry";
 import { SkinCollection, Skin } from "../generated/schema";
-import { PlayerSkinNFT as PlayerSkinNFTTemplate } from "../generated/templates";
+import { 
+  PlayerSkinNFT as PlayerSkinNFTTemplate,
+  GameOwnedNFT as GameOwnedNFTTemplate 
+} from "../generated/templates";
 import { 
   updateStatsForSkinRegistration, 
   updateStatsForSkinVerification,
@@ -21,6 +24,7 @@ export function handleSkinRegistered(event: SkinRegisteredEvent): void {
   collection.contractAddress = event.params.skinContract;
   collection.isVerified = false;
   collection.skinType = 0; // Default to Player type
+  collection.contractType = "PLAYER_OWNED"; // Default to PLAYER_OWNED
   
   collection.save();
   
@@ -42,11 +46,22 @@ export function handleSkinVerificationUpdated(event: SkinVerificationUpdatedEven
     
     // Only create the template if the collection is newly verified
     if (event.params.isVerified && !wasVerified) {
-      // Create a template to start listening for events from this contract
-      PlayerSkinNFTTemplate.create(Address.fromBytes(collection.contractAddress));
-      log.info("Started tracking events from verified skin contract: {}", [
-        collection.contractAddress.toHexString()
-      ]);
+      const contractAddress = Address.fromBytes(collection.contractAddress);
+      
+      // Use the contractType field to determine which template to create
+      if (collection.contractType == "GAME_OWNED") {
+        // Create GameOwnedNFT template for game-owned contracts
+        GameOwnedNFTTemplate.create(contractAddress);
+        log.info("Started tracking events from verified game-owned skin contract: {}", [
+          contractAddress.toHexString()
+        ]);
+      } else {
+        // Create regular PlayerSkinNFT template for player-owned contracts
+        PlayerSkinNFTTemplate.create(contractAddress);
+        log.info("Started tracking events from verified player skin contract: {}", [
+          contractAddress.toHexString()
+        ]);
+      }
     }
     
     // Update stats
@@ -64,7 +79,38 @@ export function handleSkinTypeUpdated(event: SkinTypeUpdated): void {
   
   if (collection) {
     collection.skinType = event.params.skinType;
+    
+    // Set contractType based on skinType:
+    // SkinType.Player (0) -> PLAYER_OWNED
+    // SkinType.DefaultPlayer (1) -> GAME_OWNED
+    // SkinType.Monster (2) -> GAME_OWNED
+    if (event.params.skinType == 1 || event.params.skinType == 2) { // DefaultPlayer or Monster
+      collection.contractType = "GAME_OWNED";
+    } else { // Player (0) or any other types
+      collection.contractType = "PLAYER_OWNED";
+    }
+    
     collection.save();
+    
+    // If already verified, update the template
+    if (collection.isVerified) {
+      const contractAddress = Address.fromBytes(collection.contractAddress);
+      
+      // Use the contractType field to determine which template to create
+      if (collection.contractType == "GAME_OWNED") {
+        // Create GameOwnedNFT template for game-owned contracts
+        GameOwnedNFTTemplate.create(contractAddress);
+        log.info("Updated to game-owned template for verified skin contract: {}", [
+          contractAddress.toHexString()
+        ]);
+      } else {
+        // Create regular PlayerSkinNFT template for player-owned contracts
+        PlayerSkinNFTTemplate.create(contractAddress);
+        log.info("Updated to player-owned template for verified skin contract: {}", [
+          contractAddress.toHexString()
+        ]);
+      }
+    }
   }
 }
 
