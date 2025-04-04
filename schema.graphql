@@ -167,6 +167,7 @@ type Owner @entity {
   players: [Player!]! @derivedFrom(field: "owner")
   nameChangeCharges: BigInt!
   attributeSwapCharges: BigInt!
+  playerSlots: Int!
 }
 
 # Entity to track pending player creation requests

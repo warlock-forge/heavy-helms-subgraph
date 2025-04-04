@@ -578,6 +578,11 @@ export function handlePlayerSlotsPurchased(
   entity.transactionHash = event.transaction.hash;
 
   entity.save();
+  
+  // Update owner's player slots
+  let owner = getOrCreateOwner(event.params.user);
+  owner.playerSlots = event.params.totalSlots;
+  owner.save();
 }
 
 export function handlePlayerWinLossUpdated(
@@ -701,6 +706,7 @@ function getOrCreateOwner(address: Bytes): Owner {
     owner.totalPlayers = 0;
     owner.nameChangeCharges = BigInt.fromI32(0);
     owner.attributeSwapCharges = BigInt.fromI32(0);
+    owner.playerSlots = 5; // Initialize with BASE_PLAYER_SLOTS (5)
     owner.save();
   }
   
