@@ -81,6 +81,49 @@ type Player implements Fighter @entity {
   creationTx: Bytes!
 }
 
+type PlayerSnapshot implements Fighter @entity {
+  id: ID!                 # Format: "fighterId-skinIndex-skinTokenId-stance"
+  fighterId: BigInt!      # This already serves as the player ID
+  fighterType: String!    # Will be "PlayerSnapshot"
+  owner: Owner!
+  isRetired: Boolean!
+  isImmortal: Boolean!
+  
+  # Common attributes from Fighter
+  strength: Int!
+  constitution: Int!
+  size: Int!
+  agility: Int!
+  stamina: Int!
+  luck: Int!
+  
+  # Name fields
+  firstNameIndex: Int!
+  surnameIndex: Int!
+  firstName: String
+  surname: String
+  fullName: String
+  
+  # Skin information (from event)
+  skinIndex: Int!
+  skinTokenId: Int!
+  
+  # Record fields
+  wins: Int!
+  losses: Int!
+  kills: Int!
+  
+  # Stance field (from event)
+  stance: Int!
+  
+  # Snapshot timestamp
+  snapshotTimestamp: BigInt!
+  
+  # Required by Fighter interface
+  createdAt: BigInt!
+  lastUpdatedAt: BigInt!
+}
+
 # New type for default players
 type DefaultPlayer implements Fighter @entity {
   id: ID!
@@ -666,29 +709,31 @@ type DuelChallenge @entity {
   id: ID!
   challengerId: BigInt!
   defenderId: BigInt!
-  challenger: Fighter
-  defender: Fighter
+  wagerAmount: BigInt!
+  
+  # Keep owner references on the challenge for direct querying
   challengerOwner: Owner
   defenderOwner: Owner
   
-  # Timestamp fields - simplified to just one
-  expiresTimestamp: BigInt!  
-  withdrawableTimestamp: BigInt!  
+  # References to PlayerSnapshot entities
+  challengerSnapshot: PlayerSnapshot!
+  defenderSnapshot: PlayerSnapshot
   
-  # Add fee tracking
-  feeCollected: BigInt
-  
-  # Keep existing fields
-  wagerAmount: BigInt!
   createdBlock: BigInt!
   createdAt: BigInt!
+  expiresTimestamp: BigInt
+  withdrawableTimestamp: BigInt
+
   state: DuelChallengeState!
+  
+  # Fields for completed duels
   winnerId: BigInt
-  winner: Fighter
-  randomness: BigInt
+  randomness: Bytes
   winnerPayout: BigInt
+  feeCollected: BigInt
 }
 
+# Define an enum for duel states
 enum DuelChallengeState {
   OPEN
   PENDING
@@ -706,21 +751,27 @@ type ChallengeCreated @entity(immutable: true) {
   challengerId: BigInt!
   defenderId: BigInt!
   wagerAmount: BigInt!
+  challengerSkinIndex: BigInt!
+  challengerSkinTokenId: BigInt!
+  challengerStance: BigInt!
   createdAtBlock: BigInt!
-  challenge: DuelChallenge!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
+  challenge: DuelChallenge!
 }
 
 type ChallengeAccepted @entity(immutable: true) {
   id: Bytes!
   challengeId: BigInt!
   defenderId: BigInt!
-  challenge: DuelChallenge!
+  defenderSkinIndex: BigInt!
+  defenderSkinTokenId: BigInt!
+  defenderStance: BigInt!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
+  challenge: DuelChallenge
 }
 
 type ChallengeCancelled @entity(immutable: true) {
@@ -922,3 +973,4 @@ type VrfRequestTimeoutUpdated @entity(immutable: true) {
   blockTimestamp: BigInt!
   transactionHash: Bytes!
 }
+

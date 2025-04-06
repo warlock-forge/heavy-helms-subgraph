@@ -269,9 +269,9 @@ dataSources:
         - name: DuelGame
           file: ./abis/DuelGame.json
       eventHandlers:
-        - event: ChallengeCreated(indexed uint256,indexed uint32,indexed uint32,uint256,uint256)
+        - event: ChallengeCreated(indexed uint256,indexed uint32,indexed uint32,uint256,uint32,uint16,uint8)
           handler: handleChallengeCreated
-        - event: ChallengeAccepted(indexed uint256,uint32)
+        - event: ChallengeAccepted(indexed uint256,indexed uint32,uint32,uint16,uint8)
           handler: handleChallengeAccepted
         - event: ChallengeCancelled(indexed uint256)
           handler: handleChallengeCancelled

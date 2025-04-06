@@ -53,6 +53,7 @@ import {
   updateStatsForDuelCompletion
 } from "./utils/stats-utils";
 import { DuelGame } from "../generated/DuelGame/DuelGame";
+import { PlayerSnapshot } from "../generated/schema";
 
 /**
  * Handle ChallengeCreated events
@@ -66,7 +67,10 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
   createdEvent.challengerId = event.params.challengerId;
   createdEvent.defenderId = event.params.defenderId;
   createdEvent.wagerAmount = event.params.wagerAmount;
-  createdEvent.createdAtBlock = event.params.createdAtBlock;
+  createdEvent.challengerSkinIndex = event.params.challengerSkinIndex;
+  createdEvent.challengerSkinTokenId = BigInt.fromI32(event.params.challengerSkinTokenId);
+  createdEvent.challengerStance = BigInt.fromI32(event.params.challengerStance);
+  createdEvent.createdAtBlock = event.block.number;
   createdEvent.blockNumber = event.block.number;
   createdEvent.blockTimestamp = event.block.timestamp;
   createdEvent.transactionHash = event.transaction.hash;
@@ -79,33 +83,84 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
   challenge.challengerId = event.params.challengerId;
   challenge.defenderId = event.params.defenderId;
   challenge.wagerAmount = event.params.wagerAmount;
-  challenge.createdBlock = event.params.createdAtBlock;
+  challenge.createdBlock = event.block.number;
+  challenge.createdAt = event.block.timestamp;
   challenge.state = "OPEN";
   
-  // Get the Player entities
+  // Get the Player entity
   const challengerId = event.params.challengerId.toString();
-  const defenderId = event.params.defenderId.toString();
+  const challengerPlayer = Player.load(challengerId);
   
-  // Load Player entities - we know they're Players in Duel mode
-  const challenger = Player.load(challengerId);
-  const defender = Player.load(defenderId);
-  
-  // Set references to players
-  if (challenger) {
-    challenge.challenger = challengerId;
-    
-    // Add references to the owner
-    if (challenger.owner) {
-      challenge.challengerOwner = challenger.owner;
+  if (challengerPlayer) {
+    // Set owner reference directly on challenge
+    if (challengerPlayer.owner) {
+      challenge.challengerOwner = challengerPlayer.owner;
     }
+    
+    // Create a unique ID for snapshot
+    const skinIndex = event.params.challengerSkinIndex.toString();
+    const skinTokenId = event.params.challengerSkinTokenId.toString();
+    const stance = event.params.challengerStance.toString();
+    const snapshotId = `${challengerId}-${skinIndex}-${skinTokenId}-${stance}`;
+    
+    // Try to load existing snapshot first
+    let playerSnapshot = PlayerSnapshot.load(snapshotId);
+    
+    // If no snapshot exists, create one
+    if (!playerSnapshot) {
+      playerSnapshot = new PlayerSnapshot(snapshotId);
+      
+      // Copy all fields from original player
+      playerSnapshot.fighterId = challengerPlayer.fighterId;
+      playerSnapshot.fighterType = "PlayerSnapshot";
+      playerSnapshot.owner = challengerPlayer.owner;
+      playerSnapshot.isRetired = challengerPlayer.isRetired;
+      playerSnapshot.isImmortal = challengerPlayer.isImmortal;
+      
+      // Copy attributes
+      playerSnapshot.strength = challengerPlayer.strength;
+      playerSnapshot.constitution = challengerPlayer.constitution;
+      playerSnapshot.size = challengerPlayer.size;
+      playerSnapshot.agility = challengerPlayer.agility;
+      playerSnapshot.stamina = challengerPlayer.stamina;
+      playerSnapshot.luck = challengerPlayer.luck;
+      
+      // Copy name fields
+      playerSnapshot.firstNameIndex = challengerPlayer.firstNameIndex;
+      playerSnapshot.surnameIndex = challengerPlayer.surnameIndex;
+      playerSnapshot.firstName = challengerPlayer.firstName;
+      playerSnapshot.surname = challengerPlayer.surname;
+      playerSnapshot.fullName = challengerPlayer.fullName;
+      
+      // Copy record
+      playerSnapshot.wins = challengerPlayer.wins;
+      playerSnapshot.losses = challengerPlayer.losses;
+      playerSnapshot.kills = challengerPlayer.kills;
+    }
+    
+    // Always update the appearance data from the event
+    playerSnapshot.skinIndex = event.params.challengerSkinIndex.toI32();
+    playerSnapshot.skinTokenId = event.params.challengerSkinTokenId;
+    playerSnapshot.stance = event.params.challengerStance;
+    playerSnapshot.snapshotTimestamp = event.block.timestamp;
+    playerSnapshot.createdAt = event.block.timestamp;
+    playerSnapshot.lastUpdatedAt = event.block.timestamp;
+    
+    playerSnapshot.save();
+    
+    // Link snapshot to challenge
+    challenge.challengerSnapshot = snapshotId;
   }
   
-  if (defender) {
-    challenge.defender = defenderId;
-    
-    // Add references to the owner
-    if (defender.owner) {
-      challenge.defenderOwner = defender.owner;
+  // Get the Player entities
+  const defenderId = event.params.defenderId.toString();
+  const defenderPlayer = Player.load(defenderId);
+  
+  // Set references to players
+  if (defenderPlayer) {
+    // Set owner reference directly on challenge
+    if (defenderPlayer.owner) {
+      challenge.defenderOwner = defenderPlayer.owner;
     }
   }
   
@@ -113,9 +168,6 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
   const duelGame = DuelGame.bind(event.address);
   const timeUntilExpire = duelGame.try_timeUntilExpire();
   const timeUntilWithdraw = duelGame.try_timeUntilWithdraw();
-  
-  // Set timestamp fields
-  challenge.createdAt = event.block.timestamp;
   
   // Calculate expiry timestamps
   if (!timeUntilExpire.reverted) {
@@ -128,7 +180,6 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
   
   challenge.save();
   
-  // Set the reference from event to challenge
   createdEvent.challenge = challengeId;
   createdEvent.save();
   
@@ -151,6 +202,9 @@ export function handleChallengeAccepted(event: ChallengeAcceptedEvent): void {
   
   acceptedEvent.challengeId = event.params.challengeId;
   acceptedEvent.defenderId = event.params.defenderId;
+  acceptedEvent.defenderSkinIndex = event.params.defenderSkinIndex;
+  acceptedEvent.defenderSkinTokenId = BigInt.fromI32(event.params.defenderSkinTokenId);
+  acceptedEvent.defenderStance = BigInt.fromI32(event.params.defenderStance);
   acceptedEvent.blockNumber = event.block.number;
   acceptedEvent.blockTimestamp = event.block.timestamp;
   acceptedEvent.transactionHash = event.transaction.hash;
@@ -160,10 +214,74 @@ export function handleChallengeAccepted(event: ChallengeAcceptedEvent): void {
   const challenge = DuelChallenge.load(challengeId);
   
   if (challenge) {
+    // Get the Player entity
+    const defenderId = event.params.defenderId.toString();
+    const defenderPlayer = Player.load(defenderId);
+    
+    if (defenderPlayer) {
+      // Set owner reference directly on challenge
+      if (defenderPlayer.owner) {
+        challenge.defenderOwner = defenderPlayer.owner;
+      }
+      
+      // Create a unique ID for snapshot
+      const skinIndex = event.params.defenderSkinIndex.toString();
+      const skinTokenId = event.params.defenderSkinTokenId.toString();
+      const stance = event.params.defenderStance.toString();
+      const snapshotId = `${defenderId}-${skinIndex}-${skinTokenId}-${stance}`;
+      
+      // Try to load existing snapshot first
+      let playerSnapshot = PlayerSnapshot.load(snapshotId);
+      
+      // If no snapshot exists, create one
+      if (!playerSnapshot) {
+        playerSnapshot = new PlayerSnapshot(snapshotId);
+        
+        // Copy all fields from original player
+        playerSnapshot.fighterId = defenderPlayer.fighterId;
+        playerSnapshot.fighterType = "PlayerSnapshot";
+        playerSnapshot.owner = defenderPlayer.owner;
+        playerSnapshot.isRetired = defenderPlayer.isRetired;
+        playerSnapshot.isImmortal = defenderPlayer.isImmortal;
+        
+        // Copy attributes
+        playerSnapshot.strength = defenderPlayer.strength;
+        playerSnapshot.constitution = defenderPlayer.constitution;
+        playerSnapshot.size = defenderPlayer.size;
+        playerSnapshot.agility = defenderPlayer.agility;
+        playerSnapshot.stamina = defenderPlayer.stamina;
+        playerSnapshot.luck = defenderPlayer.luck;
+        
+        // Copy name fields
+        playerSnapshot.firstNameIndex = defenderPlayer.firstNameIndex;
+        playerSnapshot.surnameIndex = defenderPlayer.surnameIndex;
+        playerSnapshot.firstName = defenderPlayer.firstName;
+        playerSnapshot.surname = defenderPlayer.surname;
+        playerSnapshot.fullName = defenderPlayer.fullName;
+        
+        // Copy record
+        playerSnapshot.wins = defenderPlayer.wins;
+        playerSnapshot.losses = defenderPlayer.losses;
+        playerSnapshot.kills = defenderPlayer.kills;
+      }
+      
+      // Always update the appearance data from the event
+      playerSnapshot.skinIndex = event.params.defenderSkinIndex.toI32();
+      playerSnapshot.skinTokenId = event.params.defenderSkinTokenId;
+      playerSnapshot.stance = event.params.defenderStance;
+      playerSnapshot.snapshotTimestamp = event.block.timestamp;
+      playerSnapshot.createdAt = event.block.timestamp;
+      playerSnapshot.lastUpdatedAt = event.block.timestamp;
+      
+      playerSnapshot.save();
+      
+      // Link snapshot to challenge
+      challenge.defenderSnapshot = snapshotId;
+    }
+    
     challenge.state = "PENDING";
     challenge.save();
     
-    // Set reference from event to challenge
     acceptedEvent.challenge = challengeId;
   } else {
     log.warning("Challenge not found for accept event: {}", [challengeId]);
@@ -259,7 +377,7 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
   if (challenge) {
     challenge.state = "COMPLETED";
     challenge.winnerId = event.params.winnerId;
-    challenge.randomness = event.params.randomness;
+    challenge.randomness = Bytes.fromHexString(event.params.randomness.toHexString());
     challenge.winnerPayout = event.params.winnerPayout;
     challenge.feeCollected = event.params.feeCollected;
     
@@ -269,7 +387,7 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
     const defaultPlayerWinner = DefaultPlayer.load(winnerId);
     
     if (playerWinner !== null || defaultPlayerWinner !== null) {
-      challenge.winner = winnerId;
+      // No need to set challenge.winner = winnerId;
     }
     
     challenge.save();
@@ -453,7 +571,7 @@ export function handleChallengeRecovered(event: ChallengeRecoveredEvent): void {
   
   if (challenge) {
     // Update challenge state to indicate it was recovered
-    challenge.state = "CANCELLED"; // Or create a new state like "RECOVERED" if needed
+    challenge.state = "CANCELLED";
     challenge.save();
     
     // Set reference from event to challenge
