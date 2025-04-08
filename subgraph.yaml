@@ -8,9 +8,9 @@ dataSources:
     name: Player
     network: base-sepolia
     source:
-      address: "0xA300e09151aE6b0aD42f04681Ea4B3Cd4Eb62574"
+      address: "0x0006A67Ca3F41885f42A42799406ea848c67f33f"
       abi: Player
-      startBlock: 23905000
+      startBlock: 24119000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -95,9 +95,9 @@ dataSources:
     name: PlayerNameRegistry
     network: base-sepolia
     source:
-      address: "0x7Ce3c5F861f28D2dB6151841D01dd9fF609E6A29"
+      address: "0x317d317165E80026dDB700E473C8CaA8de77F6b7"
       abi: PlayerNameRegistry
-      startBlock: 23905000
+      startBlock: 24119000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -117,9 +117,9 @@ dataSources:
     name: PlayerSkinRegistry
     network: base-sepolia
     source:
-      address: "0xA4d20F67E6AF474C64f05C702926981b9b3e7115"
+      address: "0x22db1b6B890175FA0853d7652060C55709c001C5"
       abi: PlayerSkinRegistry
-      startBlock: 23905000
+      startBlock: 24119000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -151,9 +151,9 @@ dataSources:
     name: DefaultPlayer
     network: base-sepolia
     source:
-      address: "0x4286125C135F2B7eC49Eb6560dED90A5532c8dC7"
+      address: "0xbd6Da864fc3a31C1aA8F27bbCDb5dc9BB0E2a51A"
       abi: DefaultPlayer
-      startBlock: 23905000
+      startBlock: 24119000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -179,9 +179,9 @@ dataSources:
     name: Monster
     network: base-sepolia
     source:
-      address: "0x407FeaFA6B1b2c10Ee3E81D3F6Cb2e0213CBbf46"
+      address: "0x4EEF73d180651E97b9D18554456ab5608c159fC7"
       abi: Monster
-      startBlock: 23905000
+      startBlock: 24119000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -219,9 +219,9 @@ dataSources:
     name: MonsterNameRegistry
     network: base-sepolia
     source:
-      address: "0xf4B91F4D35249b7B480cdF95d3FE99968948B467"
+      address: "0xF3BeBfA46037dA1B9819dB7AcE1a76a4F8b4a2C1"
       abi: MonsterNameRegistry
-      startBlock: 23905000
+      startBlock: 24119000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -242,9 +242,9 @@ dataSources:
     name: DuelGame
     network: base-sepolia
     source:
-      address: "0x4E8E299f7A47d5962A0541Cd2811D6220Cf51b2f"
+      address: "0xD50f3Ac0E0AC9b1356301a153a777dF1A985E42e"
       abi: DuelGame
-      startBlock: 23905000
+      startBlock: 24119000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9

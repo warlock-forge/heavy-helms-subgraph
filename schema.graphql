@@ -104,9 +104,8 @@ type PlayerSnapshot implements Fighter @entity {
   surname: String
   fullName: String
   
-  # Skin information (from event)
-  skinIndex: Int!
-  skinTokenId: Int!
+  # Skin information (required by Fighter interface)
+  currentSkin: Skin
   
   # Record fields
   wins: Int!
