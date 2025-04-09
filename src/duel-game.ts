@@ -477,7 +477,7 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
   if (challenge) {
     challenge.state = "COMPLETED";
     challenge.winnerId = event.params.winnerId;
-    challenge.randomness = Bytes.fromHexString(event.params.randomness.toHexString());
+    challenge.randomness = event.params.randomness;
     challenge.winnerPayout = event.params.winnerPayout;
     challenge.feeCollected = event.params.feeCollected;
     

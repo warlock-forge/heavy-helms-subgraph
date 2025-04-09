@@ -727,7 +727,7 @@ type DuelChallenge @entity {
   
   # Fields for completed duels
   winnerId: BigInt
-  randomness: Bytes
+  randomness: BigInt
   winnerPayout: BigInt
   feeCollected: BigInt
 }
