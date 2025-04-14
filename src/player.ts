@@ -343,6 +343,10 @@ export function handlePlayerCreationComplete(
     ]);
   }
   
+  // Initialize the new unique wins/losses counters
+  player.uniqueWins = 0;
+  player.uniqueLosses = 0;
+  
   // Save the player with all data set
   player.save();
 

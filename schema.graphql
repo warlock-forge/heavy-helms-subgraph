@@ -79,6 +79,8 @@ type Player implements Fighter @entity {
   createdAt: BigInt!
   lastUpdatedAt: BigInt!
   creationTx: Bytes!
+  uniqueWins: Int!
+  uniqueLosses: Int!
 }
 
 type PlayerSnapshot implements Fighter @entity {
@@ -971,5 +973,16 @@ type VrfRequestTimeoutUpdated @entity(immutable: true) {
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
+}
+
+
+type PlayerVsRecord @entity {
+  id: ID!                # "{player1Id}-{player2Id}" - always sorted to ensure uniqueness
+  player1: String!       # First player ID (lexicographically smaller)
+  player2: String!       # Second player ID (lexicographically larger)
+  player1WinsAgainst2: Boolean!  # Has player1 ever beaten player2?
+  player2WinsAgainst1: Boolean!  # Has player2 ever beaten player1?
+  firstPlayer1Win: BigInt        # When player1 first beat player2 (null if never)
+  firstPlayer2Win: BigInt        # When player2 first beat player1 (null if never)
 }
 

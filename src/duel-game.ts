@@ -55,6 +55,7 @@ import {
 import { DuelGame } from "../generated/DuelGame/DuelGame";
 import { PlayerSnapshot } from "../generated/schema";
 import { Skin } from "../generated/schema";
+import { PlayerVsRecord } from "../generated/schema";
 
 /**
  * Handle ChallengeCreated events
@@ -481,13 +482,73 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
     challenge.winnerPayout = event.params.winnerPayout;
     challenge.feeCollected = event.params.feeCollected;
     
-    // Set reference to winner Fighter entity
+    // Get winner ID and determine loser ID from the challenge
     const winnerId = event.params.winnerId.toString();
-    const playerWinner = Player.load(winnerId);
-    const defaultPlayerWinner = DefaultPlayer.load(winnerId);
+    let loserId: string;
     
-    if (playerWinner !== null || defaultPlayerWinner !== null) {
-      // No need to set challenge.winner = winnerId;
+    if (challenge.challengerId.toString() == winnerId) {
+      loserId = challenge.defenderId.toString();
+    } else {
+      loserId = challenge.challengerId.toString();
+    }
+    
+    // Now handle the unique wins/losses tracking
+    const winner = Player.load(winnerId);
+    const loser = Player.load(loserId);
+    
+    if (winner && loser) {
+      // Sort player IDs for consistent record ID
+      let player1Id = winnerId < loserId ? winnerId : loserId;
+      let player2Id = winnerId < loserId ? loserId : winnerId;
+      let winnerIsPlayer1 = winnerId == player1Id;
+      
+      const recordId = `${player1Id}-${player2Id}`;
+      let vsRecord = PlayerVsRecord.load(recordId);
+      
+      if (!vsRecord) {
+        // First encounter between these players
+        vsRecord = new PlayerVsRecord(recordId);
+        vsRecord.player1 = player1Id;
+        vsRecord.player2 = player2Id;
+        vsRecord.player1WinsAgainst2 = winnerIsPlayer1;
+        vsRecord.player2WinsAgainst1 = !winnerIsPlayer1;
+        vsRecord.firstPlayer1Win = winnerIsPlayer1 ? event.block.timestamp : null;
+        vsRecord.firstPlayer2Win = !winnerIsPlayer1 ? event.block.timestamp : null;
+        
+        // Increment unique wins for winner
+        winner.uniqueWins = (winner.uniqueWins || 0) + 1;
+        
+        // Increment unique losses for loser
+        loser.uniqueLosses = (loser.uniqueLosses || 0) + 1;
+        
+        vsRecord.save();
+        winner.save();
+        loser.save();
+      } else {
+        // Players have fought before - check for unique stats
+        let uniqueWin = false;
+        
+        // Check if this is a unique win for the winner
+        if (winnerIsPlayer1 && !vsRecord.player1WinsAgainst2) {
+          vsRecord.player1WinsAgainst2 = true;
+          vsRecord.firstPlayer1Win = event.block.timestamp;
+          uniqueWin = true;
+        } else if (!winnerIsPlayer1 && !vsRecord.player2WinsAgainst1) {
+          vsRecord.player2WinsAgainst1 = true;
+          vsRecord.firstPlayer2Win = event.block.timestamp;
+          uniqueWin = true;
+        }
+        
+        // If it's a unique win, it's also a unique loss
+        if (uniqueWin) {
+          winner.uniqueWins = (winner.uniqueWins || 0) + 1;
+          loser.uniqueLosses = (loser.uniqueLosses || 0) + 1;
+          winner.save();
+          loser.save();
+        }
+        
+        vsRecord.save();
+      }
     }
     
     challenge.save();
