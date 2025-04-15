@@ -81,6 +81,7 @@ type Player implements Fighter @entity {
   creationTx: Bytes!
   uniqueWins: Int!
   uniqueLosses: Int!
+  battleRating: Int!
 }
 
 type PlayerSnapshot implements Fighter @entity {

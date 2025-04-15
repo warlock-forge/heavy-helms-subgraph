@@ -515,15 +515,10 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
         vsRecord.firstPlayer1Win = winnerIsPlayer1 ? event.block.timestamp : null;
         vsRecord.firstPlayer2Win = !winnerIsPlayer1 ? event.block.timestamp : null;
         
-        // Increment unique wins for winner
-        winner.uniqueWins = (winner.uniqueWins || 0) + 1;
+        // Increment unique stats
+        winner.uniqueWins += 1;
+        loser.uniqueLosses += 1;
         
-        // Increment unique losses for loser
-        loser.uniqueLosses = (loser.uniqueLosses || 0) + 1;
-        
-        vsRecord.save();
-        winner.save();
-        loser.save();
       } else {
         // Players have fought before - check for unique stats
         let uniqueWin = false;
@@ -541,14 +536,19 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
         
         // If it's a unique win, it's also a unique loss
         if (uniqueWin) {
-          winner.uniqueWins = (winner.uniqueWins || 0) + 1;
-          loser.uniqueLosses = (loser.uniqueLosses || 0) + 1;
-          winner.save();
-          loser.save();
+          winner.uniqueWins += 1;
+          loser.uniqueLosses += 1;
         }
-        
-        vsRecord.save();
       }
+      
+      // Update battle ratings for both players AFTER updating wins/losses
+      winner.battleRating = winner.uniqueWins - winner.uniqueLosses;
+      loser.battleRating = loser.uniqueWins - loser.uniqueLosses;
+      
+      // Save all updated entities
+      vsRecord.save();
+      winner.save();
+      loser.save();
     }
     
     challenge.save();
