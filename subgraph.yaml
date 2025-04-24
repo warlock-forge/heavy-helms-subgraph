@@ -6,11 +6,11 @@ schema:
 dataSources:
   - kind: ethereum
     name: Player
-    network: base-sepolia
+    network: shape-mainnet
     source:
-      address: "0x0006A67Ca3F41885f42A42799406ea848c67f33f"
+      address: "0x75B4750D41A9a04e989FAD58544C37930AEf2e5B"
       abi: Player
-      startBlock: 24119000
+      startBlock: 11305000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -93,11 +93,11 @@ dataSources:
 
   - kind: ethereum
     name: PlayerNameRegistry
-    network: base-sepolia
+    network: shape-mainnet
     source:
-      address: "0x317d317165E80026dDB700E473C8CaA8de77F6b7"
+      address: "0x9e0183eD52B3A3c934879f6Ff13dC8811ED20f1c"
       abi: PlayerNameRegistry
-      startBlock: 24119000
+      startBlock: 11305000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -115,11 +115,11 @@ dataSources:
 
   - kind: ethereum
     name: PlayerSkinRegistry
-    network: base-sepolia
+    network: shape-mainnet
     source:
-      address: "0x22db1b6B890175FA0853d7652060C55709c001C5"
+      address: "0x70FA59BA4FbD253850c76B6d1A12a7DFaC744072"
       abi: PlayerSkinRegistry
-      startBlock: 24119000
+      startBlock: 11305000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -149,11 +149,11 @@ dataSources:
   # Add DefaultPlayer data source
   - kind: ethereum
     name: DefaultPlayer
-    network: base-sepolia
+    network: shape-mainnet
     source:
-      address: "0xbd6Da864fc3a31C1aA8F27bbCDb5dc9BB0E2a51A"
+      address: "0x4745bfCD3B6e785C44B47FD871CdbA8283fe94BC"
       abi: DefaultPlayer
-      startBlock: 24119000
+      startBlock: 11305000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -177,11 +177,11 @@ dataSources:
   # Add Monster data source
   - kind: ethereum
     name: Monster
-    network: base-sepolia
+    network: shape-mainnet
     source:
-      address: "0x4EEF73d180651E97b9D18554456ab5608c159fC7"
+      address: "0x9f742615fA8ae9Caa001C658Aa8000aC7506F24c"
       abi: Monster
-      startBlock: 24119000
+      startBlock: 11305000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -217,11 +217,11 @@ dataSources:
   # Add MonsterNameRegistry data source if needed
   - kind: ethereum
     name: MonsterNameRegistry
-    network: base-sepolia
+    network: shape-mainnet
     source:
-      address: "0xF3BeBfA46037dA1B9819dB7AcE1a76a4F8b4a2C1"
+      address: "0xcEE41C17c8797EAc2DD8aB1425F0e3c73f97EF0a"
       abi: MonsterNameRegistry
-      startBlock: 24119000
+      startBlock: 11305000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -240,11 +240,11 @@ dataSources:
   # Add DuelGame data source
   - kind: ethereum
     name: DuelGame
-    network: base-sepolia
+    network: shape-mainnet
     source:
-      address: "0xD50f3Ac0E0AC9b1356301a153a777dF1A985E42e"
+      address: "0x805b44fadbCBA7a65b37875551820593a45a8716"
       abi: DuelGame
-      startBlock: 24119000
+      startBlock: 11305000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -308,7 +308,7 @@ dataSources:
 templates:
   - name: PlayerSkinNFT
     kind: ethereum/contract
-    network: base-sepolia
+    network: shape-mainnet
     source:
       abi: PlayerSkinNFT
     mapping:
@@ -326,7 +326,7 @@ templates:
           file: ./abis/PlayerSkinNFT.json
   - name: GameOwnedNFT
     kind: ethereum/contract
-    network: base-sepolia
+    network: shape-mainnet
     source:
       abi: GameOwnedNFT
     mapping:
