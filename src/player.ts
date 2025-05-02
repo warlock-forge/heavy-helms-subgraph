@@ -348,6 +348,9 @@ export function handlePlayerCreationComplete(
   player.uniqueLosses = 0;
   player.battleRating = 0; // Initialize battleRating
   
+  // Set gauntlet status to NONE by default
+  player.gauntletStatus = "NONE";
+  
   // Save the player with all data set
   player.save();
 

@@ -89,7 +89,7 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
   challenge.createdAt = event.block.timestamp;
   challenge.state = "OPEN";
   
-  // Get the Player entity
+  // Get the Player entity for challenger
   const challengerId = event.params.challengerId.toString();
   const challengerPlayer = Player.load(challengerId);
   
@@ -132,27 +132,25 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
     playerSnapshot.losses = challengerPlayer.losses;
     playerSnapshot.kills = challengerPlayer.kills;
     
-    // Set skin information
-    const skinId = event.params.challengerSkinIndex.toString() + "-" + event.params.challengerSkinTokenId.toString();
-    const skin = Skin.load(skinId);
-    
+    // Set skin information using consistent ID format
+    const skinIndex = event.params.challengerSkinIndex;
+    const skinTokenId = event.params.challengerSkinTokenId;
+    const skinId = skinIndex.toString() + "-" + skinTokenId.toString(); // Use collectionId-tokenId
+
+    log.info("handleChallengeCreated: Looking up skin {} for challenger snapshot {}", [skinId, snapshotId]);
+    const skin = Skin.load(skinId); // Load using consistent ID
+
     if (skin !== null) {
+      // Skin found, assign the ID
       playerSnapshot.currentSkin = skinId;
-      log.info("Set skin for player snapshot: {} -> {}", [playerSnapshot.id, skinId]);
+      log.info("handleChallengeCreated: Set skin for player snapshot: {} -> {}", [playerSnapshot.id, skinId]);
     } else {
-      log.warning("Skin not found: {}. Creating placeholder...", [skinId]);
-      
-      // Create a placeholder skin if needed
-      const newSkin = new Skin(skinId);
-      newSkin.tokenId = event.params.challengerSkinTokenId;
-      newSkin.collection = event.params.challengerSkinIndex.toString();
-      newSkin.weapon = 0;
-      newSkin.armor = 0;
-      newSkin.metadataURI = "";
-      newSkin.save();
-      
-      // Now assign it
-      playerSnapshot.currentSkin = skinId;
+      // Skin NOT found. Log warning and set link to null. DO NOT CREATE PLACEHOLDER.
+      log.warning("handleChallengeCreated: Skin {} not found. Setting currentSkin to null for snapshot {}", [
+        skinId,
+        snapshotId
+      ]);
+      playerSnapshot.currentSkin = null; // Assign null
     }
     
     // Update stance and timestamps
@@ -278,7 +276,7 @@ export function handleChallengeAccepted(event: ChallengeAcceptedEvent): void {
   const challenge = DuelChallenge.load(challengeId);
   
   if (challenge) {
-    // Get the Player entity
+    // Get the Player entity for defender
     const defenderId = event.params.defenderId.toString();
     const defenderPlayer = Player.load(defenderId);
     
@@ -297,26 +295,24 @@ export function handleChallengeAccepted(event: ChallengeAcceptedEvent): void {
       // Add null check before accessing properties
       if (playerSnapshot !== null) {
         // Update with the chosen skin and stance for the duel
-        const skinId = event.params.defenderSkinIndex.toString() + "-" + event.params.defenderSkinTokenId.toString();
-        const skin = Skin.load(skinId);
-        
+        const skinIndex = event.params.defenderSkinIndex;
+        const skinTokenId = event.params.defenderSkinTokenId;
+        const skinId = skinIndex.toString() + "-" + skinTokenId.toString(); // Use collectionId-tokenId
+
+        log.info("handleChallengeAccepted: Looking up skin {} for defender snapshot {}", [skinId, snapshotId]);
+        const skin = Skin.load(skinId); // Load using consistent ID
+
         if (skin !== null) {
+          // Skin found, assign the ID
           playerSnapshot.currentSkin = skinId;
-          log.info("Updated skin for defender snapshot: {} -> {}", [playerSnapshot.id, skinId]);
+          log.info("handleChallengeAccepted: Updated skin for defender snapshot: {} -> {}", [playerSnapshot.id, skinId]);
         } else {
-          log.warning("Skin not found: {}. Creating placeholder...", [skinId]);
-          
-          // Create a placeholder skin if needed
-          const newSkin = new Skin(skinId);
-          newSkin.tokenId = event.params.defenderSkinTokenId;
-          newSkin.collection = event.params.defenderSkinIndex.toString();
-          newSkin.weapon = 0;
-          newSkin.armor = 0;
-          newSkin.metadataURI = "";
-          newSkin.save();
-          
-          // Now assign it
-          playerSnapshot.currentSkin = skinId;
+          // Skin NOT found. Log warning and set link to null. DO NOT CREATE PLACEHOLDER.
+          log.warning("handleChallengeAccepted: Skin {} not found. Setting currentSkin to null for snapshot {}", [
+            skinId,
+            snapshotId
+          ]);
+          playerSnapshot.currentSkin = null; // Assign null
         }
         
         // Update stance and timestamps
@@ -575,16 +571,22 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
  * Handle CombatResult events
  */
 export function handleCombatResult(event: CombatResultEvent): void {
-  // Use transaction hash directly as the ID
-  const combatResult = new CombatResult(event.transaction.hash);
-  
+  // Generate the ID using txHash-logIndex string format
+  const eventId = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
+  const combatResult = new CombatResult(eventId);
+
+  // Populate the reordered fields
+  combatResult.transactionHash = event.transaction.hash;
+  combatResult.logIndex = event.logIndex.toI32(); // Convert BigInt to i32 for Int! type
+
+  // Populate remaining fields
   combatResult.player1Data = event.params.player1Data;
   combatResult.player2Data = event.params.player2Data;
   combatResult.winningPlayerId = event.params.winningPlayerId;
   combatResult.packedResults = event.params.packedResults;
   combatResult.blockNumber = event.block.number;
   combatResult.blockTimestamp = event.block.timestamp;
-  
+
   combatResult.save();
 }
 

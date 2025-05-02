@@ -1,8 +1,0 @@
-{
-  "base-sepolia": {
-    "Player": {
-      "address": "0xc8dfCC2cD565bcA732C25F9a5A86625AABd63E80",
-      "startBlock": 22736199
-    }
-  }
-}

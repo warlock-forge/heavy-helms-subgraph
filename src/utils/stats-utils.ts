@@ -40,6 +40,16 @@ export function getOrCreateStats(): Stats {
     stats.totalWagerDuels = 0
     stats.totalNonWagerDuels = 0
     stats.totalWinnerPayouts = BigInt.fromI32(0)
+    
+    // Initialize Gauntlet-related fields
+    stats.totalGauntletsStarted = 0
+    stats.totalGauntletsCompleted = 0
+    stats.totalGauntletsRecovered = 0
+    stats.totalGauntletPrizeMoneyAwarded = BigInt.fromI32(0)
+    stats.totalGauntletFeesCollected = BigInt.fromI32(0)
+    stats.currentGauntletQueueSize = 0
+    stats.currentGauntletEntryFee = BigInt.fromI32(0)
+    stats.currentGauntletSize = 0
   }
   
   return stats as Stats
