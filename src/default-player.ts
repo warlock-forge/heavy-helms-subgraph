@@ -91,23 +91,9 @@ export function handleDefaultPlayerCreated(event: DefaultPlayerCreatedEvent): vo
   const skinTokenId = event.params.stats.skin.skinTokenId;
   const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
   
-  log.info("handleDefaultPlayerCreated: Looking up skin with ID: '{}'", [skinId]);
-
-  // Check if the skin exists before assigning it
-  const skin = Skin.load(skinId);
-
-  if (skin !== null) {
-    // Skin found, assign the ID
-    defaultPlayer.currentSkin = skinId;
-    log.info("handleDefaultPlayerCreated: Set skin for default player: {} -> {}", [defaultPlayer.id, skinId]);
-  } else {
-    // Skin NOT found. Log a warning and set link to null. DO NOT CREATE PLACEHOLDER.
-    log.warning("handleDefaultPlayerCreated: Skin {} not found. Setting currentSkin to null for DefaultPlayer {}.", [
-      skinId, 
-      defaultPlayer.id
-    ]);
-    defaultPlayer.currentSkin = null; // Assign null
-  }
+  // Directly assign the skin ID. The link will resolve if the Skin entity exists or is created later.
+  defaultPlayer.currentSkin = skinId; 
+  log.info("handleDefaultPlayerCreated: Assigning currentSkin ID '{}' to DefaultPlayer '{}'", [skinId, defaultPlayer.id]);
   
   defaultPlayer.save();
 
@@ -189,23 +175,9 @@ export function handleDefaultPlayerStatsUpdated(event: DefaultPlayerStatsUpdated
   const skinTokenId = event.params.stats.skin.skinTokenId;
   const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
   
-  log.info("handleDefaultPlayerStatsUpdated: Looking up skin with ID: '{}'", [skinId]);
-
-  // Check if the skin exists before assigning it
-  const skin = Skin.load(skinId);
-
-  if (skin !== null) {
-    // Skin found, assign the ID
-    defaultPlayer.currentSkin = skinId;
-    log.info("handleDefaultPlayerStatsUpdated: Set skin for default player: {} -> {}", [defaultPlayer.id, skinId]);
-  } else {
-    // Skin NOT found. Log a warning and set link to null. DO NOT CREATE PLACEHOLDER.
-     log.warning("handleDefaultPlayerStatsUpdated: Skin {} not found. Setting currentSkin to null for DefaultPlayer {}.", [
-      skinId, 
-      defaultPlayer.id
-    ]);
-    defaultPlayer.currentSkin = null; // Assign null
-  }
+  // Directly assign the skin ID. The link will resolve if the Skin entity exists or is created later.
+  defaultPlayer.currentSkin = skinId; 
+  log.info("handleDefaultPlayerStatsUpdated: Assigning currentSkin ID '{}' to DefaultPlayer '{}'", [skinId, defaultPlayer.id]);
 
   defaultPlayer.save();
 }

@@ -98,21 +98,9 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
   const skinTokenId = event.params.stats.skin.skinTokenId;
   const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
   
-  log.info("handleMonsterCreated: Looking up skin with ID: '{}'", [skinId]);
-  const skin = Skin.load(skinId); // Load using consistent ID
-
-  if (skin !== null) {
-    // Skin found, assign the ID
-    monster.currentSkin = skinId;
-    log.info("handleMonsterCreated: Set skin for monster: {} -> {}", [monster.id, skinId]);
-  } else {
-    // Skin NOT found. Log a warning and set link to null. DO NOT CREATE PLACEHOLDER.
-    log.warning("handleMonsterCreated: Skin {} not found. Setting currentSkin to null for Monster {}.", [
-      skinId, 
-      monster.id
-    ]);
-    monster.currentSkin = null; // Assign null
-  }
+  // Directly assign the skin ID. The link will resolve if the Skin entity exists or is created later.
+  monster.currentSkin = skinId;
+  log.info("handleMonsterCreated: Assigning currentSkin ID '{}' to Monster '{}'", [skinId, monster.id]);
 
   monster.save();
 
@@ -153,9 +141,8 @@ export function handleMonsterStatsUpdated(event: MonsterStatsUpdatedEvent): void
   let monster = Monster.load(monsterId);
   
   if (monster == null) {
-    // ... handle case where monster doesn't exist ...
     log.error("handleMonsterStatsUpdated: Monster {} not found!", [monsterId]);
-    return; // Or handle appropriately
+    return; 
   }
   
   // Update attributes
@@ -193,21 +180,9 @@ export function handleMonsterStatsUpdated(event: MonsterStatsUpdatedEvent): void
   const skinTokenId = event.params.stats.skin.skinTokenId;
   const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
   
-  log.info("handleMonsterStatsUpdated: Looking up skin with ID: '{}'", [skinId]);
-  const skin = Skin.load(skinId); // Load using consistent ID
-
-  if (skin !== null) {
-    // Skin found, assign the ID
-    monster.currentSkin = skinId;
-    log.info("handleMonsterStatsUpdated: Set skin for monster: {} -> {}", [monster.id, skinId]);
-  } else {
-    // Skin NOT found. Log a warning and set link to null. DO NOT CREATE PLACEHOLDER.
-    log.warning("handleMonsterStatsUpdated: Skin {} not found. Setting currentSkin to null for Monster {}.", [
-      skinId, 
-      monster.id
-    ]);
-    monster.currentSkin = null; // Assign null
-  }
+  // Directly assign the skin ID. The link will resolve if the Skin entity exists or is created later.
+  monster.currentSkin = skinId; 
+  log.info("handleMonsterStatsUpdated: Assigning currentSkin ID '{}' to Monster '{}'", [skinId, monster.id]);
 
   monster.save();
 }
