@@ -943,6 +943,8 @@ type Stats @entity {
   currentGauntletQueueSize: Int!
   currentGauntletEntryFee: BigInt!
   currentGauntletSize: Int!
+  currentGauntletFeePercentage: BigInt!
+  currentMinTimeBetweenGauntlets: BigInt!
 }
 
 # Helper entity for mapping addresses to collection IDs
@@ -1109,5 +1111,14 @@ type GauntletRecovered @entity(immutable: true) {
   transactionHash: Bytes!
    # Link to the recovered Gauntlet entity
   gauntlet: Gauntlet!
+}
+
+type QueueClearedDueToGameDisabled @entity(immutable: true) {
+  id: Bytes!               # Transaction hash (unique for this event type)
+  playerIds: [String!]!    # List of player IDs removed (store as String for flexibility)
+  totalRefunded: BigInt!   # Total ETH refunded
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
 }
 

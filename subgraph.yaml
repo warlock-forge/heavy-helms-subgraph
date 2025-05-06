@@ -308,9 +308,9 @@ dataSources:
     name: GauntletGame
     network: base-sepolia
     source:
-      address: "0x2Bc8cb7849A879E08b5093205b8dA95F2331C7b4" # GauntletGame contract address
+      address: "0xB1C73638C3FAeCB4bfA4D0F8623E6600B9685Dd8" # GauntletGame contract address
       abi: GauntletGame
-      startBlock: 24119000 # Use same start block
+      startBlock: 25363230
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -332,6 +332,7 @@ dataSources:
         - GauntletCompleted
         - GauntletRecovered
         - CombatResult # Standard combat result, not gauntlet-specific
+        - QueueClearedDueToGameDisabled # Add the event entity if not already implicitly covered
         # Admin Event Entities (Add if needed)
         # ...
       abis:
@@ -372,6 +373,11 @@ dataSources:
           handler: handleFeePercentageSet
         - event: GameEnabledUpdated(bool)
           handler: handleGameEnabledUpdated
+        # Add the handler for the updated event
+        - event: QueueClearedDueToGameDisabled(uint32[],uint256) # Signature with uint32[]
+          handler: handleQueueClearedDueToGameDisabled # New handler function name
+        - event: MinTimeBetweenGauntletsSet(uint256)
+          handler: handleMinTimeBetweenGauntletsSet
         # ... other admin handlers ...
       file: ./src/gauntlet-game.ts # New mapping file
 

@@ -1,4 +1,4 @@
-import { BigInt, Bytes, log, ethereum, Address } from "@graphprotocol/graph-ts";
+import { BigInt, Bytes, log, ethereum, Address, store, TypedMap } from "@graphprotocol/graph-ts";
 import { 
   PlayerQueued as PlayerQueuedEvent,
   PlayerWithdrew as PlayerWithdrewEvent,
@@ -10,7 +10,9 @@ import {
   EntryFeeSet as EntryFeeSetEvent,
   GauntletSizeSet as GauntletSizeSetEvent,
   FeePercentageSet as FeePercentageSetEvent,
-  GameEnabledUpdated as GameEnabledUpdatedEvent
+  GameEnabledUpdated as GameEnabledUpdatedEvent,
+  QueueClearedDueToGameDisabled as QueueClearedDueToGameDisabledEvent,
+  MinTimeBetweenGauntletsSet as MinTimeBetweenGauntletsSetEvent
 } from "../generated/GauntletGame/GauntletGame";
 
 import { 
@@ -26,13 +28,15 @@ import {
   Player,
   DefaultPlayer,
   Skin,
-  SkinCollection
+  SkinCollection,
+  QueueClearedDueToGameDisabled
 } from "../generated/schema";
 
 import { getOrCreateStats } from "./utils/stats-utils";
 
 // Define ZERO_BI directly
 const ZERO_BI = BigInt.fromI32(0);
+const ZERO_I32 = 0; // Helper constant
 
 // Handle the PlayerQueued event
 export function handlePlayerQueued(event: PlayerQueuedEvent): void {
@@ -199,7 +203,14 @@ export function handleGauntletStarted(event: GauntletStartedEvent): void {
 
   const stats = getOrCreateStats();
   stats.totalGauntletsStarted += 1;
-  stats.currentGauntletQueueSize = 0; // Reset queue size as gauntlet starts
+
+  // --- Corrected Logic ---
+  let currentQueueSize = stats.currentGauntletQueueSize;
+  let gauntletSize = event.params.size;
+  // Explicitly cast the result of Math.max to i32
+  stats.currentGauntletQueueSize = i32(Math.max(0, currentQueueSize - gauntletSize)); 
+  // --- End Correction ---
+
   stats.lastUpdated = event.block.timestamp;
   stats.save();
 }
@@ -222,77 +233,87 @@ export function handleGauntletCompleted(event: GauntletCompletedEvent): void {
     
     const championIdString = `${event.params.championId}`;
     
-    let player = Player.load(championIdString);
-    if (player != null) {
+    let playerChamp = Player.load(championIdString);
+    if (playerChamp != null) {
       gauntlet.champion = championIdString;
     } else {
-      let defaultPlayer = DefaultPlayer.load(championIdString);
-      if (defaultPlayer != null) {
+      let defaultPlayerChamp = DefaultPlayer.load(championIdString);
+      if (defaultPlayerChamp != null) {
         gauntlet.champion = championIdString;
+      } else {
+         log.warning("[GauntletCompleted {}] Champion ID {} not found as Player or DefaultPlayer.", [gauntletId, championIdString]);
       }
     }
     
-    // --- Populate finalParticipantIds using indexed access (INDEX 6) --- CORRECTED BASED ON EVENT DEF
-    let participantIdsParam = event.parameters[6].value; 
-    if (participantIdsParam.kind == ethereum.ValueKind.ARRAY) {
-        let participantIds_i32_array = participantIdsParam.toArray().map<i32>((val: ethereum.Value) => val.toI32());
-        finalParticipantIdsString = participantIds_i32_array.map<string>((id: i32) => id.toString());
-        gauntlet.finalParticipantIds = finalParticipantIdsString; 
-    } else {
-        log.error("Expected participantIds array (index 6) for GauntletCompleted {}, but got kind {}", [
-          gauntletId, 
-          participantIdsParam.kind.toString()
-        ]);
-        gauntlet.finalParticipantIds = []; 
-    }
-    // --- End finalParticipantIds population ---
+    // --- Populate finalParticipantIds from event.params ---
+    let participantIdsParam = event.params.participantIds; // Directly access the typed array
+    finalParticipantIdsString = participantIdsParam.map<string>((id: BigInt) => id.toString());
+    gauntlet.finalParticipantIds = finalParticipantIdsString; 
 
-    // --- Populate roundWinners using indexed access (INDEX 7) --- CORRECTED BASED ON EVENT DEF
-    let roundWinnersParam = event.parameters[7].value; 
-    if (roundWinnersParam.kind == ethereum.ValueKind.ARRAY) {
-      let roundWinnerIds_i32 = roundWinnersParam.toArray().map<i32>((val: ethereum.Value) => val.toI32());
-      roundWinnersString = roundWinnerIds_i32.map<string>((id: i32) => id.toString());
-      gauntlet.roundWinners = roundWinnersString; 
-    } else {
-       log.error("Expected roundWinners array (index 7) for GauntletCompleted {}, but got kind {}", [
-          gauntletId, 
-          roundWinnersParam.kind.toString()
-        ]);
-       gauntlet.roundWinners = []; 
+    // --- Populate roundWinners from event.params ---
+    let roundWinnersParam = event.params.roundWinners; // Directly access the typed array
+    roundWinnersString = roundWinnersParam.map<string>((id: BigInt) => id.toString());
+    gauntlet.roundWinners = roundWinnersString; 
+
+    gauntlet.save(); // Save the updated Gauntlet entity
+
+    // --- BEGIN ADDED LOGIC: Update Player Statuses ---
+    log.info("[GauntletCompleted {}] Updating status for {} participants.", [gauntletId, finalParticipantIdsString.length.toString()]);
+    for (let i = 0; i < finalParticipantIdsString.length; i++) {
+      let participantIdString = finalParticipantIdsString[i];
+      let player = Player.load(participantIdString);
+
+      if (player) {
+        // Check if the player was indeed in this gauntlet before resetting status
+        if (player.gauntletStatus == "IN_GAUNTLET" && player.currentGauntlet == gauntletId) {
+          player.gauntletStatus = "NONE";
+          player.currentGauntlet = null; // Clear link to this gauntlet
+          player.lastUpdatedAt = event.block.timestamp;
+          player.save();
+          log.info("[GauntletCompleted {}] Set Player {} status to NONE.", [gauntletId, participantIdString]);
+        } else {
+          // This might happen if a player somehow got into another state between start and completion, or if event data is unexpected
+          log.warning("[GauntletCompleted {}] Player {} status was not IN_GAUNTLET for this gauntlet (status: {}, currentGauntlet: {}). Status not reset.", [
+            gauntletId, 
+            participantIdString, 
+            player.gauntletStatus, 
+            player.currentGauntlet ? player.currentGauntlet! : "null"
+          ]);
+        }
+      } else {
+        // If the participant ID doesn't resolve to a Player entity, it might be a DefaultPlayer
+        // DefaultPlayers don't have gauntletStatus tracked in the same way, so we can often ignore them here.
+         log.info("[GauntletCompleted {}] Participant ID {} not found as Player entity. Likely a DefaultPlayer, skipping status update.", [gauntletId, participantIdString]);
+      }
     }
-    // --- End roundWinners population ---
-    
-    gauntlet.save();
+    // --- END ADDED LOGIC ---
+
   } else {
     log.error("GauntletCompleted event for non-existent Gauntlet id {} in tx {}", [
       gauntletId,
       event.transaction.hash.toHex(),
     ]);
-    return;
+    return; // Exit if gauntlet entity doesn't exist
   }
 
-  // Create the GauntletCompleted event entity
-  const entity = new GauntletCompleted(event.transaction.hash);
+  // --- (Keep existing logic to create GauntletCompleted event entity) ---
+  const entity = new GauntletCompleted(event.transaction.hash.concatI32(event.logIndex.toI32())); // Use tx hash + log index for event entity ID
   entity.gauntlet = gauntletId;
   entity.gauntletId = event.params.gauntletId;
   entity.size = event.params.size;
   entity.entryFee = event.params.entryFee;
-  entity.championId = event.params.championId.toI32();
+  entity.championId = event.params.championId.toI32(); // Assuming event param championId is i32/u32
   entity.prizeAwarded = event.params.prizeAwarded;
   entity.feeCollected = event.params.feeCollected;
-  
-  // Save the final participant IDs (as BigInt) also to the event entity (using the variable populated from index 6)
-  if (finalParticipantIdsString.length > 0) {
-      entity.participantIds = finalParticipantIdsString.map<BigInt>((idStr: string) => BigInt.fromString(idStr));
-  } else {
-      entity.participantIds = [];
-  }
-
+  entity.participantIds = event.params.participantIds; // Store original BigInt array from event
+  // Note: Storing roundWinners on the event entity might also be useful
+  // entity.roundWinners = event.params.roundWinners; 
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
   entity.transactionHash = event.transaction.hash;
   entity.save();
 
+  // --- (Keep existing logic to update Stats entity) ---
   const stats = getOrCreateStats();
   stats.totalGauntletsCompleted += 1;
   stats.totalGauntletPrizeMoneyAwarded = stats.totalGauntletPrizeMoneyAwarded.plus(event.params.prizeAwarded);
@@ -392,15 +413,88 @@ export function handleGauntletSizeSet(event: GauntletSizeSetEvent): void {
 
 export function handleFeePercentageSet(event: FeePercentageSetEvent): void {
   const stats = getOrCreateStats();
+  stats.currentGauntletFeePercentage = event.params.newPercentage;
   stats.lastUpdated = event.block.timestamp;
   stats.save();
 }
 
+export function handleQueueClearedDueToGameDisabled(event: QueueClearedDueToGameDisabledEvent): void {
+  log.info("[Queue Cleared] Processing QueueClearedDueToGameDisabled event in tx {}", [event.transaction.hash.toHex()]);
+
+  // 1. Update Stats
+  const stats = getOrCreateStats();
+  stats.currentGauntletQueueSize = ZERO_I32; // Reset the queue size counter
+  stats.lastUpdated = event.block.timestamp;
+  stats.save();
+
+  // 2. Update Player Statuses
+  let playerIds = event.params.playerIds;
+  for (let i = 0; i < playerIds.length; i++) {
+    let playerId = playerIds[i];
+    // Skip potential zero IDs if the array wasn't resized perfectly in the contract (though it should be uint32)
+    if (playerId.isZero()) continue; 
+
+    let playerIdString = playerId.toString();
+    let player = Player.load(playerIdString);
+
+    if (player) {
+      // Only update if the player was actually in the QUEUED state
+      if (player.gauntletStatus == "QUEUED") {
+        player.gauntletStatus = "NONE";
+        player.lastUpdatedAt = event.block.timestamp;
+        // player.currentGauntlet should already be null if status was QUEUED
+        player.save();
+        log.info("[Queue Cleared] Set Player {} status to NONE", [playerIdString]);
+      } else {
+        // This case should ideally not happen if the event only contains IDs that were in the queue
+         log.warning("[Queue Cleared] Player {} found in QueueCleared event but status was not QUEUED (was {}). Status not changed.", [
+           playerIdString,
+           player.gauntletStatus
+         ]);
+      }
+    } else {
+      // This indicates a potential inconsistency if an ID in the event doesn't correspond to a Player entity
+      log.warning("[Queue Cleared] Player {} from QueueCleared event not found in store.", [playerIdString]);
+    }
+  }
+
+  // 3. Create the event entity for history
+  // Use only the transaction hash as the ID
+  let entityId = event.transaction.hash;
+  let clearedEvent = new QueueClearedDueToGameDisabled(entityId);
+  
+  clearedEvent.playerIds = event.params.playerIds.map<string>((id: BigInt) => id.toString()); 
+  clearedEvent.totalRefunded = event.params.totalRefunded;
+  clearedEvent.blockNumber = event.block.number;
+  clearedEvent.blockTimestamp = event.block.timestamp;
+  clearedEvent.transactionHash = event.transaction.hash;
+  clearedEvent.save(); 
+}
+
 export function handleGameEnabledUpdated(event: GameEnabledUpdatedEvent): void {
   const stats = getOrCreateStats();
+  
+  // REMOVE the queue size reset logic from here - it's now handled by handleQueueClearedDueToGameDisabled
+  /*
   if (!event.params.enabled) {
-      stats.currentGauntletQueueSize = 0;
+      stats.currentGauntletQueueSize = 0; // <-- REMOVE THIS LINE
   }
+  */
+
+  // You might want to add a field to Stats to track the enabled status if needed
+  // stats.isGauntletGameEnabled = event.params.enabled; 
+
+  stats.lastUpdated = event.block.timestamp;
+  stats.save();
+
+  // Optionally: Create the GameEnabledUpdated event entity if needed for history
+  // ...
+}
+
+export function handleMinTimeBetweenGauntletsSet(event: MinTimeBetweenGauntletsSetEvent): void {
+  const stats = getOrCreateStats();
+  // Update the min time field
+  stats.currentMinTimeBetweenGauntlets = event.params.newMinTime; 
   stats.lastUpdated = event.block.timestamp;
   stats.save();
 } 

@@ -50,6 +50,8 @@ export function getOrCreateStats(): Stats {
     stats.currentGauntletQueueSize = 0
     stats.currentGauntletEntryFee = BigInt.fromI32(0)
     stats.currentGauntletSize = 0
+    stats.currentGauntletFeePercentage = BigInt.fromI32(0)
+    stats.currentMinTimeBetweenGauntlets = BigInt.fromI32(0)
   }
   
   return stats as Stats
