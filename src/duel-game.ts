@@ -50,7 +50,8 @@ import {
   updateStatsForChallengeCreation,
   updateStatsForChallengeCancellation,
   updateStatsForChallengeForfeit,
-  updateStatsForDuelCompletion
+  updateStatsForDuelCompletion,
+  updatePlayerPostCombatStats
 } from "./utils/stats-utils";
 import { DuelGame } from "../generated/DuelGame/DuelGame";
 import { PlayerSnapshot } from "../generated/schema";
@@ -479,84 +480,27 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
     challenge.feeCollected = event.params.feeCollected;
     
     // Get winner ID and determine loser ID from the challenge
-    const winnerId = event.params.winnerId.toString();
-    let loserId: string;
+    const winnerId_str = event.params.winnerId.toString();
+    let loserId_str: string;
     
-    if (challenge.challengerId.toString() == winnerId) {
-      loserId = challenge.defenderId.toString();
+    if (challenge.challengerId.toString() == winnerId_str) {
+      loserId_str = challenge.defenderId.toString();
     } else {
-      loserId = challenge.challengerId.toString();
+      loserId_str = challenge.challengerId.toString();
     }
     
-    // Now handle the unique wins/losses tracking
-    const winner = Player.load(winnerId);
-    const loser = Player.load(loserId);
-    
-    if (winner && loser) {
-      // Sort player IDs for consistent record ID
-      let player1Id = winnerId < loserId ? winnerId : loserId;
-      let player2Id = winnerId < loserId ? loserId : winnerId;
-      let winnerIsPlayer1 = winnerId == player1Id;
-      
-      const recordId = `${player1Id}-${player2Id}`;
-      let vsRecord = PlayerVsRecord.load(recordId);
-      
-      if (!vsRecord) {
-        // First encounter between these players
-        vsRecord = new PlayerVsRecord(recordId);
-        vsRecord.player1 = player1Id;
-        vsRecord.player2 = player2Id;
-        vsRecord.player1WinsAgainst2 = winnerIsPlayer1;
-        vsRecord.player2WinsAgainst1 = !winnerIsPlayer1;
-        vsRecord.firstPlayer1Win = winnerIsPlayer1 ? event.block.timestamp : null;
-        vsRecord.firstPlayer2Win = !winnerIsPlayer1 ? event.block.timestamp : null;
-        
-        // Increment unique stats
-        winner.uniqueWins += 1;
-        loser.uniqueLosses += 1;
-        
-      } else {
-        // Players have fought before - check for unique stats
-        let uniqueWin = false;
-        
-        // Check if this is a unique win for the winner
-        if (winnerIsPlayer1 && !vsRecord.player1WinsAgainst2) {
-          vsRecord.player1WinsAgainst2 = true;
-          vsRecord.firstPlayer1Win = event.block.timestamp;
-          uniqueWin = true;
-        } else if (!winnerIsPlayer1 && !vsRecord.player2WinsAgainst1) {
-          vsRecord.player2WinsAgainst1 = true;
-          vsRecord.firstPlayer2Win = event.block.timestamp;
-          uniqueWin = true;
-        }
-        
-        // If it's a unique win, it's also a unique loss
-        if (uniqueWin) {
-          winner.uniqueWins += 1;
-          loser.uniqueLosses += 1;
-        }
-      }
-      
-      // Update battle ratings for both players AFTER updating wins/losses
-      winner.battleRating = winner.uniqueWins - winner.uniqueLosses;
-      loser.battleRating = loser.uniqueWins - loser.uniqueLosses;
-      
-      // Save all updated entities
-      vsRecord.save();
-      winner.save();
-      loser.save();
-    }
+    // Call the unified utility function to update player stats
+    updatePlayerPostCombatStats(winnerId_str, loserId_str, event.block.timestamp);
     
     challenge.save();
     
     // Set reference from event to challenge
     duelComplete.challenge = challengeId;
     
-    // Update stats - moved inside the if block
-    // Double the wager amount to account for both players' contributions
+    // Update general duel stats
     updateStatsForDuelCompletion(
       event.block.timestamp,
-      challenge.wagerAmount.times(BigInt.fromI32(2)),
+      challenge.wagerAmount.times(BigInt.fromI32(2)), // Assuming wagerAmount is per player
       event.params.winnerPayout,
       event.params.feeCollected
     );

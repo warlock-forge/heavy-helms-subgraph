@@ -1,5 +1,6 @@
 import { BigInt, Address } from "@graphprotocol/graph-ts"
-import { Stats, Owner } from "../../generated/schema"
+import { Stats, Owner, Player, PlayerVsRecord } from "../../generated/schema"
+import { log } from "@graphprotocol/graph-ts"
 
 export function getOrCreateStats(): Stats {
   let stats = Stats.load("all")
@@ -217,4 +218,84 @@ export function updateStatsForSkinCreation(timestamp: BigInt): void {
   stats.totalSkinsCount += 1
   stats.lastUpdated = timestamp
   stats.save()
+}
+
+export function updatePlayerPostCombatStats(winnerId_str: string, loserId_str: string, timestamp: BigInt): void {
+  log.info("updatePlayerPostCombatStats: Winner ID: {}, Loser ID: {}, Timestamp: {}", [winnerId_str, loserId_str, timestamp.toString()]);
+
+  let winner = Player.load(winnerId_str);
+  let loser = Player.load(loserId_str);
+
+  if (winner && loser) {
+    // Sort player IDs for consistent PlayerVsRecord ID
+    // Ensure comparison is on strings if IDs can have varying lengths, though BigInt converted to string should be fine.
+    let player1Id_for_record: string;
+    let player2Id_for_record: string;
+
+    if (winnerId_str < loserId_str) {
+      player1Id_for_record = winnerId_str;
+      player2Id_for_record = loserId_str;
+    } else {
+      player1Id_for_record = loserId_str;
+      player2Id_for_record = winnerId_str;
+    }
+    
+    let winnerIsPlayer1_for_record = (winnerId_str == player1Id_for_record);
+
+    const recordId = player1Id_for_record + "-" + player2Id_for_record;
+    let vsRecord = PlayerVsRecord.load(recordId);
+
+    if (!vsRecord) {
+      vsRecord = new PlayerVsRecord(recordId);
+      vsRecord.player1 = player1Id_for_record;
+      vsRecord.player2 = player2Id_for_record;
+      vsRecord.player1WinsAgainst2 = winnerIsPlayer1_for_record;
+      vsRecord.player2WinsAgainst1 = !winnerIsPlayer1_for_record;
+      vsRecord.firstPlayer1Win = winnerIsPlayer1_for_record ? timestamp : null;
+      vsRecord.firstPlayer2Win = !winnerIsPlayer1_for_record ? timestamp : null;
+
+      winner.uniqueWins += 1;
+      loser.uniqueLosses += 1;
+      log.info("updatePlayerPostCombatStats: First encounter. Winner {} uniqueWins: {}, Loser {} uniqueLosses: {}", [winnerId_str, winner.uniqueWins.toString(), loserId_str, loser.uniqueLosses.toString()]);
+
+    } else {
+      let uniqueWinForThisMatch = false;
+      if (winnerIsPlayer1_for_record && !vsRecord.player1WinsAgainst2) {
+        vsRecord.player1WinsAgainst2 = true;
+        vsRecord.firstPlayer1Win = timestamp;
+        uniqueWinForThisMatch = true;
+      } else if (!winnerIsPlayer1_for_record && !vsRecord.player2WinsAgainst1) {
+        vsRecord.player2WinsAgainst1 = true;
+        vsRecord.firstPlayer2Win = timestamp;
+        uniqueWinForThisMatch = true;
+      }
+
+      if (uniqueWinForThisMatch) {
+        winner.uniqueWins += 1;
+        loser.uniqueLosses += 1;
+        log.info("updatePlayerPostCombatStats: Unique win in existing matchup. Winner {} uniqueWins: {}, Loser {} uniqueLosses: {}", [winnerId_str, winner.uniqueWins.toString(), loserId_str, loser.uniqueLosses.toString()]);
+      } else {
+        log.info("updatePlayerPostCombatStats: Non-unique win in existing matchup. Winner: {}, Loser: {}", [winnerId_str, loserId_str]);
+      }
+    }
+
+    winner.battleRating = winner.uniqueWins - winner.uniqueLosses;
+    loser.battleRating = loser.uniqueWins - loser.uniqueLosses;
+    
+    winner.lastUpdatedAt = timestamp;
+    loser.lastUpdatedAt = timestamp;
+
+    vsRecord.save();
+    winner.save();
+    loser.save();
+    log.info("updatePlayerPostCombatStats: Updated battle ratings. Winner {}: {}, Loser {}: {}", [winnerId_str, winner.battleRating.toString(), loserId_str, loser.battleRating.toString()]);
+
+  } else {
+    if (!winner) {
+      log.warning("updatePlayerPostCombatStats: Winner Player entity not found for ID: {}. Skipping battle rating update for this combat.", [winnerId_str]);
+    }
+    if (!loser) {
+      log.warning("updatePlayerPostCombatStats: Loser Player entity not found for ID: {}. Skipping battle rating update for this combat.", [loserId_str]);
+    }
+  }
 }

@@ -33,6 +33,7 @@ import {
 } from "../generated/schema";
 
 import { getOrCreateStats } from "./utils/stats-utils";
+import { updatePlayerPostCombatStats } from "./utils/stats-utils";
 
 // Define ZERO_BI directly
 const ZERO_BI = BigInt.fromI32(0);
@@ -365,28 +366,100 @@ export function handleGauntletRecovered(event: GauntletRecoveredEvent): void {
 
 // Handle the GauntletCombatResult event
 export function handleGauntletCombatResult(event: CombatResultEvent): void {
-  // Generate the ID using txHash and the event's logIndex
   const eventId = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
-  const combatResult = new CombatResult(eventId); // Use the schema type
+  const combatResult = new CombatResult(eventId); 
 
-  // Populate the reordered fields
   combatResult.transactionHash = event.transaction.hash;
-  combatResult.logIndex = event.logIndex.toI32(); // Use the event's logIndex
-
-  // Populate remaining fields from event params
+  combatResult.logIndex = event.logIndex.toI32(); 
   combatResult.player1Data = event.params.player1Data;
   combatResult.player2Data = event.params.player2Data;
   combatResult.winningPlayerId = event.params.winningPlayerId;
   combatResult.packedResults = event.params.packedResults;
   combatResult.blockNumber = event.block.number;
   combatResult.blockTimestamp = event.block.timestamp;
-
   combatResult.save();
 
-  // Note: We don't link this CombatResult directly to a specific Gauntlet here,
-  // as multiple results can share the same tx hash.
-  // You would typically query CombatResults by transactionHash (e.g., from GauntletCompleted.transactionHash)
-  // and sort by logIndex to get the sequence for a specific Gauntlet.
+  const winnerIdFromEvent_str = event.params.winningPlayerId.toString();
+  let p1IdFromData_str: string | null = null;
+  let p2IdFromData_str: string | null = null;
+
+  let player1DataBytes = event.params.player1Data as Bytes;
+  let player2DataBytes = event.params.player2Data as Bytes;
+
+  if (player1DataBytes.length >= 4) {
+    let p1IdSlice_Uint8Array = player1DataBytes.slice(0, 4); 
+    p1IdSlice_Uint8Array.reverse(); 
+    let p1IdSlice_Bytes = Bytes.fromUint8Array(p1IdSlice_Uint8Array); 
+    p1IdFromData_str = BigInt.fromUnsignedBytes(p1IdSlice_Bytes).toString(); 
+  } else {
+    log.warning("[GauntletCombatResult] player1Data is too short (length {}) to extract ID for event ID {}. P1 Data (hex): {}", [
+      player1DataBytes.length.toString(),
+      eventId,
+      player1DataBytes.toHex()
+    ]);
+  }
+
+  if (player2DataBytes.length >= 4) {
+    let p2IdSlice_Uint8Array = player2DataBytes.slice(0, 4); 
+    p2IdSlice_Uint8Array.reverse(); 
+    let p2IdSlice_Bytes = Bytes.fromUint8Array(p2IdSlice_Uint8Array);
+    p2IdFromData_str = BigInt.fromUnsignedBytes(p2IdSlice_Bytes).toString();
+  } else {
+    log.warning("[GauntletCombatResult] player2Data is too short (length {}) to extract ID for event ID {}. P2 Data (hex): {}", [
+      player2DataBytes.length.toString(),
+      eventId,
+      player2DataBytes.toHex()
+    ]);
+  }
+  
+  let determinedLoserId_str: string | null = null;
+
+  if (p1IdFromData_str && p2IdFromData_str) {
+    if (winnerIdFromEvent_str == p1IdFromData_str) {
+      determinedLoserId_str = p2IdFromData_str;
+    } else if (winnerIdFromEvent_str == p2IdFromData_str) {
+      determinedLoserId_str = p1IdFromData_str;
+    } else {
+      // This is an important error to keep if the data is malformed or unexpected
+      log.error(
+        "[GauntletCombatResult] Winning player ID {} from event does not match derived P1 ID ({}) or P2 ID ({}) from event data for event ID {}. Cannot determine loser.",
+        [
+          winnerIdFromEvent_str, 
+          p1IdFromData_str ? p1IdFromData_str : "null", 
+          p2IdFromData_str ? p2IdFromData_str : "null", 
+          eventId
+        ]
+      );
+    }
+  } else {
+    // This is also an important warning to keep
+    log.warning(
+        "[GauntletCombatResult] Could not derive one or both player IDs (P1: {}, P2: {}) from event data for event ID {}. Cannot determine loser.",
+        [
+          p1IdFromData_str ? p1IdFromData_str : "null", 
+          p2IdFromData_str ? p2IdFromData_str : "null", 
+          eventId
+        ]
+      );
+  }
+
+  if (winnerIdFromEvent_str && determinedLoserId_str) {
+    // Optional: Could add a log.info here if you want to confirm successful calls in production without too much noise
+    // log.info("[GauntletCombatResult] Calling updatePlayerPostCombatStats for Winner: {}, Loser: {}", [winnerIdFromEvent_str, determinedLoserId_str]);
+    updatePlayerPostCombatStats(winnerIdFromEvent_str, determinedLoserId_str as string, event.block.timestamp);
+  } else {
+    // This warning is important to keep if the stats update is skipped
+    log.warning(
+      "[GauntletCombatResult] Skipping call to updatePlayerPostCombatStats due to missing winner or loser. Event Winner: {}, Determined Loser: {}, P1 Derived: {}, P2 Derived: {}, Event ID: {}",
+      [
+        winnerIdFromEvent_str, 
+        determinedLoserId_str ? determinedLoserId_str : "null",
+        p1IdFromData_str ? p1IdFromData_str : "null",
+        p2IdFromData_str ? p2IdFromData_str : "null",
+        eventId
+      ]
+    );
+  }
 }
 
 // Admin event handlers
