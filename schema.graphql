@@ -82,6 +82,8 @@ type Player implements Fighter @entity {
   uniqueWins: Int!
   uniqueLosses: Int!
   battleRating: Int!
+  gauntletStatus: PlayerGauntletStatus! # Default to NONE
+  currentGauntlet: Gauntlet # Link to Gauntlet if IN_GAUNTLET
 }
 
 type PlayerSnapshot implements Fighter @entity {
@@ -808,7 +810,9 @@ type DuelComplete @entity(immutable: true) {
 }
 
 type CombatResult @entity(immutable: true) {
-  id: Bytes!
+  id: ID!                  
+  transactionHash: Bytes! @index
+  logIndex: Int!           
   player1Data: Bytes!
   player2Data: Bytes!
   winningPlayerId: BigInt!
@@ -929,6 +933,18 @@ type Stats @entity {
   
   # Timestamps
   lastUpdated: BigInt!
+  
+  # Gauntlet statistics
+  totalGauntletsStarted: Int!
+  totalGauntletsCompleted: Int!
+  totalGauntletsRecovered: Int!
+  totalGauntletPrizeMoneyAwarded: BigInt!
+  totalGauntletFeesCollected: BigInt!
+  currentGauntletQueueSize: Int!
+  currentGauntletEntryFee: BigInt!
+  currentGauntletSize: Int!
+  currentGauntletFeePercentage: BigInt!
+  currentMinTimeBetweenGauntlets: BigInt!
 }
 
 # Helper entity for mapping addresses to collection IDs
@@ -985,5 +1001,124 @@ type PlayerVsRecord @entity {
   player2WinsAgainst1: Boolean!  # Has player2 ever beaten player1?
   firstPlayer1Win: BigInt        # When player1 first beat player2 (null if never)
   firstPlayer2Win: BigInt        # When player2 first beat player1 (null if never)
+}
+
+# ==========================================================
+#                   GAUNTLET GAME ENTITIES                   
+# ==========================================================
+
+enum GauntletState {
+  PENDING
+  COMPLETED
+}
+
+enum PlayerGauntletStatus {
+  NONE
+  QUEUED
+  IN_GAUNTLET
+}
+
+# Represents a single Gauntlet run
+type Gauntlet @entity {
+  id: ID!                  # Gauntlet ID (uint256 from contract)
+  size: Int!               # 4, 8, 16, or 32
+  entryFee: BigInt!        # Entry fee paid by each participant
+  state: GauntletState!    # PENDING or COMPLETED
+  vrfRequestId: BigInt     # ID of the associated VRF request
+  vrfRequestTimestamp: BigInt! # Timestamp of VRF request
+  completionTimestamp: BigInt # Timestamp of completion or recovery
+  participants: [GauntletParticipant!]! @derivedFrom(field: "gauntlet") # List of participants (INITIAL REGISTRANTS)
+  roundWinners: [String!]  # List of Fighter IDs for each round winner (size - 1)
+  champion: Fighter        # Link to the final winner (Player or DefaultPlayer)
+  prizeAwarded: BigInt!    # Amount paid to the winner (0 if default wins or no payout)
+  feeCollected: BigInt!    # Amount collected as contract fees
+  startedAt: BigInt!       # Timestamp GauntletStarted event occurred
+  startedTx: Bytes!        # Transaction hash of GauntletStarted
+  completedAt: BigInt      # Timestamp GauntletCompleted event occurred
+  completedTx: Bytes       # Transaction hash of GauntletCompleted
+  recoveredAt: BigInt      # Timestamp GauntletRecovered event occurred
+  recoveredTx: Bytes       # Transaction hash of GauntletRecovered
+  finalParticipantIds: [String!] # List of final participant IDs (INCLUDING SUBSTITUTIONS)
+}
+
+# Represents a player's participation in a specific Gauntlet
+type GauntletParticipant @entity {
+  id: ID!                  # Composite ID: "{gauntletId}-{playerId}"
+  gauntlet: Gauntlet!      # Link back to the Gauntlet
+  player: Fighter!         # Link to the participating Fighter (Player or DefaultPlayer)
+  skin: Skin               
+  stance: Int!             # Stance used by the player in this gauntlet
+}
+
+# ==========================================================
+#                   GAUNTLET GAME EVENTS                     
+# ==========================================================
+
+type PlayerQueued @entity(immutable: true) {
+  id: Bytes!               # Transaction hash
+  playerId: BigInt!        # uint32 indexed playerId
+  queueSize: BigInt!       # uint256 queueSize
+  entryFee: BigInt!        # uint256 entryFee
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerWithdrew @entity(immutable: true) {
+  id: Bytes!               # Transaction hash
+  playerId: BigInt!        # uint32 indexed playerId
+  queueSize: BigInt!       # uint256 queueSize
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type GauntletStarted @entity(immutable: true) {
+  id: Bytes!               # Transaction hash
+  gauntletId: BigInt!      # uint256 indexed gauntletId
+  size: Int!               # uint8 size
+  entryFee: BigInt!        # uint256 entryFee
+  participantIds: [BigInt!]! # uint32[] participantIds
+  vrfRequestId: BigInt!    # uint256 vrfRequestId
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+  # Link to the created Gauntlet entity
+  gauntlet: Gauntlet!
+}
+
+type GauntletCompleted @entity(immutable: true) {
+  id: Bytes!               # Transaction hash
+  gauntletId: BigInt!      # uint256 indexed gauntletId
+  size: Int!               # uint8 size
+  entryFee: BigInt!        # uint256 entryFee
+  championId: Int!         # uint32 indexed championId (Keep as Int if event param is i32)
+  prizeAwarded: BigInt!    # uint256 prizeAwarded (amount paid to winner)
+  feeCollected: BigInt!    # uint256 feeCollected (amount added to contract fees)
+  participantIds: [BigInt!]! # uint32[] participantIds (post-substitution)
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+  # Link to the completed Gauntlet entity
+  gauntlet: Gauntlet!
+}
+
+type GauntletRecovered @entity(immutable: true) {
+  id: Bytes!               # Transaction hash
+  gauntletId: BigInt!      # uint256 indexed gauntletId
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+   # Link to the recovered Gauntlet entity
+  gauntlet: Gauntlet!
+}
+
+type QueueClearedDueToGameDisabled @entity(immutable: true) {
+  id: Bytes!               # Transaction hash (unique for this event type)
+  playerIds: [String!]!    # List of player IDs removed (store as String for flexibility)
+  totalRefunded: BigInt!   # Total ETH refunded
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
 }
 

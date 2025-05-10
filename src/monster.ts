@@ -93,30 +93,14 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
   monster.createdAt = event.block.timestamp;
   monster.lastUpdatedAt = event.block.timestamp;
   
-  // Set skin using utility function
+  // Construct the consistent skin ID
   const skinIndex = event.params.stats.skin.skinIndex;
   const skinTokenId = event.params.stats.skin.skinTokenId;
   const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
   
-  const skin = Skin.load(skinId);
-  if (skin !== null) {
-    monster.currentSkin = skinId;
-    log.info("Set skin for monster: {} -> {}", [monster.id, skinId]);
-  } else {
-    log.warning("Skin not found: {}. Creating placeholder...", [skinId]);
-    
-    // Create a placeholder skin
-    const newSkin = new Skin(skinId);
-    newSkin.tokenId = skinTokenId;
-    newSkin.collection = skinIndex.toString();
-    newSkin.weapon = 0; // Will be updated when actual skin event arrives
-    newSkin.armor = 0;
-    newSkin.metadataURI = ""; // Empty string, not null
-    newSkin.save();
-    
-    // Now associate it
-    monster.currentSkin = skinId;
-  }
+  // Directly assign the skin ID. The link will resolve if the Skin entity exists or is created later.
+  monster.currentSkin = skinId;
+  log.info("handleMonsterCreated: Assigning currentSkin ID '{}' to Monster '{}'", [skinId, monster.id]);
 
   monster.save();
 
@@ -156,13 +140,9 @@ export function handleMonsterStatsUpdated(event: MonsterStatsUpdatedEvent): void
   const monsterId = event.params.monsterId.toString();
   let monster = Monster.load(monsterId);
   
-  // If the monster doesn't exist, create it (should not happen normally, but just in case)
   if (monster == null) {
-    monster = new Monster(monsterId);
-    monster.fighterId = event.params.monsterId;
-    monster.fighterType = "Monster";
-    monster.isRetired = false;
-    monster.createdAt = event.block.timestamp;
+    log.error("handleMonsterStatsUpdated: Monster {} not found!", [monsterId]);
+    return; 
   }
   
   // Update attributes
@@ -195,30 +175,14 @@ export function handleMonsterStatsUpdated(event: MonsterStatsUpdatedEvent): void
   // Update timestamp
   monster.lastUpdatedAt = event.block.timestamp;
   
-  // Update skin using utility function
+  // Construct the consistent skin ID
   const skinIndex = event.params.stats.skin.skinIndex;
   const skinTokenId = event.params.stats.skin.skinTokenId;
   const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
   
-  const skin = Skin.load(skinId);
-  if (skin !== null) {
-    monster.currentSkin = skinId;
-    log.info("Updated skin for monster: {} -> {}", [monster.id, skinId]);
-  } else {
-    log.warning("Skin not found: {}. Creating placeholder...", [skinId]);
-    
-    // Create a placeholder skin
-    const newSkin = new Skin(skinId);
-    newSkin.tokenId = skinTokenId;
-    newSkin.collection = skinIndex.toString();
-    newSkin.weapon = 0; // Will be updated when actual skin event arrives
-    newSkin.armor = 0;
-    newSkin.metadataURI = ""; // Empty string, not null
-    newSkin.save();
-    
-    // Now associate it
-    monster.currentSkin = skinId;
-  }
+  // Directly assign the skin ID. The link will resolve if the Skin entity exists or is created later.
+  monster.currentSkin = skinId; 
+  log.info("handleMonsterStatsUpdated: Assigning currentSkin ID '{}' to Monster '{}'", [skinId, monster.id]);
 
   monster.save();
 }

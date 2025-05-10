@@ -50,7 +50,8 @@ import {
   updateStatsForChallengeCreation,
   updateStatsForChallengeCancellation,
   updateStatsForChallengeForfeit,
-  updateStatsForDuelCompletion
+  updateStatsForDuelCompletion,
+  updatePlayerPostCombatStats
 } from "./utils/stats-utils";
 import { DuelGame } from "../generated/DuelGame/DuelGame";
 import { PlayerSnapshot } from "../generated/schema";
@@ -89,7 +90,7 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
   challenge.createdAt = event.block.timestamp;
   challenge.state = "OPEN";
   
-  // Get the Player entity
+  // Get the Player entity for challenger
   const challengerId = event.params.challengerId.toString();
   const challengerPlayer = Player.load(challengerId);
   
@@ -132,27 +133,25 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
     playerSnapshot.losses = challengerPlayer.losses;
     playerSnapshot.kills = challengerPlayer.kills;
     
-    // Set skin information
-    const skinId = event.params.challengerSkinIndex.toString() + "-" + event.params.challengerSkinTokenId.toString();
-    const skin = Skin.load(skinId);
-    
+    // Set skin information using consistent ID format
+    const skinIndex = event.params.challengerSkinIndex;
+    const skinTokenId = event.params.challengerSkinTokenId;
+    const skinId = skinIndex.toString() + "-" + skinTokenId.toString(); // Use collectionId-tokenId
+
+    log.info("handleChallengeCreated: Looking up skin {} for challenger snapshot {}", [skinId, snapshotId]);
+    const skin = Skin.load(skinId); // Load using consistent ID
+
     if (skin !== null) {
+      // Skin found, assign the ID
       playerSnapshot.currentSkin = skinId;
-      log.info("Set skin for player snapshot: {} -> {}", [playerSnapshot.id, skinId]);
+      log.info("handleChallengeCreated: Set skin for player snapshot: {} -> {}", [playerSnapshot.id, skinId]);
     } else {
-      log.warning("Skin not found: {}. Creating placeholder...", [skinId]);
-      
-      // Create a placeholder skin if needed
-      const newSkin = new Skin(skinId);
-      newSkin.tokenId = event.params.challengerSkinTokenId;
-      newSkin.collection = event.params.challengerSkinIndex.toString();
-      newSkin.weapon = 0;
-      newSkin.armor = 0;
-      newSkin.metadataURI = "";
-      newSkin.save();
-      
-      // Now assign it
-      playerSnapshot.currentSkin = skinId;
+      // Skin NOT found. Log warning and set link to null. DO NOT CREATE PLACEHOLDER.
+      log.warning("handleChallengeCreated: Skin {} not found. Setting currentSkin to null for snapshot {}", [
+        skinId,
+        snapshotId
+      ]);
+      playerSnapshot.currentSkin = null; // Assign null
     }
     
     // Update stance and timestamps
@@ -278,7 +277,7 @@ export function handleChallengeAccepted(event: ChallengeAcceptedEvent): void {
   const challenge = DuelChallenge.load(challengeId);
   
   if (challenge) {
-    // Get the Player entity
+    // Get the Player entity for defender
     const defenderId = event.params.defenderId.toString();
     const defenderPlayer = Player.load(defenderId);
     
@@ -297,26 +296,24 @@ export function handleChallengeAccepted(event: ChallengeAcceptedEvent): void {
       // Add null check before accessing properties
       if (playerSnapshot !== null) {
         // Update with the chosen skin and stance for the duel
-        const skinId = event.params.defenderSkinIndex.toString() + "-" + event.params.defenderSkinTokenId.toString();
-        const skin = Skin.load(skinId);
-        
+        const skinIndex = event.params.defenderSkinIndex;
+        const skinTokenId = event.params.defenderSkinTokenId;
+        const skinId = skinIndex.toString() + "-" + skinTokenId.toString(); // Use collectionId-tokenId
+
+        log.info("handleChallengeAccepted: Looking up skin {} for defender snapshot {}", [skinId, snapshotId]);
+        const skin = Skin.load(skinId); // Load using consistent ID
+
         if (skin !== null) {
+          // Skin found, assign the ID
           playerSnapshot.currentSkin = skinId;
-          log.info("Updated skin for defender snapshot: {} -> {}", [playerSnapshot.id, skinId]);
+          log.info("handleChallengeAccepted: Updated skin for defender snapshot: {} -> {}", [playerSnapshot.id, skinId]);
         } else {
-          log.warning("Skin not found: {}. Creating placeholder...", [skinId]);
-          
-          // Create a placeholder skin if needed
-          const newSkin = new Skin(skinId);
-          newSkin.tokenId = event.params.defenderSkinTokenId;
-          newSkin.collection = event.params.defenderSkinIndex.toString();
-          newSkin.weapon = 0;
-          newSkin.armor = 0;
-          newSkin.metadataURI = "";
-          newSkin.save();
-          
-          // Now assign it
-          playerSnapshot.currentSkin = skinId;
+          // Skin NOT found. Log warning and set link to null. DO NOT CREATE PLACEHOLDER.
+          log.warning("handleChallengeAccepted: Skin {} not found. Setting currentSkin to null for snapshot {}", [
+            skinId,
+            snapshotId
+          ]);
+          playerSnapshot.currentSkin = null; // Assign null
         }
         
         // Update stance and timestamps
@@ -483,84 +480,27 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
     challenge.feeCollected = event.params.feeCollected;
     
     // Get winner ID and determine loser ID from the challenge
-    const winnerId = event.params.winnerId.toString();
-    let loserId: string;
+    const winnerId_str = event.params.winnerId.toString();
+    let loserId_str: string;
     
-    if (challenge.challengerId.toString() == winnerId) {
-      loserId = challenge.defenderId.toString();
+    if (challenge.challengerId.toString() == winnerId_str) {
+      loserId_str = challenge.defenderId.toString();
     } else {
-      loserId = challenge.challengerId.toString();
+      loserId_str = challenge.challengerId.toString();
     }
     
-    // Now handle the unique wins/losses tracking
-    const winner = Player.load(winnerId);
-    const loser = Player.load(loserId);
-    
-    if (winner && loser) {
-      // Sort player IDs for consistent record ID
-      let player1Id = winnerId < loserId ? winnerId : loserId;
-      let player2Id = winnerId < loserId ? loserId : winnerId;
-      let winnerIsPlayer1 = winnerId == player1Id;
-      
-      const recordId = `${player1Id}-${player2Id}`;
-      let vsRecord = PlayerVsRecord.load(recordId);
-      
-      if (!vsRecord) {
-        // First encounter between these players
-        vsRecord = new PlayerVsRecord(recordId);
-        vsRecord.player1 = player1Id;
-        vsRecord.player2 = player2Id;
-        vsRecord.player1WinsAgainst2 = winnerIsPlayer1;
-        vsRecord.player2WinsAgainst1 = !winnerIsPlayer1;
-        vsRecord.firstPlayer1Win = winnerIsPlayer1 ? event.block.timestamp : null;
-        vsRecord.firstPlayer2Win = !winnerIsPlayer1 ? event.block.timestamp : null;
-        
-        // Increment unique stats
-        winner.uniqueWins += 1;
-        loser.uniqueLosses += 1;
-        
-      } else {
-        // Players have fought before - check for unique stats
-        let uniqueWin = false;
-        
-        // Check if this is a unique win for the winner
-        if (winnerIsPlayer1 && !vsRecord.player1WinsAgainst2) {
-          vsRecord.player1WinsAgainst2 = true;
-          vsRecord.firstPlayer1Win = event.block.timestamp;
-          uniqueWin = true;
-        } else if (!winnerIsPlayer1 && !vsRecord.player2WinsAgainst1) {
-          vsRecord.player2WinsAgainst1 = true;
-          vsRecord.firstPlayer2Win = event.block.timestamp;
-          uniqueWin = true;
-        }
-        
-        // If it's a unique win, it's also a unique loss
-        if (uniqueWin) {
-          winner.uniqueWins += 1;
-          loser.uniqueLosses += 1;
-        }
-      }
-      
-      // Update battle ratings for both players AFTER updating wins/losses
-      winner.battleRating = winner.uniqueWins - winner.uniqueLosses;
-      loser.battleRating = loser.uniqueWins - loser.uniqueLosses;
-      
-      // Save all updated entities
-      vsRecord.save();
-      winner.save();
-      loser.save();
-    }
+    // Call the unified utility function to update player stats
+    updatePlayerPostCombatStats(winnerId_str, loserId_str, event.block.timestamp);
     
     challenge.save();
     
     // Set reference from event to challenge
     duelComplete.challenge = challengeId;
     
-    // Update stats - moved inside the if block
-    // Double the wager amount to account for both players' contributions
+    // Update general duel stats
     updateStatsForDuelCompletion(
       event.block.timestamp,
-      challenge.wagerAmount.times(BigInt.fromI32(2)),
+      challenge.wagerAmount.times(BigInt.fromI32(2)), // Assuming wagerAmount is per player
       event.params.winnerPayout,
       event.params.feeCollected
     );
@@ -575,16 +515,22 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
  * Handle CombatResult events
  */
 export function handleCombatResult(event: CombatResultEvent): void {
-  // Use transaction hash directly as the ID
-  const combatResult = new CombatResult(event.transaction.hash);
-  
+  // Generate the ID using txHash-logIndex string format
+  const eventId = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
+  const combatResult = new CombatResult(eventId);
+
+  // Populate the reordered fields
+  combatResult.transactionHash = event.transaction.hash;
+  combatResult.logIndex = event.logIndex.toI32(); // Convert BigInt to i32 for Int! type
+
+  // Populate remaining fields
   combatResult.player1Data = event.params.player1Data;
   combatResult.player2Data = event.params.player2Data;
   combatResult.winningPlayerId = event.params.winningPlayerId;
   combatResult.packedResults = event.params.packedResults;
   combatResult.blockNumber = event.block.number;
   combatResult.blockTimestamp = event.block.timestamp;
-  
+
   combatResult.save();
 }
 
