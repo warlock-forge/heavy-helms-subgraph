@@ -86,40 +86,14 @@ export function handleDefaultPlayerCreated(event: DefaultPlayerCreatedEvent): vo
   defaultPlayer.createdAt = event.block.timestamp;
   defaultPlayer.lastUpdatedAt = event.block.timestamp;
   
-  // Directly construct the skin ID
+  // Construct the consistent skin ID
   const skinIndex = event.params.stats.skin.skinIndex;
   const skinTokenId = event.params.stats.skin.skinTokenId;
   const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
   
-  // Add detailed logging
-  log.info("Looking up skin with ID: '{}', skinIndex: {}, skinTokenId: {}", [
-    skinId,
-    skinIndex.toString(),
-    skinTokenId.toString()
-  ]);
-
-  // Check if the skin exists before assigning it
-  const skin = Skin.load(skinId);
-
-  // Add more logging after the lookup
-  if (skin !== null) {
-    defaultPlayer.currentSkin = skinId;
-    log.info("Set skin for default player: {} -> {}", [defaultPlayer.id, skinId]);
-  } else {
-    log.warning("Skin not found: {}. Creating placeholder...", [skinId]);
-    
-    // Create a placeholder skin
-    const newSkin = new Skin(skinId);
-    newSkin.tokenId = skinTokenId;
-    newSkin.collection = skinIndex.toString();
-    newSkin.weapon = 0; 
-    newSkin.armor = 0;
-    newSkin.metadataURI = ""; // Critical: Must be empty string, not null
-    newSkin.save();
-    
-    // Now assign it
-    defaultPlayer.currentSkin = skinId;
-  }
+  // Directly assign the skin ID. The link will resolve if the Skin entity exists or is created later.
+  defaultPlayer.currentSkin = skinId; 
+  log.info("handleDefaultPlayerCreated: Assigning currentSkin ID '{}' to DefaultPlayer '{}'", [skinId, defaultPlayer.id]);
   
   defaultPlayer.save();
 
@@ -159,13 +133,10 @@ export function handleDefaultPlayerStatsUpdated(event: DefaultPlayerStatsUpdated
   const defaultPlayerId = event.params.playerId.toString();
   let defaultPlayer = DefaultPlayer.load(defaultPlayerId);
   
-  // If the player doesn't exist, create it (should not happen normally, but just in case)
   if (defaultPlayer == null) {
-    defaultPlayer = new DefaultPlayer(defaultPlayerId);
-    defaultPlayer.fighterId = event.params.playerId;
-    defaultPlayer.fighterType = "DefaultPlayer";
-    defaultPlayer.isRetired = false;
-    defaultPlayer.createdAt = event.block.timestamp;
+    // ... handle case where player doesn't exist (log error or create minimal) ...
+     log.error("handleDefaultPlayerStatsUpdated: DefaultPlayer {} not found!", [defaultPlayerId]);
+     return; // Or handle appropriately
   }
   
   // Update attributes
@@ -199,40 +170,14 @@ export function handleDefaultPlayerStatsUpdated(event: DefaultPlayerStatsUpdated
   // Update timestamp
   defaultPlayer.lastUpdatedAt = event.block.timestamp;
   
-  // Directly construct the skin ID
+  // Construct the consistent skin ID
   const skinIndex = event.params.stats.skin.skinIndex;
   const skinTokenId = event.params.stats.skin.skinTokenId;
   const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
   
-  // Add detailed logging
-  log.info("Looking up skin with ID: '{}', skinIndex: {}, skinTokenId: {}", [
-    skinId,
-    skinIndex.toString(),
-    skinTokenId.toString()
-  ]);
-
-  // Check if the skin exists before assigning it
-  const skin = Skin.load(skinId);
-
-  // Add more logging after the lookup
-  if (skin !== null) {
-    defaultPlayer.currentSkin = skinId;
-    log.info("Set skin for default player: {} -> {}", [defaultPlayer.id, skinId]);
-  } else {
-    log.warning("Skin not found: {}. Creating placeholder...", [skinId]);
-    
-    // Create a placeholder skin
-    const newSkin = new Skin(skinId);
-    newSkin.tokenId = skinTokenId;
-    newSkin.collection = skinIndex.toString();
-    newSkin.weapon = 0; 
-    newSkin.armor = 0;
-    newSkin.metadataURI = ""; // Critical: Must be empty string, not null
-    newSkin.save();
-    
-    // Now assign it
-    defaultPlayer.currentSkin = skinId;
-  }
+  // Directly assign the skin ID. The link will resolve if the Skin entity exists or is created later.
+  defaultPlayer.currentSkin = skinId; 
+  log.info("handleDefaultPlayerStatsUpdated: Assigning currentSkin ID '{}' to DefaultPlayer '{}'", [skinId, defaultPlayer.id]);
 
   defaultPlayer.save();
 }

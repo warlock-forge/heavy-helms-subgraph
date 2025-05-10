@@ -348,6 +348,9 @@ export function handlePlayerCreationComplete(
   player.uniqueLosses = 0;
   player.battleRating = 0; // Initialize battleRating
   
+  // Set gauntlet status to NONE by default
+  player.gauntletStatus = "NONE";
+  
   // Save the player with all data set
   player.save();
 
@@ -539,22 +542,14 @@ export function handlePlayerSkinEquipped(
   // Update player's skin reference and stance
   let player = Player.load(event.params.playerId.toString());
   if (player) {
-    // Update skin using direct approach
+    // Construct the consistent skin ID
     const skinIndex = event.params.skinIndex;
     const skinTokenId = event.params.tokenId;
     const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
 
-    // Check if the skin exists before assigning it
-    const skin = Skin.load(skinId);
-    if (skin !== null) {
-      player.currentSkin = skinId;
-      log.info("Updated player skin: {} -> {}", [player.id, skinId]);
-    } else {
-      log.warning("Skin does not exist: {}. Cannot associate with player: {}", [
-        skinId, 
-        player.id
-      ]);
-    }
+    // Directly assign the skin ID. The link will resolve if the Skin entity exists or is created later.
+    player.currentSkin = skinId; 
+    log.info("Assigning currentSkin ID '{}' to Player '{}'", [skinId, player.id]);
     
     // Update stance
     player.stance = event.params.stance;
@@ -563,7 +558,7 @@ export function handlePlayerSkinEquipped(
     player.lastUpdatedAt = event.block.timestamp;
     player.save();
   } else {
-    log.warning("Player not found: {}", [event.params.playerId.toString()]);
+    log.warning("Player not found for skin equip event: {}", [event.params.playerId.toString()]);
   }
 }
 

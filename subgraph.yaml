@@ -299,11 +299,87 @@ dataSources:
           handler: handleTimeUntilWithdrawUpdated
         - event: ChallengeRecovered(indexed uint256,uint256,uint256)
           handler: handleChallengeRecovered
-        - event: GameEngineUpdated(indexed address,indexed address)
-          handler: handleGameEngineUpdated
         - event: PlayerContractUpdated(indexed address,indexed address)
           handler: handlePlayerContractUpdated
       file: ./src/duel-game.ts
+
+  # Add GauntletGame data source
+  - kind: ethereum
+    name: GauntletGame
+    network: base-sepolia
+    source:
+      address: "0xB1C73638C3FAeCB4bfA4D0F8623E6600B9685Dd8" # GauntletGame contract address
+      abi: GauntletGame
+      startBlock: 25363230
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        # Core Entities
+        - Gauntlet
+        - GauntletParticipant
+        - Player # Updated by this source
+        - Owner # Potentially updated if fees paid to owner etc.
+        - Fighter # Interface used
+        - Skin # Referenced in GauntletParticipant
+        - SkinCollection # Needed for Skin lookup
+        - Stats # Updated by this source
+        # Event Entities
+        - PlayerQueued
+        - PlayerWithdrew
+        - GauntletStarted
+        - GauntletCompleted
+        - GauntletRecovered
+        - CombatResult # Standard combat result, not gauntlet-specific
+        - QueueClearedDueToGameDisabled # Add the event entity if not already implicitly covered
+        # Admin Event Entities (Add if needed)
+        # ...
+      abis:
+        - name: GauntletGame
+          file: ./abis/GauntletGame.json # ABI for the new contract
+        - name: Player # Already listed, but needed
+          file: ./abis/Player.json
+        - name: PlayerSkinRegistry # Needed for skin validation/info
+          file: ./abis/PlayerSkinRegistry.json
+        - name: PlayerSkinNFT # Needed for skin attributes
+          file: ./abis/PlayerSkinNFT.json
+        - name: DefaultPlayer # Needed for default player info
+          file: ./abis/DefaultPlayer.json
+      eventHandlers:
+        # Queue Management
+        - event: PlayerQueued(indexed uint32,uint256,uint256)
+          handler: handlePlayerQueued
+        - event: PlayerWithdrew(indexed uint32,uint256)
+          handler: handlePlayerWithdrew
+        # Gauntlet Lifecycle
+        - event: GauntletStarted(indexed uint256,uint8,uint256,(uint32,(uint32,(uint32,uint16),uint8))[],uint256)
+          handler: handleGauntletStarted
+        - event: GauntletCompleted(indexed uint256,uint8,uint256,indexed uint32,uint256,uint256,uint32[],uint32[])
+          handler: handleGauntletCompleted
+        - event: GauntletRecovered(indexed uint256)
+          handler: handleGauntletRecovered
+        # BaseGame Event (emitted by GauntletGame during fulfillment)
+        - event: CombatResult(indexed bytes32,indexed bytes32,indexed uint32,bytes)
+          handler: handleGauntletCombatResult # Use a specific handler
+        # Admin & Settings Events
+        - event: FeesWithdrawn(uint256)
+          handler: handleFeesWithdrawn
+        - event: EntryFeeSet(uint256,uint256)
+          handler: handleEntryFeeSet
+        - event: GauntletSizeSet(uint8,uint8)
+          handler: handleGauntletSizeSet
+        - event: FeePercentageSet(uint256,uint256)
+          handler: handleFeePercentageSet
+        - event: GameEnabledUpdated(bool)
+          handler: handleGameEnabledUpdated
+        # Add the handler for the updated event
+        - event: QueueClearedDueToGameDisabled(uint32[],uint256) # Signature with uint32[]
+          handler: handleQueueClearedDueToGameDisabled # New handler function name
+        - event: MinTimeBetweenGauntletsSet(uint256)
+          handler: handleMinTimeBetweenGauntletsSet
+        # ... other admin handlers ...
+      file: ./src/gauntlet-game.ts # New mapping file
 
 templates:
   - name: PlayerSkinNFT

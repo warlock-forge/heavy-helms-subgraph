@@ -4,130 +4,144 @@ import {
   SkinAttributesUpdated as SkinAttributesUpdatedEvent,
   GameOwnedNFT
 } from "../../generated/templates/GameOwnedNFT/GameOwnedNFT";
-import { Skin } from "../../generated/schema";
-import { BigInt, log } from "@graphprotocol/graph-ts";
+import { Skin, SkinCollection } from "../../generated/schema";
+import { BigInt, log, Address } from "@graphprotocol/graph-ts";
 import { getCollectionIdForAddress, processMetadataURI } from "../utils/registry-utils";
 import { updateStatsForSkinCreation } from "../utils/stats-utils";
 
 export function handleSkinMinted(event: SkinMintedEvent): void {
-  // Get the skin collection ID for this contract
   const contractAddress = event.address;
-  const collectionId = getCollectionIdForAddress(contractAddress);
+  const collectionIdResult = getCollectionIdForAddress(contractAddress);
   
-  if (!collectionId) {
-    log.warning("Unknown skin contract: {}", [contractAddress.toHexString()]);
+  if (!collectionIdResult) {
+    log.warning("handleSkinMinted: Unknown skin contract address mapping: {}", [contractAddress.toHexString()]);
     return;
   }
+  let collectionId: BigInt = collectionIdResult;
+  let collectionIdString = collectionId.toString();
+
+  let tokenId_i32 = event.params.tokenId;
+  let tokenIdString = tokenId_i32.toString();
+
+  const skinId = collectionIdString + "-" + tokenIdString;
   
-  // Create a unique ID for the skin
-  const tokenId = event.params.tokenId;
-  const skinId = collectionId.toString() + "-" + tokenId.toString();
-  
-  // Check if the skin already exists (could be a placeholder)
+  log.info("handleSkinMinted: Processing Skin ID (collectionId-tokenId): {}, Collection: {}, Token: {}", [
+    skinId,
+    collectionIdString,
+    tokenIdString
+  ]);
+
   let skin = Skin.load(skinId);
   let isNew = false;
   
-  // If the skin doesn't exist, create it
   if (!skin) {
+    log.info("handleSkinMinted: Skin {} not found, creating new entity.", [skinId]);
     skin = new Skin(skinId);
-    skin.collection = collectionId.toString();
+    skin.collection = collectionIdString;
     skin.metadataURI = "";
     isNew = true;
+  } else {
+    log.info("handleSkinMinted: Found existing Skin {}, updating.", [skinId]);
+    skin.collection = collectionIdString;
   }
   
-  // Always update token ID and attributes regardless of whether it's new or existing
-  skin.tokenId = tokenId;
+  skin.tokenId = tokenId_i32;
   skin.weapon = event.params.weapon;
   skin.armor = event.params.armor;
   
-  // Get the tokenURI directly from the contract
   const nftContract = GameOwnedNFT.bind(contractAddress);
-  const tokenURIResult = nftContract.try_tokenURI(BigInt.fromI32(tokenId));
+  const tokenURIResult = nftContract.try_tokenURI(BigInt.fromI32(tokenId_i32));
   
-  // Store the result in a local variable to avoid nullability issues
   let metadataURIValue = "";
   
   if (!tokenURIResult.reverted) {
     metadataURIValue = processMetadataURI(tokenURIResult.value);
     skin.metadataURI = metadataURIValue;
-    log.info("Set metadata URI for game owned skin {}: {}", [skinId, metadataURIValue]);
+    log.info("handleSkinMinted: Set metadata URI for skin {}: {}", [skinId, metadataURIValue]);
   } else {
-    log.warning("Failed to get tokenURI for game owned skin: {}", [skinId]);
+    log.warning("handleSkinMinted: Failed to get tokenURI for skin: {}", [skinId]);
+    if (isNew) {
+      skin.metadataURI = "";
+    }
   }
-  
+
+  log.info("handleSkinMinted: Saving Skin {} with weapon: {}, armor: {}", [
+    skinId,
+    skin.weapon.toString(),
+    skin.armor.toString()
+  ]);
   skin.save();
   
-  // Only update stats for new skins
   if (isNew) {
+    log.info("handleSkinMinted: Skin {} was newly created. Updating stats.", [skinId]);
     updateStatsForSkinCreation(event.block.timestamp);
   }
   
-  // Use the local variable (which is guaranteed to be a string)
-  if (isNew) {
-    log.info("Game owned skin minted: collection {}, token {}, metadata: {}", [
-      collectionId.toString(),
-      tokenId.toString(),
-      metadataURIValue
-    ]);
-  } else {
-    log.info("Updated existing game owned skin: collection {}, token {}, metadata: {}", [
-      collectionId.toString(),
-      tokenId.toString(),
-      metadataURIValue
-    ]);
-  }
+  log.info("Game owned skin {}: id {}, collection {}, token {}, metadata: {}", [
+    isNew ? "CREATED" : "UPDATED",
+    skinId,
+    collectionIdString,
+    tokenIdString,
+    skin.metadataURI ? skin.metadataURI! : "null"
+  ]);
 }
 
 export function handleCIDUpdated(event: CIDUpdatedEvent): void {
   const contractAddress = event.address;
-  const collectionId = getCollectionIdForAddress(contractAddress);
+  const collectionIdResult = getCollectionIdForAddress(contractAddress);
   
-  if (!collectionId) {
-    log.warning("Unknown skin contract: {}", [contractAddress.toHexString()]);
+  if (!collectionIdResult) {
+    log.warning("handleCIDUpdated: Unknown skin contract address mapping: {}", [contractAddress.toHexString()]);
     return;
   }
   
-  const tokenId = event.params.tokenId;
-  const skinId = collectionId.toString() + "-" + tokenId.toString();
+  let collectionIdString = collectionIdResult.toString();
   
+  const tokenId_i32 = event.params.tokenId;
+  let tokenIdString = tokenId_i32.toString();
+  const skinId = collectionIdString + "-" + tokenIdString;
+  
+  log.info("handleCIDUpdated: Processing Skin ID (collectionId-tokenId): {}", [skinId]);
   let skin = Skin.load(skinId);
   if (skin) {
-    // Construct the full IPFS URI
     const ipfsURI = "ipfs://" + event.params.newCID;
     const processedURI = processMetadataURI(ipfsURI);
     skin.metadataURI = processedURI;
     skin.save();
-    
-    log.info("Updated CID for game owned skin {}: {}", [skinId, processedURI]);
+    log.info("handleCIDUpdated: Updated CID for skin {}: {}", [skinId, processedURI]);
   } else {
-    log.warning("Game owned skin not found for CID update: {}", [skinId]);
+    log.warning("handleCIDUpdated: Skin not found using ID {}. Cannot update CID.", [skinId]);
   }
 }
 
 export function handleSkinAttributesUpdated(event: SkinAttributesUpdatedEvent): void {
   const contractAddress = event.address;
-  const collectionId = getCollectionIdForAddress(contractAddress);
+  const collectionIdResult = getCollectionIdForAddress(contractAddress);
   
-  if (!collectionId) {
-    log.warning("Unknown skin contract: {}", [contractAddress.toHexString()]);
-    return;
+  if (!collectionIdResult) {
+     log.warning("handleSkinAttributesUpdated: Unknown skin contract address mapping: {}", [contractAddress.toHexString()]);
+     return;
   }
   
-  const tokenId = event.params.tokenId;
-  const skinId = collectionId.toString() + "-" + tokenId.toString();
+  let collectionIdString = collectionIdResult.toString();
   
+  const tokenId_i32 = event.params.tokenId;
+  let tokenIdString = tokenId_i32.toString();
+  const skinId = collectionIdString + "-" + tokenIdString;
+  
+  log.info("handleSkinAttributesUpdated: Processing Skin ID (collectionId-tokenId): {}", [skinId]);
   let skin = Skin.load(skinId);
   if (skin) {
     skin.weapon = event.params.weapon;
     skin.armor = event.params.armor;
     skin.save();
     
-    log.info("Updated attributes for game owned skin {}: weapon={}, armor={}", [
+    log.info("handleSkinAttributesUpdated: Updated attributes for skin {}: weapon={}, armor={}", [
       skinId, 
       event.params.weapon.toString(),
       event.params.armor.toString()
     ]);
   } else {
-    log.warning("Game owned skin not found for attributes update: {}", [skinId]);
+    log.warning("handleSkinAttributesUpdated: Skin not found using ID {}. Cannot update attributes.", [skinId]);
   }
 }
