@@ -88,6 +88,8 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
   monster.wins = event.params.stats.record.wins;
   monster.losses = event.params.stats.record.losses;
   monster.kills = event.params.stats.record.kills;
+  monster.gauntletWins = 0; // Initialize gauntlet wins counter
+  monster.duelWins = 0; // Initialize duel wins counter
   
   // Set timestamps
   monster.createdAt = event.block.timestamp;

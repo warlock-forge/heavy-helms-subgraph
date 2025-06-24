@@ -51,7 +51,8 @@ import {
   updateStatsForChallengeCancellation,
   updateStatsForChallengeForfeit,
   updateStatsForDuelCompletion,
-  updatePlayerPostCombatStats
+  updatePlayerPostCombatStats,
+  updateStatsForDuelWin
 } from "./utils/stats-utils";
 import { DuelGame } from "../generated/DuelGame/DuelGame";
 import { PlayerSnapshot } from "../generated/schema";
@@ -132,6 +133,8 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
     playerSnapshot.wins = challengerPlayer.wins;
     playerSnapshot.losses = challengerPlayer.losses;
     playerSnapshot.kills = challengerPlayer.kills;
+    playerSnapshot.gauntletWins = challengerPlayer.gauntletWins;
+    playerSnapshot.duelWins = challengerPlayer.duelWins;
     
     // Set skin information using consistent ID format
     const skinIndex = event.params.challengerSkinIndex;
@@ -209,6 +212,8 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
     defenderSnapshot.wins = defenderPlayer.wins;
     defenderSnapshot.losses = defenderPlayer.losses;
     defenderSnapshot.kills = defenderPlayer.kills;
+    defenderSnapshot.gauntletWins = defenderPlayer.gauntletWins;
+    defenderSnapshot.duelWins = defenderPlayer.duelWins;
     
     // Use the player's current skin and stance - not from event parameters
     defenderSnapshot.currentSkin = defenderPlayer.currentSkin;
@@ -358,6 +363,8 @@ export function handleChallengeAccepted(event: ChallengeAcceptedEvent): void {
           newSnapshot.wins = defenderPlayer.wins;
           newSnapshot.losses = defenderPlayer.losses;
           newSnapshot.kills = defenderPlayer.kills;
+          newSnapshot.gauntletWins = defenderPlayer.gauntletWins;
+          newSnapshot.duelWins = defenderPlayer.duelWins;
           
           // Set for this duel
           const skinId = event.params.defenderSkinIndex.toString() + "-" + event.params.defenderSkinTokenId.toString();
@@ -491,6 +498,9 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
     
     // Call the unified utility function to update player stats
     updatePlayerPostCombatStats(winnerId_str, loserId_str, event.block.timestamp);
+    
+    // Update the winner's duel wins counter
+    updateStatsForDuelWin(winnerId_str, event.block.timestamp);
     
     challenge.save();
     

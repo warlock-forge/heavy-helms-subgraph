@@ -33,7 +33,7 @@ import {
 } from "../generated/schema";
 
 import { getOrCreateStats } from "./utils/stats-utils";
-import { updatePlayerPostCombatStats } from "./utils/stats-utils";
+import { updatePlayerPostCombatStats, updateStatsForGauntletWin } from "./utils/stats-utils";
 
 // Define ZERO_BI directly
 const ZERO_BI = BigInt.fromI32(0);
@@ -288,6 +288,9 @@ export function handleGauntletCompleted(event: GauntletCompletedEvent): void {
       }
     }
     // --- END ADDED LOGIC ---
+
+    // Update the champion's gauntlet wins counter
+    updateStatsForGauntletWin(championIdString, event.block.timestamp);
 
   } else {
     log.error("GauntletCompleted event for non-existent Gauntlet id {} in tx {}", [

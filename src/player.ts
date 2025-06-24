@@ -347,6 +347,8 @@ export function handlePlayerCreationComplete(
   player.uniqueWins = 0;
   player.uniqueLosses = 0;
   player.battleRating = 0; // Initialize battleRating
+  player.gauntletWins = 0; // Initialize gauntlet wins counter
+  player.duelWins = 0; // Initialize duel wins counter
   
   // Set gauntlet status to NONE by default
   player.gauntletStatus = "NONE";

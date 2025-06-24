@@ -30,6 +30,8 @@ interface Fighter {
   wins: Int!
   losses: Int!
   kills: Int!
+  gauntletWins: Int!       # Number of gauntlets won
+  duelWins: Int!           # Number of duels won
   
   # Stance field (new)
   stance: Int!            # uint8 stance value
@@ -72,6 +74,8 @@ type Player implements Fighter @entity {
   wins: Int!
   losses: Int!
   kills: Int!
+  gauntletWins: Int!       # Number of gauntlets won
+  duelWins: Int!           # Number of duels won
   
   # Stance field (new)
   stance: Int!            # uint8 stance value, defaults to 1
@@ -116,6 +120,8 @@ type PlayerSnapshot implements Fighter @entity {
   wins: Int!
   losses: Int!
   kills: Int!
+  gauntletWins: Int!       # Number of gauntlets won (snapshot value)
+  duelWins: Int!           # Number of duels won (snapshot value)
   
   # Stance field (from event)
   stance: Int!
@@ -157,6 +163,8 @@ type DefaultPlayer implements Fighter @entity {
   wins: Int!
   losses: Int!
   kills: Int!
+  gauntletWins: Int!       # Number of gauntlets won
+  duelWins: Int!           # Number of duels won
   
   # Stance field (new)
   stance: Int!            # uint8 stance value, set on creation
@@ -195,6 +203,8 @@ type Monster implements Fighter @entity {
   wins: Int!
   losses: Int!
   kills: Int!
+  gauntletWins: Int!       # Number of gauntlets won
+  duelWins: Int!           # Number of duels won
   
   # Stance field (new)
   stance: Int!            # uint8 stance value, set on creation
