@@ -1,5 +1,5 @@
 import { BigInt, Address } from "@graphprotocol/graph-ts"
-import { Stats, Owner, Player, PlayerVsRecord } from "../../generated/schema"
+import { Stats, Owner, Player, PlayerVsRecord, DefaultPlayer } from "../../generated/schema"
 import { log } from "@graphprotocol/graph-ts"
 
 export function getOrCreateStats(): Stats {
@@ -102,6 +102,68 @@ export function updateStatsForKills(timestamp: BigInt, killsDelta: i32): void {
   stats.totalKills += killsDelta
   stats.lastUpdated = timestamp
   stats.save()
+}
+
+// New function to update gauntlet wins
+export function updateStatsForGauntletWin(winnerId: string, timestamp: BigInt): void {
+  // Update the winner's gauntlet wins counter
+  let player = Player.load(winnerId)
+  if (player) {
+    player.gauntletWins += 1
+    player.lastUpdatedAt = timestamp
+    player.save()
+    return
+  }
+  
+  let defaultPlayer = DefaultPlayer.load(winnerId)
+  if (defaultPlayer) {
+    defaultPlayer.gauntletWins += 1
+    defaultPlayer.lastUpdatedAt = timestamp
+    defaultPlayer.save()
+    return
+  }
+  
+  // Could also check for Monster if they can win gauntlets
+  // let monster = Monster.load(winnerId)
+  // if (monster) {
+  //   monster.gauntletWins += 1
+  //   monster.lastUpdatedAt = timestamp
+  //   monster.save()
+  //   return
+  // }
+  
+  log.warning("Fighter with ID {} not found when updating gauntlet wins", [winnerId])
+}
+
+// New function to update duel wins
+export function updateStatsForDuelWin(winnerId: string, timestamp: BigInt): void {
+  // Update the winner's duel wins counter
+  let player = Player.load(winnerId)
+  if (player) {
+    player.duelWins += 1
+    player.lastUpdatedAt = timestamp
+    player.save()
+    return
+  }
+  
+  let defaultPlayer = DefaultPlayer.load(winnerId)
+  if (defaultPlayer) {
+    defaultPlayer.duelWins += 1
+    defaultPlayer.lastUpdatedAt = timestamp
+    defaultPlayer.save()
+    return
+  }
+  
+  // Could also check for Monster if they can win duels
+  // let monster = Monster.load(winnerId)
+  // if (monster) {
+  //   monster.duelWins += 1
+  //   monster.lastUpdatedAt = timestamp
+  //   monster.save()
+  //   return
+  // }
+  
+  log.warning("Fighter with ID {} not found when updating duel wins", [winnerId])
 }
 
 // Monster-related update methods

@@ -74,10 +74,12 @@ export function handleDefaultPlayerCreated(event: DefaultPlayerCreatedEvent): vo
   defaultPlayer.surname = surname;
   defaultPlayer.fullName = createFullName(firstName, surname);
   
-  // Set record fields
+  // Set record fields (always 0 for default players)
   defaultPlayer.wins = event.params.stats.record.wins;
   defaultPlayer.losses = event.params.stats.record.losses;
   defaultPlayer.kills = event.params.stats.record.kills;
+  defaultPlayer.gauntletWins = 0; // Initialize gauntlet wins counter
+  defaultPlayer.duelWins = 0; // Initialize duel wins counter
   
   // Set stance
   defaultPlayer.stance = event.params.stats.stance;
