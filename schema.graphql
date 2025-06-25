@@ -829,6 +829,54 @@ type CombatResult @entity(immutable: true) {
   packedResults: Bytes!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
+  
+  # Decoded combat statistics (extracted from packedResults)
+  player1Won: Boolean!      # True if player1 won, false if player2 won
+  gameEngineVersion: Int!   # Version of the game engine that generated this log
+  winCondition: String!     # HEALTH, EXHAUSTION, MAX_ROUNDS, or DEATH
+  roundCount: Int!          # Number of rounds/actions in the combat
+  
+  # Player 1 Statistics
+  player1TotalDamage: Int!     # Total damage dealt by player 1
+  player1TotalStaminaLost: Int! # Total stamina lost by player 1
+  player1Attacks: Int!         # Number of attack actions by player 1
+  player1Hits: Int!            # Number of successful hits by player 1
+  player1Misses: Int!          # Number of misses by player 1
+  player1Crits: Int!           # Number of critical hits by player 1 (including riposte/counter crits)
+  player1Blocks: Int!          # Number of successful blocks by player 1
+  player1Counters: Int!        # Number of counter attacks by player 1
+  player1Dodges: Int!          # Number of successful dodges by player 1
+  player1Parries: Int!         # Number of successful parries by player 1
+  player1Ripostes: Int!        # Number of riposte attacks by player 1
+  player1DefensiveActions: Int! # Total defensive actions (blocks + dodges + parries)
+  player1MaxDamage: Int!       # Highest single damage dealt by player 1
+  
+  # Player 1 Calculated Stats (from decoded player data)
+  player1MaxHealth: Int!       # Player 1's maximum health at start of combat
+  player1MaxStamina: Int!      # Player 1's maximum stamina at start of combat
+  player1EndingHealth: Int!    # Player 1's health at end of combat (maxHealth - damage taken)
+  player1EndingStamina: Int!   # Player 1's stamina at end of combat (maxStamina - stamina lost)
+  
+  # Player 2 Statistics (mirror of player 1)
+  player2TotalDamage: Int!
+  player2TotalStaminaLost: Int!
+  player2Attacks: Int!
+  player2Hits: Int!
+  player2Misses: Int!
+  player2Crits: Int!
+  player2Blocks: Int!
+  player2Counters: Int!
+  player2Dodges: Int!
+  player2Parries: Int!
+  player2Ripostes: Int!
+  player2DefensiveActions: Int!
+  player2MaxDamage: Int!
+  
+  # Player 2 Calculated Stats (from decoded player data)
+  player2MaxHealth: Int!       # Player 2's maximum health at start of combat
+  player2MaxStamina: Int!      # Player 2's maximum stamina at start of combat
+  player2EndingHealth: Int!    # Player 2's health at end of combat (maxHealth - damage taken)
+  player2EndingStamina: Int!   # Player 2's stamina at end of combat (maxStamina - stamina lost)
 }
 
 type FeesWithdrawn @entity(immutable: true) {

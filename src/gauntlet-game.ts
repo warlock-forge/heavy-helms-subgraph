@@ -33,7 +33,7 @@ import {
 } from "../generated/schema";
 
 import { getOrCreateStats } from "./utils/stats-utils";
-import { updatePlayerPostCombatStats, updateStatsForGauntletWin } from "./utils/stats-utils";
+import { updatePlayerPostCombatStats, updateStatsForGauntletWin, processCombatResultsWithPlayerData } from "./utils/stats-utils";
 
 // Define ZERO_BI directly
 const ZERO_BI = BigInt.fromI32(0);
@@ -380,6 +380,62 @@ export function handleGauntletCombatResult(event: CombatResultEvent): void {
   combatResult.packedResults = event.params.packedResults;
   combatResult.blockNumber = event.block.number;
   combatResult.blockTimestamp = event.block.timestamp;
+
+  // Decode combat statistics with player data processing
+  const decodedStats = processCombatResultsWithPlayerData(
+    event.params.packedResults,
+    event.params.player1Data,
+    event.params.player2Data
+  );
+  
+  // Basic combat info
+  combatResult.player1Won = decodedStats.player1Won;
+  combatResult.gameEngineVersion = decodedStats.gameEngineVersion;
+  combatResult.winCondition = decodedStats.winCondition;
+  combatResult.roundCount = decodedStats.roundCount;
+  
+  // Player 1 combat stats
+  combatResult.player1TotalDamage = decodedStats.player1TotalDamage;
+  combatResult.player1TotalStaminaLost = decodedStats.player1TotalStaminaLost;
+  combatResult.player1Attacks = decodedStats.player1Attacks;
+  combatResult.player1Hits = decodedStats.player1Hits;
+  combatResult.player1Misses = decodedStats.player1Misses;
+  combatResult.player1Crits = decodedStats.player1Crits;
+  combatResult.player1Blocks = decodedStats.player1Blocks;
+  combatResult.player1Counters = decodedStats.player1Counters;
+  combatResult.player1Dodges = decodedStats.player1Dodges;
+  combatResult.player1Parries = decodedStats.player1Parries;
+  combatResult.player1Ripostes = decodedStats.player1Ripostes;
+  combatResult.player1DefensiveActions = decodedStats.player1DefensiveActions;
+  combatResult.player1MaxDamage = decodedStats.player1MaxDamage;
+  
+  // Player 1 calculated stats
+  combatResult.player1MaxHealth = decodedStats.player1MaxHealth;
+  combatResult.player1MaxStamina = decodedStats.player1MaxStamina;
+  combatResult.player1EndingHealth = decodedStats.player1EndingHealth;
+  combatResult.player1EndingStamina = decodedStats.player1EndingStamina;
+  
+  // Player 2 combat stats
+  combatResult.player2TotalDamage = decodedStats.player2TotalDamage;
+  combatResult.player2TotalStaminaLost = decodedStats.player2TotalStaminaLost;
+  combatResult.player2Attacks = decodedStats.player2Attacks;
+  combatResult.player2Hits = decodedStats.player2Hits;
+  combatResult.player2Misses = decodedStats.player2Misses;
+  combatResult.player2Crits = decodedStats.player2Crits;
+  combatResult.player2Blocks = decodedStats.player2Blocks;
+  combatResult.player2Counters = decodedStats.player2Counters;
+  combatResult.player2Dodges = decodedStats.player2Dodges;
+  combatResult.player2Parries = decodedStats.player2Parries;
+  combatResult.player2Ripostes = decodedStats.player2Ripostes;
+  combatResult.player2DefensiveActions = decodedStats.player2DefensiveActions;
+  combatResult.player2MaxDamage = decodedStats.player2MaxDamage;
+  
+  // Player 2 calculated stats
+  combatResult.player2MaxHealth = decodedStats.player2MaxHealth;
+  combatResult.player2MaxStamina = decodedStats.player2MaxStamina;
+  combatResult.player2EndingHealth = decodedStats.player2EndingHealth;
+  combatResult.player2EndingStamina = decodedStats.player2EndingStamina;
+
   combatResult.save();
 
   const winnerIdFromEvent_str = event.params.winningPlayerId.toString();
