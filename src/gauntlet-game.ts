@@ -39,8 +39,53 @@ import { updatePlayerPostCombatStats } from "./utils/stats-utils";
 const ZERO_BI = BigInt.fromI32(0);
 const ZERO_I32 = 0; // Helper constant
 
+/**
+ * One-time migration to fix players stuck in IN_GAUNTLET status from gauntlet 954
+ * This runs once per deployment to backfill the 8 stuck players
+ */
+function migrateStuckPlayersFromGauntlet954(): void {
+  // Check if migration has already run by looking for a marker in Stats
+  let stats = getOrCreateStats();
+  
+  // Use a field that we can repurpose as a migration marker
+  // We'll use a timestamp field to mark when this migration ran
+  if (stats.lastUpdated.gt(BigInt.fromI32(1750988719))) {
+    // Migration already ran (lastUpdated is after the recovery timestamp)
+    return;
+  }
+
+  log.info("[MIGRATION] Starting one-time fix for stuck players from gauntlet 954", []);
+  
+  // List of the 8 stuck player IDs from gauntlet 954
+  let stuckPlayerIds = ["10165", "10284", "10287", "10300", "10322", "10327", "10331", "10332"];
+  let fixedCount = 0;
+  
+  for (let i = 0; i < stuckPlayerIds.length; i++) {
+    let playerId = stuckPlayerIds[i];
+    let player = Player.load(playerId);
+    
+    if (player && player.gauntletStatus == "IN_GAUNTLET" && player.currentGauntlet == "954") {
+      player.gauntletStatus = "NONE";
+      player.currentGauntlet = null;
+      player.lastUpdatedAt = BigInt.fromI32(1750988719); // Set to recovery timestamp
+      player.save();
+      fixedCount++;
+      log.info("[MIGRATION] Fixed stuck player {} from gauntlet 954", [playerId]);
+    }
+  }
+  
+  log.info("[MIGRATION] Completed: Fixed {} stuck players from gauntlet 954", [fixedCount.toString()]);
+  
+  // Mark migration as complete by updating the stats timestamp
+  stats.lastUpdated = BigInt.fromI32(1750988720); // One second after recovery
+  stats.save();
+}
+
 // Handle the PlayerQueued event
 export function handlePlayerQueued(event: PlayerQueuedEvent): void {
+  // Run one-time migration for stuck players (idempotent)
+  migrateStuckPlayersFromGauntlet954();
+  
   const entityId = event.transaction.hash.concatI32(event.logIndex.toI32());
   const entity = new PlayerQueued(entityId);
   
