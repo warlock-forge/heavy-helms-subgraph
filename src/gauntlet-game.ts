@@ -39,6 +39,8 @@ import { updatePlayerPostCombatStats, updateStatsForGauntletWin } from "./utils/
 const ZERO_BI = BigInt.fromI32(0);
 const ZERO_I32 = 0; // Helper constant
 
+
+
 // Handle the PlayerQueued event
 export function handlePlayerQueued(event: PlayerQueuedEvent): void {
   const entityId = event.transaction.hash.concatI32(event.logIndex.toI32());
@@ -343,6 +345,45 @@ export function handleGauntletRecovered(event: GauntletRecoveredEvent): void {
         stats.totalGauntletsRecovered += 1;
         stats.lastUpdated = event.block.timestamp;
         stats.save();
+
+        // --- BEGIN ADDED LOGIC: Reset Player Statuses for VRF Recovery ---
+        // Since GauntletRecovered event doesn't provide participant IDs, we need to find them
+        // by querying the GauntletParticipant entities for this gauntlet
+        log.info("[GauntletRecovered {}] Resetting player statuses for recovered gauntlet.", [gauntletId]);
+        
+        // Find all participants in this gauntlet using the derived relationship
+        let participants = gauntlet.participants.load();
+        log.info("[GauntletRecovered {}] Found {} participants to reset.", [gauntletId, participants.length.toString()]);
+        
+        for (let i = 0; i < participants.length; i++) {
+          let participant = participants[i];
+          let playerIdString = participant.player;
+          let player = Player.load(playerIdString);
+
+          if (player) {
+            // Check if the player was indeed in this gauntlet before resetting status
+            if (player.gauntletStatus == "IN_GAUNTLET" && player.currentGauntlet == gauntletId) {
+              player.gauntletStatus = "NONE";
+              player.currentGauntlet = null; // Clear link to this gauntlet
+              player.lastUpdatedAt = event.block.timestamp;
+              player.save();
+              log.info("[GauntletRecovered {}] Reset Player {} status to NONE.", [gauntletId, playerIdString]);
+            } else {
+              // This might happen if a player somehow got into another state, but we should still log it
+              log.warning("[GauntletRecovered {}] Player {} status was not IN_GAUNTLET for this gauntlet (status: {}, currentGauntlet: {}). Status not reset.", [
+                gauntletId, 
+                playerIdString, 
+                player.gauntletStatus, 
+                player.currentGauntlet ? player.currentGauntlet! : "null"
+              ]);
+            }
+          } else {
+            // If the participant ID doesn't resolve to a Player entity, it might be a DefaultPlayer
+            // DefaultPlayers don't have gauntletStatus tracked in the same way, so we can skip them
+            log.info("[GauntletRecovered {}] Participant ID {} not found as Player entity. Likely a DefaultPlayer, skipping status update.", [gauntletId, playerIdString]);
+          }
+        }
+        // --- END ADDED LOGIC ---
 
     } else {
         log.warning("GauntletRecovered event for already completed Gauntlet id {} in tx {}", [
