@@ -472,104 +472,212 @@ export function decodeCombatResults(packedResults: Bytes): CombatStats {
     
     // Player 2 action data
     let p2Result = packedResults[offset + 4];
-    let p2Damage = (packedResults[offset + 5] << 8) | packedResults[offset + 6];
-    let p2StaminaLost = packedResults[offset + 7];
-    
-    // Process Player 1 results
-    stats.player1TotalDamage += p1Damage as i32;
-    stats.player1TotalStaminaLost += p1StaminaLost as i32;
-    if ((p1Damage as i32) > stats.player1MaxDamage) {
-      stats.player1MaxDamage = p1Damage as i32;
+          let p2Damage = (packedResults[offset + 5] << 8) | packedResults[offset + 6];
+      let p2StaminaLost = packedResults[offset + 7];
+      
+
+      
+      // Process Player 1 results
+      stats.player1TotalDamage += p1Damage as i32;
+      stats.player1TotalStaminaLost += p1StaminaLost as i32;
+      if ((p1Damage as i32) > stats.player1MaxDamage) {
+        stats.player1MaxDamage = p1Damage as i32;
+      }
+      
+      // Process Player 1's action - need to check both players to determine hit/miss
+    if (p1Result == 0) { // MISS - successful defensive action
+      stats.player1DefensiveActions++;
     }
-    
-    // Count Player 1 action types based on CombatResultType enum
-    if (p1Result == 0) { // MISS - failed offensive attempt
-      stats.player1Misses++;
-      stats.player1Attacks++; // Missed attacks still count as attack attempts
-    } else if (p1Result == 1) { // ATTACK - successful offensive attempt
-      stats.player1Hits++;
+    if (p1Result == 1) { // ATTACK - offensive action
       stats.player1Attacks++;
-    } else if (p1Result == 2) { // CRIT - critical offensive attempt
+      // Check defender's result to determine if attack hit or missed
+      // Player 2 result 11 (HIT) means Player 2 failed to defend = Player 1 hit
+      // Player 2 result 0,3,4,5,6,7,8,9 means Player 2 successfully defended = Player 1 missed
+      if (p2Result == 11) {
+        stats.player1Hits++;
+      } else {
+        stats.player1Misses++;
+      }
+    }
+    if (p1Result == 2) { // CRIT - critical offensive action
+      stats.player1Attacks++;
       stats.player1Crits++;
-      stats.player1Hits++;
-      stats.player1Attacks++;
-    } else if (p1Result == 3) { // BLOCK - successful defensive action
+      // Check defender's result to determine if attack hit or missed
+      // Player 2 result 11 (HIT) means Player 2 failed to defend = Player 1 hit
+      // Player 2 result 0,3,4,5,6,7,8,9 means Player 2 successfully defended = Player 1 missed
+      if (p2Result == 11) {
+        stats.player1Hits++;
+      } else {
+        stats.player1Misses++;
+      }
+    }
+    if (p1Result == 3) { // BLOCK - successful defensive action
       stats.player1Blocks++;
       stats.player1DefensiveActions++;
-    } else if (p1Result == 4) { // COUNTER - successful defensive action that deals damage
+      // Player 2's attack was blocked by Player 1
+      if (p2Result == 1 || p2Result == 2) {
+        stats.player2AttacksBlocked++;
+      }
+    }
+    if (p1Result == 4) { // COUNTER - successful defensive action that deals damage
       stats.player1Counters++;
       stats.player1DefensiveActions++;
-    } else if (p1Result == 5) { // COUNTER_CRIT - critical defensive action that deals damage
+      // Player 2's attack was countered by Player 1
+      if (p2Result == 1 || p2Result == 2) {
+        stats.player2AttacksCountered++;
+      }
+    }
+    if (p1Result == 5) { // COUNTER_CRIT - critical defensive action that deals damage
       stats.player1Counters++;
       stats.player1Crits++;
       stats.player1DefensiveActions++;
-    } else if (p1Result == 6) { // DODGE - successful defensive action
+      // Player 2's attack was countered by Player 1
+      if (p2Result == 1 || p2Result == 2) {
+        stats.player2AttacksCountered++;
+      }
+    }
+    if (p1Result == 6) { // DODGE - successful defensive action
       stats.player1Dodges++;
       stats.player1DefensiveActions++;
-    } else if (p1Result == 7) { // PARRY - successful defensive action
+      // Player 2's attack was dodged by Player 1
+      if (p2Result == 1 || p2Result == 2) {
+        stats.player2AttacksDodged++;
+      }
+    }
+    if (p1Result == 7) { // PARRY - successful defensive action
       stats.player1Parries++;
       stats.player1DefensiveActions++;
-    } else if (p1Result == 8) { // RIPOSTE - successful defensive action that deals damage
+      // Player 2's attack was parried by Player 1
+      if (p2Result == 1 || p2Result == 2) {
+        stats.player2AttacksParried++;
+      }
+    }
+    if (p1Result == 8) { // RIPOSTE - successful defensive action that deals damage
       stats.player1Ripostes++;
       stats.player1DefensiveActions++;
-    } else if (p1Result == 9) { // RIPOSTE_CRIT - critical defensive action that deals damage
+      // Player 2's attack was riposted by Player 1
+      if (p2Result == 1 || p2Result == 2) {
+        stats.player2AttacksRiposted++;
+      }
+    }
+    if (p1Result == 9) { // RIPOSTE_CRIT - critical defensive action that deals damage
       stats.player1Ripostes++;
       stats.player1Crits++;
       stats.player1DefensiveActions++;
-    } else if (p1Result == 10) { // EXHAUSTED - failed offensive attempt (too tired)
-      stats.player1Misses++;
-      stats.player1Attacks++; // Exhausted attacks still count as attack attempts
-    } else if (p1Result == 11) { // HIT - failed defensive attempt (took damage)
-      stats.player1DefensiveActions++;
+      // Player 2's attack was riposted by Player 1
+      if (p2Result == 1 || p2Result == 2) {
+        stats.player2AttacksRiposted++;
+      }
     }
-    
-    // Process Player 2 results (same logic)
+    if (p1Result == 10) { // EXHAUSTED - failed offensive attempt (too tired)
+      stats.player1Misses++;
+      stats.player1Attacks++;
+    }
+    if (p1Result == 11) { // HIT - failed defensive attempt (took damage)
+      // HIT means failed defense - do not count as defensive action
+    }
+
+    // Process Player 2's action
     stats.player2TotalDamage += p2Damage as i32;
     stats.player2TotalStaminaLost += p2StaminaLost as i32;
     if ((p2Damage as i32) > stats.player2MaxDamage) {
       stats.player2MaxDamage = p2Damage as i32;
     }
-    
-    // Count Player 2 action types
-    if (p2Result == 0) { // MISS - failed offensive attempt
-      stats.player2Misses++;
-      stats.player2Attacks++;
-    } else if (p2Result == 1) { // ATTACK - successful offensive attempt
-      stats.player2Hits++;
-      stats.player2Attacks++;
-    } else if (p2Result == 2) { // CRIT - critical offensive attempt
-      stats.player2Crits++;
-      stats.player2Hits++;
-      stats.player2Attacks++;
-    } else if (p2Result == 3) { // BLOCK - successful defensive action
-      stats.player2Blocks++;
-      stats.player2DefensiveActions++;
-    } else if (p2Result == 4) { // COUNTER - successful defensive action that deals damage
-      stats.player2Counters++;
-      stats.player2DefensiveActions++;
-    } else if (p2Result == 5) { // COUNTER_CRIT - critical defensive action that deals damage
-      stats.player2Counters++;
-      stats.player2Crits++;
-      stats.player2DefensiveActions++;
-    } else if (p2Result == 6) { // DODGE - successful defensive action
-      stats.player2Dodges++;
-      stats.player2DefensiveActions++;
-    } else if (p2Result == 7) { // PARRY - successful defensive action
-      stats.player2Parries++;
-      stats.player2DefensiveActions++;
-    } else if (p2Result == 8) { // RIPOSTE - successful defensive action that deals damage
-      stats.player2Ripostes++;
-      stats.player2DefensiveActions++;
-    } else if (p2Result == 9) { // RIPOSTE_CRIT - critical defensive action that deals damage
-      stats.player2Ripostes++;
-      stats.player2Crits++;
-      stats.player2DefensiveActions++;
-    } else if (p2Result == 10) { // EXHAUSTED - failed offensive attempt (too tired)
-      stats.player2Misses++;
-      stats.player2Attacks++;
-    } else if (p2Result == 11) { // HIT - failed defensive attempt (took damage)
+
+    // Process Player 2's action - need to check both players to determine hit/miss
+    if (p2Result == 0) { // MISS - successful defensive action
       stats.player2DefensiveActions++;
     }
+    if (p2Result == 1) { // ATTACK - offensive action
+      stats.player2Attacks++;
+      // Check defender's result to determine if attack hit or missed
+      // Player 1 result 11 (HIT) means Player 1 failed to defend = Player 2 hit
+      // Player 1 result 0,3,4,5,6,7,8,9 means Player 1 successfully defended = Player 2 missed
+      if (p1Result == 11) {
+        stats.player2Hits++;
+      } else {
+        stats.player2Misses++;
+      }
+    }
+    if (p2Result == 2) { // CRIT - critical offensive action
+      stats.player2Attacks++;
+      stats.player2Crits++;
+      // Check defender's result to determine if attack hit or missed
+      // Player 1 result 11 (HIT) means Player 1 failed to defend = Player 2 hit
+      // Player 1 result 0,3,4,5,6,7,8,9 means Player 1 successfully defended = Player 2 missed
+      if (p1Result == 11) {
+        stats.player2Hits++;
+      } else {
+        stats.player2Misses++;
+      }
+    }
+    if (p2Result == 3) { // BLOCK - successful defensive action
+      stats.player2Blocks++;
+      stats.player2DefensiveActions++;
+      // Player 1's attack was blocked by Player 2
+      if (p1Result == 1 || p1Result == 2) {
+        stats.player1AttacksBlocked++;
+      }
+    }
+    if (p2Result == 4) { // COUNTER - successful defensive action that deals damage
+      stats.player2Counters++;
+      stats.player2DefensiveActions++;
+      // Player 1's attack was countered by Player 2
+      if (p1Result == 1 || p1Result == 2) {
+        stats.player1AttacksCountered++;
+      }
+    }
+    if (p2Result == 5) { // COUNTER_CRIT - critical defensive action that deals damage
+      stats.player2Counters++;
+      stats.player2Crits++;
+      stats.player2DefensiveActions++;
+      // Player 1's attack was countered by Player 2
+      if (p1Result == 1 || p1Result == 2) {
+        stats.player1AttacksCountered++;
+      }
+    }
+    if (p2Result == 6) { // DODGE - successful defensive action
+      stats.player2Dodges++;
+      stats.player2DefensiveActions++;
+      // Player 1's attack was dodged by Player 2
+      if (p1Result == 1 || p1Result == 2) {
+        stats.player1AttacksDodged++;
+      }
+    }
+    if (p2Result == 7) { // PARRY - successful defensive action
+      stats.player2Parries++;
+      stats.player2DefensiveActions++;
+      // Player 1's attack was parried by Player 2
+      if (p1Result == 1 || p1Result == 2) {
+        stats.player1AttacksParried++;
+      }
+    }
+    if (p2Result == 8) { // RIPOSTE - successful defensive action that deals damage
+      stats.player2Ripostes++;
+      stats.player2DefensiveActions++;
+      // Player 1's attack was riposted by Player 2
+      if (p1Result == 1 || p1Result == 2) {
+        stats.player1AttacksRiposted++;
+      }
+    }
+    if (p2Result == 9) { // RIPOSTE_CRIT - critical defensive action that deals damage
+      stats.player2Ripostes++;
+      stats.player2Crits++;
+      stats.player2DefensiveActions++;
+      // Player 1's attack was riposted by Player 2
+      if (p1Result == 1 || p1Result == 2) {
+        stats.player1AttacksRiposted++;
+      }
+    }
+    if (p2Result == 10) { // EXHAUSTED - failed offensive attempt (too tired)
+      stats.player2Misses++;
+      stats.player2Attacks++;
+    }
+    if (p2Result == 11) { // HIT - failed defensive attempt (took damage)
+      // HIT means failed defense - do not count as defensive action
+    }
+
+
   }
   
   log.info("decodeCombatResults: Combat decoded - P1: {} dmg, {} hits, {} crits | P2: {} dmg, {} hits, {} crits", [
@@ -793,6 +901,13 @@ class CombatStats {
   player1DefensiveActions: i32;
   player1MaxDamage: i32;
   
+  // Player 1 failed attack types (attacks that didn't land due to opponent's defense)
+  player1AttacksBlocked: i32;
+  player1AttacksCountered: i32;
+  player1AttacksDodged: i32;
+  player1AttacksParried: i32;
+  player1AttacksRiposted: i32;
+  
   // Player 2 stats
   player2TotalDamage: i32;
   player2TotalStaminaLost: i32;
@@ -807,6 +922,13 @@ class CombatStats {
   player2Ripostes: i32;
   player2DefensiveActions: i32;
   player2MaxDamage: i32;
+  
+  // Player 2 failed attack types (attacks that didn't land due to opponent's defense)
+  player2AttacksBlocked: i32;
+  player2AttacksCountered: i32;
+  player2AttacksDodged: i32;
+  player2AttacksParried: i32;
+  player2AttacksRiposted: i32;
   
   // Calculated stats for both players
   player1MaxHealth: i32;
@@ -836,6 +958,11 @@ class CombatStats {
     this.player1Ripostes = 0;
     this.player1DefensiveActions = 0;
     this.player1MaxDamage = 0;
+    this.player1AttacksBlocked = 0;
+    this.player1AttacksCountered = 0;
+    this.player1AttacksDodged = 0;
+    this.player1AttacksParried = 0;
+    this.player1AttacksRiposted = 0;
     this.player2TotalDamage = 0;
     this.player2TotalStaminaLost = 0;
     this.player2Attacks = 0;
@@ -849,5 +976,10 @@ class CombatStats {
     this.player2Ripostes = 0;
     this.player2DefensiveActions = 0;
     this.player2MaxDamage = 0;
+    this.player2AttacksBlocked = 0;
+    this.player2AttacksCountered = 0;
+    this.player2AttacksDodged = 0;
+    this.player2AttacksParried = 0;
+    this.player2AttacksRiposted = 0;
   }
 }

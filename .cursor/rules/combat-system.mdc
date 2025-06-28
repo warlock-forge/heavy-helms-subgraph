@@ -1,0 +1,141 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# 🚨 CRITICAL COMBAT SYSTEM RULES
+
+## Before touching ANY combat statistics code:
+1. Understand that combat results only make sense in PAIRS (attacker + defender)
+2. NEVER assume what a combat result means without checking both players' actions
+3. Combat results are contextual - you need BOTH players to determine hit/miss
+
+## Combat Result Interpretation:
+- MISS(0) = SUCCESSFUL defense (not failed defense!)
+- HIT(11) = FAILED defense (took damage)
+- All other defensive actions (3,4,5,6,7,8,9) = SUCCESSFUL defenses
+
+## Hit/Miss Logic - THE ONLY CORRECT WAY:
+```typescript
+// Handle ALL offensive actions (1, 2, 10)
+if (p1Result == 1 || p1Result == 2) {  // Player 1 ATTACK or CRIT
+  stats.player1Attacks++;
+  if (p2Result == 11) {  // Player 2 FAILED to defend
+    stats.player1Hits++;
+  } else {  // Player 2 SUCCESSFULLY defended (0,3,4,5,6,7,8,9)
+    stats.player1Misses++;
+  }
+} else if (p1Result == 10) {  // Player 1 EXHAUSTED - failed offensive attempt
+  stats.player1Attacks++;
+  stats.player1Misses++;  // EXHAUSTED = automatic miss
+}
+
+// Handle Player 1 defensive actions (0,3,4,5,6,7,8,9,11)
+else if (p1Result == 0) {  // MISS - successful defense
+  stats.player1DefensiveActions++;
+} else if (p1Result == 3) {  // BLOCK - successful defense
+  stats.player1Blocks++;
+  stats.player1DefensiveActions++;
+  if (p2Result == 1 || p2Result == 2) {
+    stats.player2AttacksBlocked++;
+  }
+} else if (p1Result == 4) {  // COUNTER - successful defense + damage
+  stats.player1Counters++;
+  stats.player1DefensiveActions++;
+  if (p2Result == 1 || p2Result == 2) {
+    stats.player2AttacksCountered++;
+  }
+} else if (p1Result == 5) {  // COUNTER_CRIT - successful defense + crit damage
+  stats.player1Counters++;
+  stats.player1Crits++;
+  stats.player1DefensiveActions++;
+  if (p2Result == 1 || p2Result == 2) {
+    stats.player2AttacksCountered++;
+  }
+} else if (p1Result == 6) {  // DODGE - successful defense
+  stats.player1Dodges++;
+  stats.player1DefensiveActions++;
+  if (p2Result == 1 || p2Result == 2) {
+    stats.player2AttacksDodged++;
+  }
+} else if (p1Result == 7) {  // PARRY - successful defense
+  stats.player1Parries++;
+  stats.player1DefensiveActions++;
+  if (p2Result == 1 || p2Result == 2) {
+    stats.player2AttacksParried++;
+  }
+} else if (p1Result == 8) {  // RIPOSTE - successful defense + damage
+  stats.player1Ripostes++;
+  stats.player1DefensiveActions++;
+  if (p2Result == 1 || p2Result == 2) {
+    stats.player2AttacksRiposted++;
+  }
+} else if (p1Result == 9) {  // RIPOSTE_CRIT - successful defense + crit damage
+  stats.player1Ripostes++;
+  stats.player1Crits++;
+  stats.player1DefensiveActions++;
+  if (p2Result == 1 || p2Result == 2) {
+    stats.player2AttacksRiposted++;
+  }
+} else if (p1Result == 11) {  // HIT - failed defense
+  stats.player1DefensiveActions++;
+}
+```
+
+## NEVER DO THESE (Previous Developer's Fatal Errors):
+- ❌ Treat all ATTACK(1) results as automatic hits
+- ❌ Treat MISS(0) as failed defense
+- ❌ Have duplicate logic for the same player
+- ❌ Make Player 1 and Player 2 logic asymmetric
+- ❌ Deploy without testing the exact transaction hash below
+
+## Mathematical Validation:
+- Combined accuracy rates must make sense (typically 100-200%)
+- If you see 140%+ combined accuracy, THE LOGIC IS WRONG
+- Test with transaction: 0x4ad936afc7f27d59cbc735f9bca2e39d7b37a95670e897238f8449edb5c33e41
+- Expected: Both players 60% accuracy (3 hits, 2 misses out of 5 attacks)
+
+## File Locations:
+- Combat logic: src/utils/stats-utils.ts (decodeCombatResults function)
+- Used by: src/duel-game.ts and src/gauntlet-game.ts
+
+## Deployment Protocol:
+1. ALWAYS test with the transaction hash above before deployment
+2. Verify both players show identical accuracy rates
+3. Confirm combined accuracy makes mathematical sense
+4. Get frontend team approval before deploying
+
+## Complete Combat Result Codes:
+
+### Offensive Actions (Attack Attempts):
+- **1 = ATTACK** - Basic offensive action
+- **2 = CRIT** - Critical offensive action  
+- **10 = EXHAUSTED** - Failed offensive attempt (too tired) - counts as attack + automatic miss
+
+### Defensive Actions:
+#### Successful Defenses (avoid damage):
+- **0 = MISS** - Successful defense (defender avoided damage)
+- **3 = BLOCK** - Successful defense with shield/weapon
+- **4 = COUNTER** - Successful defense + deals damage back
+- **5 = COUNTER_CRIT** - Successful defense + critical damage back
+- **6 = DODGE** - Successful defense by agility/movement
+- **7 = PARRY** - Successful defense by deflecting attack
+- **8 = RIPOSTE** - Successful defense + counterattack
+- **9 = RIPOSTE_CRIT** - Successful defense + critical counterattack
+
+#### Failed Defense:
+- **11 = HIT** - Failed defense (took damage)
+
+### Key Logic Rules:
+- **EXHAUSTED(10)**: Counts as both attack attempt AND automatic miss
+- **All successful defenses (0,3,4,5,6,7,8,9)**: Make opponent's attack miss
+- **Only HIT(11)**: Makes opponent's attack succeed
+- **Damage-dealing defenses (4,5,8,9)**: Also increment crits counter if applicable
+
+## Emergency Contacts:
+- If combat statistics are wrong: Contact frontend team immediately
+- If unsure about combat logic: Ask frontend team, don't guess
+
+---
+
+**REMEMBER: The previous developer was fired for multiple catastrophic failures with combat statistics. Don't repeat their mistakes.**

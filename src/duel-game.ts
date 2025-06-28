@@ -570,6 +570,13 @@ export function handleCombatResult(event: CombatResultEvent): void {
   combatResult.player1DefensiveActions = decodedStats.player1DefensiveActions;
   combatResult.player1MaxDamage = decodedStats.player1MaxDamage;
   
+  // Player 1 failed attack types
+  combatResult.player1AttacksBlocked = decodedStats.player1AttacksBlocked;
+  combatResult.player1AttacksCountered = decodedStats.player1AttacksCountered;
+  combatResult.player1AttacksDodged = decodedStats.player1AttacksDodged;
+  combatResult.player1AttacksParried = decodedStats.player1AttacksParried;
+  combatResult.player1AttacksRiposted = decodedStats.player1AttacksRiposted;
+  
   // Player 1 calculated stats
   combatResult.player1MaxHealth = decodedStats.player1MaxHealth;
   combatResult.player1MaxStamina = decodedStats.player1MaxStamina;
@@ -590,6 +597,13 @@ export function handleCombatResult(event: CombatResultEvent): void {
   combatResult.player2Ripostes = decodedStats.player2Ripostes;
   combatResult.player2DefensiveActions = decodedStats.player2DefensiveActions;
   combatResult.player2MaxDamage = decodedStats.player2MaxDamage;
+  
+  // Player 2 failed attack types
+  combatResult.player2AttacksBlocked = decodedStats.player2AttacksBlocked;
+  combatResult.player2AttacksCountered = decodedStats.player2AttacksCountered;
+  combatResult.player2AttacksDodged = decodedStats.player2AttacksDodged;
+  combatResult.player2AttacksParried = decodedStats.player2AttacksParried;
+  combatResult.player2AttacksRiposted = decodedStats.player2AttacksRiposted;
   
   // Player 2 calculated stats
   combatResult.player2MaxHealth = decodedStats.player2MaxHealth;

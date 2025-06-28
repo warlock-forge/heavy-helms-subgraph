@@ -3,6 +3,7 @@ indexerHints:
   prune: auto
 schema:
   file: ./schema.graphql
+
 dataSources:
   - kind: ethereum
     name: Player

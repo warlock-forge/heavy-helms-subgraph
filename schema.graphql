@@ -851,6 +851,13 @@ type CombatResult @entity(immutable: true) {
   player1DefensiveActions: Int! # Total defensive actions (blocks + dodges + parries)
   player1MaxDamage: Int!       # Highest single damage dealt by player 1
   
+  # Player 1 Failed Attack Types (attacks that didn't land due to opponent's defense)
+  player1AttacksBlocked: Int!  # Number of player 1's attacks that were blocked by opponent
+  player1AttacksCountered: Int! # Number of player 1's attacks that were countered by opponent  
+  player1AttacksDodged: Int!   # Number of player 1's attacks that were dodged by opponent
+  player1AttacksParried: Int!  # Number of player 1's attacks that were parried by opponent
+  player1AttacksRiposted: Int! # Number of player 1's attacks that were riposted by opponent
+  
   # Player 1 Calculated Stats (from decoded player data)
   player1MaxHealth: Int!       # Player 1's maximum health at start of combat
   player1MaxStamina: Int!      # Player 1's maximum stamina at start of combat
@@ -871,6 +878,13 @@ type CombatResult @entity(immutable: true) {
   player2Ripostes: Int!
   player2DefensiveActions: Int!
   player2MaxDamage: Int!
+  
+  # Player 2 Failed Attack Types (attacks that didn't land due to opponent's defense)
+  player2AttacksBlocked: Int!  # Number of player 2's attacks that were blocked by opponent
+  player2AttacksCountered: Int! # Number of player 2's attacks that were countered by opponent  
+  player2AttacksDodged: Int!   # Number of player 2's attacks that were dodged by opponent
+  player2AttacksParried: Int!  # Number of player 2's attacks that were parried by opponent
+  player2AttacksRiposted: Int! # Number of player 2's attacks that were riposted by opponent
   
   # Player 2 Calculated Stats (from decoded player data)
   player2MaxHealth: Int!       # Player 2's maximum health at start of combat
