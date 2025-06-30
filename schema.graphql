@@ -830,6 +830,17 @@ type CombatResult @entity(immutable: true) {
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   
+  # NEW: Historical loadout data (extracted from player1Data/player2Data)
+  player1SkinCollectionId: BigInt!    # Skin Index from bytes 10-13
+  player1SkinTokenId: Int!            # Skin Token ID from bytes 14-15
+  player1Skin: Skin                   # Reference to actual Skin entity (if exists)
+  player1Stance: Int!                 # Stance from byte 16 (0=Defensive, 1=Balanced, 2=Offensive)
+  
+  player2SkinCollectionId: BigInt!    # Skin Index from bytes 10-13  
+  player2SkinTokenId: Int!            # Skin Token ID from bytes 14-15
+  player2Skin: Skin                   # Reference to actual Skin entity (if exists)
+  player2Stance: Int!                 # Stance from byte 16 (0=Defensive, 1=Balanced, 2=Offensive)
+  
   # Decoded combat statistics (extracted from packedResults)
   player1Won: Boolean!      # True if player1 won, false if player2 won
   gameEngineVersion: Int!   # Version of the game engine that generated this log
@@ -891,6 +902,12 @@ type CombatResult @entity(immutable: true) {
   player2MaxStamina: Int!      # Player 2's maximum stamina at start of combat
   player2EndingHealth: Int!    # Player 2's health at end of combat (maxHealth - damage taken)
   player2EndingStamina: Int!   # Player 2's stamina at end of combat (maxStamina - stamina lost)
+  
+  # NEW: Damage mitigation metrics (for defensive analytics)
+  player1DamageTaken: Int!     # Total damage player1 received (player2TotalDamage)
+  player1HealthLost: Int!      # Health lost by player1 (maxHealth - endingHealth)
+  player2DamageTaken: Int!     # Total damage player2 received (player1TotalDamage)
+  player2HealthLost: Int!      # Health lost by player2 (maxHealth - endingHealth)
 }
 
 type FeesWithdrawn @entity(immutable: true) {
@@ -1073,6 +1090,48 @@ type PlayerVsRecord @entity {
   player2WinsAgainst1: Boolean!  # Has player2 ever beaten player1?
   firstPlayer1Win: BigInt        # When player1 first beat player2 (null if never)
   firstPlayer2Win: BigInt        # When player2 first beat player1 (null if never)
+  
+  # NEW: Actual win/loss counts
+  player1TotalWinsAgainst2: Int!    # Total times player1 beat player2
+  player2TotalWinsAgainst1: Int!    # Total times player2 beat player1
+  totalMatchups: Int!               # Total fights between these players
+  lastMatchup: BigInt!              # Timestamp of most recent fight
+}
+
+type SkinCombatStat @entity {
+  id: ID!
+  skin: Skin
+  skinCollectionId: BigInt!
+  skinTokenId: Int!
+  stance: Int!
+  totalCombats: Int!
+  wins: Int!
+  losses: Int!
+  kills: Int!
+  deaths: Int!
+  knockouts: Int!
+  knockedOut: Int!
+  exhaustions: Int!
+  exhausted: Int!
+  maxRoundWins: Int!
+  maxRoundLosses: Int!
+  killRate: BigDecimal!
+  deathRate: BigDecimal!
+  killDeathRatio: BigDecimal!
+  winRate: BigDecimal!
+  totalDamageDealt: Int!
+  averageDamageDealt: BigDecimal!
+  maxDamageDealt: Int!
+  totalDamageTaken: Int!
+  averageDamageTaken: BigDecimal!
+  totalHealthLost: Int!
+  averageHealthLost: BigDecimal!
+  minDamageTaken: Int!
+  damageEfficiency: BigDecimal!
+  survivalRate: BigDecimal!
+  firstCombat: BigInt!
+  lastCombat: BigInt!
+  lastUpdated: BigInt!
 }
 
 # ==========================================================

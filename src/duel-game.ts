@@ -53,7 +53,9 @@ import {
   updateStatsForDuelCompletion,
   updatePlayerPostCombatStats,
   updateStatsForDuelWin,
-  processCombatResultsWithPlayerData
+  processCombatResultsWithPlayerData,
+  decodePlayerData,
+  updateSkinCombatAnalytics
 } from "./utils/stats-utils";
 import { DuelGame } from "../generated/DuelGame/DuelGame";
 import { PlayerSnapshot } from "../generated/schema";
@@ -611,7 +613,60 @@ export function handleCombatResult(event: CombatResultEvent): void {
   combatResult.player2EndingHealth = decodedStats.player2EndingHealth;
   combatResult.player2EndingStamina = decodedStats.player2EndingStamina;
 
+  // NEW: Extract skin information from decoded player data
+  let p1Data = decodePlayerData(event.params.player1Data);
+  let p2Data = decodePlayerData(event.params.player2Data);
+
+  // NEW: Set skin data in combat result
+  combatResult.player1SkinCollectionId = BigInt.fromI32(p1Data.skinCollectionId);
+  combatResult.player1SkinTokenId = p1Data.skinTokenId;
+  combatResult.player1Stance = p1Data.stance;
+
+  combatResult.player2SkinCollectionId = BigInt.fromI32(p2Data.skinCollectionId);
+  combatResult.player2SkinTokenId = p2Data.skinTokenId;
+  combatResult.player2Stance = p2Data.stance;
+
+  // NEW: Try to link to actual Skin entities (format: "collectionId-tokenId")
+  let p1SkinId = p1Data.skinCollectionId.toString() + "-" + p1Data.skinTokenId.toString();
+  let p2SkinId = p2Data.skinCollectionId.toString() + "-" + p2Data.skinTokenId.toString();
+
+  let p1Skin = Skin.load(p1SkinId);
+  let p2Skin = Skin.load(p2SkinId);
+
+  combatResult.player1Skin = p1Skin ? p1SkinId : null;
+  combatResult.player2Skin = p2Skin ? p2SkinId : null;
+
+  log.info("handleCombatResult: Skins - P1: {} ({}), P2: {} ({})", [
+    p1SkinId,
+    p1Skin ? "found" : "not found",
+    p2SkinId,
+    p2Skin ? "found" : "not found"
+  ]);
+
+  // NEW: Set damage mitigation metrics (cross-reference for defensive analytics)
+  combatResult.player1DamageTaken = decodedStats.player2TotalDamage;
+  combatResult.player1HealthLost = p1Data.maxHealth - decodedStats.player1EndingHealth;
+  combatResult.player2DamageTaken = decodedStats.player1TotalDamage;
+  combatResult.player2HealthLost = p2Data.maxHealth - decodedStats.player2EndingHealth;
+
   combatResult.save();
+
+  // NEW: Update skin combat analytics for both players
+  updateSkinCombatAnalytics(
+    p1Data, 
+    decodedStats, 
+    true,  // isPlayer1
+    decodedStats.player1Won, 
+    event.block.timestamp
+  );
+  
+  updateSkinCombatAnalytics(
+    p2Data, 
+    decodedStats, 
+    false, // isPlayer1 (this is player2)
+    !decodedStats.player1Won, 
+    event.block.timestamp
+  );
 }
 
 /**
