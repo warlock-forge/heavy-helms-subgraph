@@ -1134,6 +1134,48 @@ type SkinCombatStat @entity {
   lastUpdated: BigInt!
 }
 
+type PlayerSkinCombatStat @entity {
+  id: ID!  # Format: "playerId-skinCollectionId-tokenId-stance"
+  
+  # Entity references + raw IDs for fast lookups
+  player: Player!              # Reference to Player entity
+  playerId: BigInt!            # Raw ID for fast filtering on player details page
+  skin: Skin                   # Reference to Skin entity (nullable)
+  skinCollectionId: BigInt!    # Raw ID for fast filtering
+  skinTokenId: Int!            # Raw ID for fast filtering
+  stance: Int!
+  
+  # EXACT SAME FIELDS as SkinCombatStat for consistency
+  totalCombats: Int!
+  wins: Int!
+  losses: Int!
+  kills: Int!
+  deaths: Int!
+  knockouts: Int!
+  knockedOut: Int!
+  exhaustions: Int!
+  exhausted: Int!
+  maxRoundWins: Int!
+  maxRoundLosses: Int!
+  killRate: BigDecimal!
+  deathRate: BigDecimal!
+  killDeathRatio: BigDecimal!
+  winRate: BigDecimal!
+  totalDamageDealt: Int!
+  averageDamageDealt: BigDecimal!
+  maxDamageDealt: Int!
+  totalDamageTaken: Int!
+  averageDamageTaken: BigDecimal!
+  totalHealthLost: Int!
+  averageHealthLost: BigDecimal!
+  minDamageTaken: Int!
+  damageEfficiency: BigDecimal!
+  survivalRate: BigDecimal!
+  firstCombat: BigInt!
+  lastCombat: BigInt!
+  lastUpdated: BigInt!
+}
+
 # ==========================================================
 #                   GAUNTLET GAME ENTITIES                   
 # ==========================================================

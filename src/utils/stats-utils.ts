@@ -1,5 +1,5 @@
 import { BigInt, Address, Bytes, BigDecimal } from "@graphprotocol/graph-ts"
-import { Stats, Owner, Player, PlayerVsRecord, DefaultPlayer, SkinCombatStat, Skin } from "../../generated/schema"
+import { Stats, Owner, Player, PlayerVsRecord, DefaultPlayer, SkinCombatStat, PlayerSkinCombatStat, Skin } from "../../generated/schema"
 import { log } from "@graphprotocol/graph-ts"
 
 // Helper function to get stance name for logging
@@ -8,6 +8,30 @@ function getStanceName(stance: i32): string {
   if (stance == 1) return "Balanced";
   if (stance == 2) return "Offensive";
   return "Unknown";
+}
+
+// Little-endian helper functions
+function u32LE(data: Bytes, off: i32): i32 {
+  return (data[off] as i32) |
+         (data[off + 1] << 8) |
+         (data[off + 2] << 16) |
+         (data[off + 3] << 24);
+}
+
+function u16LE(data: Bytes, off: i32): i32 {
+  return (data[off] as i32) | (data[off + 1] << 8);
+}
+
+// Big-endian helper functions with proper type casting for AssemblyScript
+function u32BE(b: Bytes, off: i32): u32 {
+  return (u32(b[off])   << 24) |
+         (u32(b[off+1]) << 16) |
+         (u32(b[off+2]) <<  8) |
+          u32(b[off+3]);
+}
+
+function u16BE(b: Bytes, off: i32): u32 {
+  return (u32(b[off]) << 8) | u32(b[off+1]);
 }
 
 export function getOrCreateStats(): Stats {
@@ -549,6 +573,192 @@ export function updateSkinCombatAnalytics(
   ]);
 }
 
+// NEW: Update player-specific skin combat analytics
+export function updatePlayerSkinCombatAnalytics(
+  playerId: BigInt,
+  playerData: PlayerData, 
+  combatStats: CombatStats, 
+  isPlayer1: boolean, 
+  isWinner: boolean,
+  timestamp: BigInt
+): void {
+  log.info("[PSC] called for raw playerId={} (BigInt)", [playerId.toString()]);
+  
+  const playerId_str = playerId.toString();
+  const playerAnalyticsId = playerId_str + "-" + BigInt.fromI32(playerData.skinCollectionId).toString() + "-" + playerData.skinTokenId.toString() + "-" + playerData.stance.toString();
+  
+  log.info("[PSC] playerId_str={}, skinCollectionId={}, tokenId={}, stance={}", [
+    playerId_str, 
+    BigInt.fromI32(playerData.skinCollectionId).toString(),
+    playerData.skinTokenId.toString(),
+    playerData.stance.toString()
+  ]);
+  
+  const player = Player.load(playerId_str);
+  if (!player) {
+    log.warning("[PSC] Player {} not found in store - EARLY RETURN", [playerId_str]);
+    return; // Skip if player doesn't exist
+  }
+  
+  log.info("[PSC] Player {} found! Proceeding with analytics...", [playerId_str]);
+
+  let playerAnalytics = PlayerSkinCombatStat.load(playerAnalyticsId);
+  if (!playerAnalytics) {
+    const skinId = BigInt.fromI32(playerData.skinCollectionId).toString() + "-" + playerData.skinTokenId.toString();
+    
+
+    
+    playerAnalytics = new PlayerSkinCombatStat(playerAnalyticsId);
+    
+    // Set entity references
+    playerAnalytics.player = playerId_str;
+    playerAnalytics.playerId = playerId;
+    playerAnalytics.skinCollectionId = BigInt.fromI32(playerData.skinCollectionId);
+    playerAnalytics.skinTokenId = playerData.skinTokenId;
+    playerAnalytics.stance = playerData.stance;
+    
+    const skin = Skin.load(skinId);
+    playerAnalytics.skin = skin ? skinId : null;
+    
+    // Initialize ALL counters to match SkinCombatStat structure
+    playerAnalytics.totalCombats = 0;
+    playerAnalytics.wins = 0;
+    playerAnalytics.losses = 0;
+    playerAnalytics.kills = 0;
+    playerAnalytics.deaths = 0;
+    playerAnalytics.knockouts = 0;
+    playerAnalytics.knockedOut = 0;
+    playerAnalytics.exhaustions = 0;
+    playerAnalytics.exhausted = 0;
+    playerAnalytics.maxRoundWins = 0;
+    playerAnalytics.maxRoundLosses = 0;
+    playerAnalytics.totalDamageDealt = 0;
+    playerAnalytics.totalDamageTaken = 0;
+    playerAnalytics.totalHealthLost = 0;
+    playerAnalytics.maxDamageDealt = 0;
+    playerAnalytics.minDamageTaken = 999999;
+    playerAnalytics.firstCombat = timestamp;
+    playerAnalytics.lastCombat = timestamp;
+    playerAnalytics.lastUpdated = timestamp;
+    
+    // Initialize calculated fields to zero
+    const zeroBD = BigDecimal.zero();
+    playerAnalytics.killRate = zeroBD;
+    playerAnalytics.deathRate = zeroBD;
+    playerAnalytics.killDeathRatio = zeroBD;
+    playerAnalytics.winRate = zeroBD;
+    playerAnalytics.averageDamageDealt = zeroBD;
+    playerAnalytics.averageDamageTaken = zeroBD;
+    playerAnalytics.averageHealthLost = zeroBD;
+    playerAnalytics.damageEfficiency = zeroBD;
+    playerAnalytics.survivalRate = zeroBD;
+  }
+  
+  // Update basic counters (EXACT SAME LOGIC as SkinCombatStat)
+  playerAnalytics.totalCombats += 1;
+  playerAnalytics.lastCombat = timestamp;
+  playerAnalytics.lastUpdated = timestamp;
+  
+  if (isWinner) {
+    playerAnalytics.wins += 1;
+  } else {
+    playerAnalytics.losses += 1;
+  }
+  
+  // Extract damage data based on player position
+  let damageDealt: i32;
+  let damageTaken: i32;
+  let healthLost: i32;
+  let maxHealth: i32;
+  
+  if (isPlayer1) {
+    damageDealt = combatStats.player1TotalDamage;
+    damageTaken = combatStats.player2TotalDamage;
+    maxHealth = combatStats.player1MaxHealth;
+    healthLost = maxHealth - combatStats.player1EndingHealth;
+  } else {
+    damageDealt = combatStats.player2TotalDamage;
+    damageTaken = combatStats.player1TotalDamage;
+    maxHealth = combatStats.player2MaxHealth;
+    healthLost = maxHealth - combatStats.player2EndingHealth;
+  }
+  
+  // Update damage metrics
+  playerAnalytics.totalDamageDealt += damageDealt;
+  playerAnalytics.totalDamageTaken += damageTaken;
+  playerAnalytics.totalHealthLost += healthLost;
+  
+  if (damageDealt > playerAnalytics.maxDamageDealt) {
+    playerAnalytics.maxDamageDealt = damageDealt;
+  }
+  
+  if (damageTaken < playerAnalytics.minDamageTaken) {
+    playerAnalytics.minDamageTaken = damageTaken;
+  }
+  
+  // Update win condition counters (EXACT SAME LOGIC as SkinCombatStat)
+  if (isWinner) {
+    if (combatStats.winCondition == "KILL") {
+      playerAnalytics.kills += 1;
+    } else if (combatStats.winCondition == "HEALTH" || combatStats.winCondition == "KO") {
+      playerAnalytics.knockouts += 1;
+    } else if (combatStats.winCondition == "EXHAUSTION") {
+      playerAnalytics.exhaustions += 1;
+    } else if (combatStats.winCondition == "MAX_ROUNDS") {
+      playerAnalytics.maxRoundWins += 1;
+    }
+  } else {
+    if (combatStats.winCondition == "KILL") {
+      playerAnalytics.deaths += 1;
+    } else if (combatStats.winCondition == "HEALTH" || combatStats.winCondition == "KO") {
+      playerAnalytics.knockedOut += 1;
+    } else if (combatStats.winCondition == "EXHAUSTION") {
+      playerAnalytics.exhausted += 1;
+    } else if (combatStats.winCondition == "MAX_ROUNDS") {
+      playerAnalytics.maxRoundLosses += 1;
+    }
+  }
+  
+  // Calculate rates and ratios with ZERO-DIVISION GUARDS
+  if (playerAnalytics.totalCombats > 0) {
+    const totalCombatsDecimal = BigDecimal.fromString(playerAnalytics.totalCombats.toString());
+    
+    playerAnalytics.winRate = BigDecimal.fromString(playerAnalytics.wins.toString()).div(totalCombatsDecimal);
+    playerAnalytics.killRate = BigDecimal.fromString(playerAnalytics.kills.toString()).div(totalCombatsDecimal);
+    playerAnalytics.deathRate = BigDecimal.fromString(playerAnalytics.deaths.toString()).div(totalCombatsDecimal);
+    
+    playerAnalytics.averageDamageDealt = BigDecimal.fromString(playerAnalytics.totalDamageDealt.toString()).div(totalCombatsDecimal);
+    playerAnalytics.averageDamageTaken = BigDecimal.fromString(playerAnalytics.totalDamageTaken.toString()).div(totalCombatsDecimal);
+    playerAnalytics.averageHealthLost = BigDecimal.fromString(playerAnalytics.totalHealthLost.toString()).div(totalCombatsDecimal);
+    
+    const survivedFights = playerAnalytics.totalCombats - playerAnalytics.deaths;
+    playerAnalytics.survivalRate = BigDecimal.fromString(survivedFights.toString()).div(totalCombatsDecimal);
+  } else {
+    // Zero combats - keep all rates at zero (already initialized)
+  }
+  
+  // Kill/Death ratio
+  if (playerAnalytics.deaths > 0) {
+    playerAnalytics.killDeathRatio = BigDecimal.fromString(playerAnalytics.kills.toString()).div(BigDecimal.fromString(playerAnalytics.deaths.toString()));
+  } else {
+    playerAnalytics.killDeathRatio = BigDecimal.fromString(playerAnalytics.kills.toString());
+  }
+  
+  // Damage efficiency
+  if (playerAnalytics.totalDamageTaken > 0) {
+    playerAnalytics.damageEfficiency = BigDecimal.fromString(playerAnalytics.totalDamageDealt.toString()).div(BigDecimal.fromString(playerAnalytics.totalDamageTaken.toString()));
+  } else {
+    playerAnalytics.damageEfficiency = BigDecimal.fromString(playerAnalytics.totalDamageDealt.toString());
+  }
+  
+  playerAnalytics.save();
+  
+  log.info("[PSC] COMPLETED for playerId={}, analytics saved with totalCombats={}", [
+    playerId_str,
+    playerAnalytics.totalCombats.toString()
+  ]);
+}
+
 /**
  * Decode packed combat results from bytes data based on the actual contract format
  * 
@@ -968,10 +1178,27 @@ export function decodePlayerData(data: Bytes): PlayerData {
     return playerData;
   }
   
-  // Decode playerId (bytes 0-3, big-endian)
-  playerData.playerId = (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3];
+  // DEBUG: Log raw bytes for player ID (first 4 bytes)
+  log.info("decodePlayerData: Raw bytes [0-3]: {} {} {} {} (hex: 0x{} 0x{} 0x{} 0x{})", [
+    data[0].toString(),
+    data[1].toString(), 
+    data[2].toString(),
+    data[3].toString(),
+    data[0].toString(16),
+    data[1].toString(16),
+    data[2].toString(16), 
+    data[3].toString(16)
+  ]);
   
-  // Decode attributes (bytes 4-9)
+  // FIXED: Decode playerId with proper u32 casting to prevent AssemblyScript truncation
+  playerData.playerId = u32BE(data, 0);
+  
+  // DEBUG: Log the calculated player ID  
+  log.info("decodePlayerData: Calculated playerId using u32BE = {}", [
+    playerData.playerId.toString()
+  ]);
+  
+  // Decode attributes (bytes 4-9) - Single bytes, no casting needed
   playerData.strength = data[4];
   playerData.constitution = data[5];
   playerData.size = data[6];
@@ -979,12 +1206,15 @@ export function decodePlayerData(data: Bytes): PlayerData {
   playerData.stamina = data[8];
   playerData.luck = data[9];
   
-  // NEW: Decode skin info (bytes 10-15)
-  playerData.skinCollectionId = (data[10] << 24) | (data[11] << 16) | (data[12] << 8) | data[13];
-  playerData.skinTokenId = (data[14] << 8) | data[15];
+  // FIXED: Decode skin info with proper type casting
+  playerData.skinCollectionId = u32BE(data, 10);  // bytes 10-13
+  playerData.skinTokenId = u16BE(data, 14);       // bytes 14-15
   
-  // NEW: Decode stance (byte 16)
+  // Decode stance (byte 16) - Single byte, no casting needed
   playerData.stance = data[16];
+  
+  // Additional fields from contract (bytes 17-26) - we can add these later if needed
+  // For now, we have the essential data: playerId, attributes, skin, stance
   
   log.info("decodePlayerData: Player {} - Skin: {}-{}, Stance: {} ({}), STR:{} CON:{} SIZ:{} AGI:{} STA:{} LUK:{}", [
     playerData.playerId.toString(),
@@ -999,6 +1229,7 @@ export function decodePlayerData(data: Bytes): PlayerData {
     playerData.stamina.toString(),
     playerData.luck.toString()
   ]);
+  
   
   return playerData;
 }
@@ -1045,7 +1276,7 @@ export function calculatePlayerStats(playerData: PlayerData, gameEngineVersion: 
  * Helper class to hold decoded player data
  */
 class PlayerData {
-  playerId: i32;
+  playerId: i32;  // Note: AssemblyScript i32 can handle 0 to 2^31-1, should be sufficient for player IDs
   strength: i32;
   constitution: i32;
   size: i32;
@@ -1054,7 +1285,7 @@ class PlayerData {
   luck: i32;
   maxHealth: i32;
   maxStamina: i32;
-  skinCollectionId: i32;
+  skinCollectionId: i32;  // Note: Should handle unsigned 32-bit values up to 2^31-1
   skinTokenId: i32;
   stance: i32;  // 0=Defensive, 1=Balanced, 2=Offensive
   

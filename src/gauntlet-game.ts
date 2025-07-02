@@ -33,7 +33,7 @@ import {
 } from "../generated/schema";
 
 import { getOrCreateStats } from "./utils/stats-utils";
-import { updatePlayerPostCombatStats, updateStatsForGauntletWin, processCombatResultsWithPlayerData, decodePlayerData, updateSkinCombatAnalytics } from "./utils/stats-utils";
+import { updatePlayerPostCombatStats, updateStatsForGauntletWin, processCombatResultsWithPlayerData, decodePlayerData, updateSkinCombatAnalytics, updatePlayerSkinCombatAnalytics } from "./utils/stats-utils";
 
 // Define ZERO_BI directly
 const ZERO_BI = BigInt.fromI32(0);
@@ -537,6 +537,30 @@ export function handleGauntletCombatResult(event: CombatResultEvent): void {
   );
   
   updateSkinCombatAnalytics(
+    p2Data, 
+    decodedStats, 
+    false, // isPlayer1 (this is player2)
+    !decodedStats.player1Won, 
+    event.block.timestamp
+  );
+
+  // NEW: Update player-specific skin combat analytics
+  const player1Id = BigInt.fromI32(p1Data.playerId);
+  const player2Id = BigInt.fromI32(p2Data.playerId);
+  
+  log.info("[GAUNTLET] About to call updatePlayerSkinCombatAnalytics for player1Id={}", [player1Id.toString()]);
+  updatePlayerSkinCombatAnalytics(
+    player1Id,
+    p1Data, 
+    decodedStats, 
+    true,  // isPlayer1
+    decodedStats.player1Won, 
+    event.block.timestamp
+  );
+  
+  log.info("[GAUNTLET] About to call updatePlayerSkinCombatAnalytics for player2Id={}", [player2Id.toString()]);
+  updatePlayerSkinCombatAnalytics(
+    player2Id,
     p2Data, 
     decodedStats, 
     false, // isPlayer1 (this is player2)
