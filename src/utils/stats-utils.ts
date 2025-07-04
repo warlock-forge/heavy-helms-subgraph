@@ -23,7 +23,7 @@ function u16LE(data: Bytes, off: i32): i32 {
 }
 
 // Big-endian helper functions with proper type casting for AssemblyScript
-function u32BE(b: Bytes, off: i32): u32 {
+export function u32BE(b: Bytes, off: i32): u32 {
   return (u32(b[off])   << 24) |
          (u32(b[off+1]) << 16) |
          (u32(b[off+2]) <<  8) |
@@ -870,7 +870,7 @@ export function decodeCombatResults(packedResults: Bytes): CombatStats {
     // Player 2 action data
     let p2Result = packedResults[offset + 4];
     let p2Damage = u16BE(packedResults, offset + 5);
-    let p2StaminaLost = packedResults[offset + 7];
+      let p2StaminaLost = packedResults[offset + 7];
       
 
       
@@ -1411,5 +1411,7 @@ class CombatStats {
     this.player2AttacksRiposted = 0;
   }
 }
+
+
 
 

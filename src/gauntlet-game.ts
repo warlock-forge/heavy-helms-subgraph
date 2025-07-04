@@ -33,11 +33,13 @@ import {
 } from "../generated/schema";
 
 import { getOrCreateStats } from "./utils/stats-utils";
-import { updatePlayerPostCombatStats, updateStatsForGauntletWin, processCombatResultsWithPlayerData, decodePlayerData, updateSkinCombatAnalytics, updatePlayerSkinCombatAnalytics } from "./utils/stats-utils";
+import { updatePlayerPostCombatStats, updateStatsForGauntletWin, processCombatResultsWithPlayerData, decodePlayerData, updateSkinCombatAnalytics, updatePlayerSkinCombatAnalytics, u32BE } from "./utils/stats-utils";
 
 // Define ZERO_BI directly
 const ZERO_BI = BigInt.fromI32(0);
 const ZERO_I32 = 0; // Helper constant
+
+
 
 // Handle the PlayerQueued event
 export function handlePlayerQueued(event: PlayerQueuedEvent): void {
@@ -344,12 +346,9 @@ export function handleGauntletRecovered(event: GauntletRecoveredEvent): void {
         stats.lastUpdated = event.block.timestamp;
         stats.save();
 
-        // --- BEGIN ADDED LOGIC: Reset Player Statuses for VRF Recovery ---
-        // Since GauntletRecovered event doesn't provide participant IDs, we need to find them
-        // by querying the GauntletParticipant entities for this gauntlet
+        // Reset participant statuses for VRF recovery
         log.info("[GauntletRecovered {}] Resetting player statuses for recovered gauntlet.", [gauntletId]);
         
-        // Find all participants in this gauntlet using the derived relationship
         let participants = gauntlet.participants.load();
         log.info("[GauntletRecovered {}] Found {} participants to reset.", [gauntletId, participants.length.toString()]);
         
@@ -359,15 +358,13 @@ export function handleGauntletRecovered(event: GauntletRecoveredEvent): void {
           let player = Player.load(playerIdString);
 
           if (player) {
-            // Check if the player was indeed in this gauntlet before resetting status
             if (player.gauntletStatus == "IN_GAUNTLET" && player.currentGauntlet == gauntletId) {
               player.gauntletStatus = "NONE";
-              player.currentGauntlet = null; // Clear link to this gauntlet
+              player.currentGauntlet = null;
               player.lastUpdatedAt = event.block.timestamp;
               player.save();
               log.info("[GauntletRecovered {}] Reset Player {} status to NONE.", [gauntletId, playerIdString]);
             } else {
-              // This might happen if a player somehow got into another state, but we should still log it
               log.warning("[GauntletRecovered {}] Player {} status was not IN_GAUNTLET for this gauntlet (status: {}, currentGauntlet: {}). Status not reset.", [
                 gauntletId, 
                 playerIdString, 
@@ -376,12 +373,9 @@ export function handleGauntletRecovered(event: GauntletRecoveredEvent): void {
               ]);
             }
           } else {
-            // If the participant ID doesn't resolve to a Player entity, it might be a DefaultPlayer
-            // DefaultPlayers don't have gauntletStatus tracked in the same way, so we can skip them
             log.info("[GauntletRecovered {}] Participant ID {} not found as Player entity. Likely a DefaultPlayer, skipping status update.", [gauntletId, playerIdString]);
           }
         }
-        // --- END ADDED LOGIC ---
 
     } else {
         log.warning("GauntletRecovered event for already completed Gauntlet id {} in tx {}", [
@@ -576,10 +570,7 @@ export function handleGauntletCombatResult(event: CombatResultEvent): void {
   let player2DataBytes = event.params.player2Data as Bytes;
 
   if (player1DataBytes.length >= 4) {
-    let p1IdSlice_Uint8Array = player1DataBytes.slice(0, 4); 
-    p1IdSlice_Uint8Array.reverse(); 
-    let p1IdSlice_Bytes = Bytes.fromUint8Array(p1IdSlice_Uint8Array); 
-    p1IdFromData_str = BigInt.fromUnsignedBytes(p1IdSlice_Bytes).toString(); 
+    p1IdFromData_str = u32BE(player1DataBytes, 0).toString(); 
   } else {
     log.warning("[GauntletCombatResult] player1Data is too short (length {}) to extract ID for event ID {}. P1 Data (hex): {}", [
       player1DataBytes.length.toString(),
@@ -589,10 +580,7 @@ export function handleGauntletCombatResult(event: CombatResultEvent): void {
   }
 
   if (player2DataBytes.length >= 4) {
-    let p2IdSlice_Uint8Array = player2DataBytes.slice(0, 4); 
-    p2IdSlice_Uint8Array.reverse(); 
-    let p2IdSlice_Bytes = Bytes.fromUint8Array(p2IdSlice_Uint8Array);
-    p2IdFromData_str = BigInt.fromUnsignedBytes(p2IdSlice_Bytes).toString();
+    p2IdFromData_str = u32BE(player2DataBytes, 0).toString();
   } else {
     log.warning("[GauntletCombatResult] player2Data is too short (length {}) to extract ID for event ID {}. P2 Data (hex): {}", [
       player2DataBytes.length.toString(),
