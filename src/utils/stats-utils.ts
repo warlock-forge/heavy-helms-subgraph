@@ -830,7 +830,7 @@ export function decodeCombatResults(packedResults: Bytes): CombatStats {
   stats.player1Won = packedResults[0] == 0;
   
   // Bytes 1-2: Game Engine Version (16 bits, big-endian)
-  stats.gameEngineVersion = (packedResults[1] << 8) | packedResults[2];
+  stats.gameEngineVersion = u16BE(packedResults, 1);
   
   // Byte 3: Win Condition
   let winConditionValue = packedResults[3];
@@ -864,13 +864,13 @@ export function decodeCombatResults(packedResults: Bytes): CombatStats {
     
     // Player 1 action data
     let p1Result = packedResults[offset];
-    let p1Damage = (packedResults[offset + 1] << 8) | packedResults[offset + 2];
+    let p1Damage = u16BE(packedResults, offset + 1);
     let p1StaminaLost = packedResults[offset + 3];
     
     // Player 2 action data
     let p2Result = packedResults[offset + 4];
-          let p2Damage = (packedResults[offset + 5] << 8) | packedResults[offset + 6];
-      let p2StaminaLost = packedResults[offset + 7];
+    let p2Damage = u16BE(packedResults, offset + 5);
+    let p2StaminaLost = packedResults[offset + 7];
       
 
       
