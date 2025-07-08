@@ -829,6 +829,85 @@ type CombatResult @entity(immutable: true) {
   packedResults: Bytes!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
+  
+  # NEW: Historical loadout data (extracted from player1Data/player2Data)
+  player1SkinCollectionId: BigInt!    # Skin Index from bytes 10-13
+  player1SkinTokenId: Int!            # Skin Token ID from bytes 14-15
+  player1Skin: Skin                   # Reference to actual Skin entity (if exists)
+  player1Stance: Int!                 # Stance from byte 16 (0=Defensive, 1=Balanced, 2=Offensive)
+  
+  player2SkinCollectionId: BigInt!    # Skin Index from bytes 10-13  
+  player2SkinTokenId: Int!            # Skin Token ID from bytes 14-15
+  player2Skin: Skin                   # Reference to actual Skin entity (if exists)
+  player2Stance: Int!                 # Stance from byte 16 (0=Defensive, 1=Balanced, 2=Offensive)
+  
+  # Decoded combat statistics (extracted from packedResults)
+  player1Won: Boolean!      # True if player1 won, false if player2 won
+  gameEngineVersion: Int!   # Version of the game engine that generated this log
+  winCondition: String!     # HEALTH, EXHAUSTION, MAX_ROUNDS, or DEATH
+  roundCount: Int!          # Number of rounds/actions in the combat
+  
+  # Player 1 Statistics
+  player1TotalDamage: Int!     # Total damage dealt by player 1
+  player1TotalStaminaLost: Int! # Total stamina lost by player 1
+  player1Attacks: Int!         # Number of attack actions by player 1
+  player1Hits: Int!            # Number of successful hits by player 1
+  player1Misses: Int!          # Number of misses by player 1
+  player1Crits: Int!           # Number of critical hits by player 1 (including riposte/counter crits)
+  player1Blocks: Int!          # Number of successful blocks by player 1
+  player1Counters: Int!        # Number of counter attacks by player 1
+  player1Dodges: Int!          # Number of successful dodges by player 1
+  player1Parries: Int!         # Number of successful parries by player 1
+  player1Ripostes: Int!        # Number of riposte attacks by player 1
+  player1DefensiveActions: Int! # Total defensive actions (blocks + dodges + parries)
+  player1MaxDamage: Int!       # Highest single damage dealt by player 1
+  
+  # Player 1 Failed Attack Types (attacks that didn't land due to opponent's defense)
+  player1AttacksBlocked: Int!  # Number of player 1's attacks that were blocked by opponent
+  player1AttacksCountered: Int! # Number of player 1's attacks that were countered by opponent  
+  player1AttacksDodged: Int!   # Number of player 1's attacks that were dodged by opponent
+  player1AttacksParried: Int!  # Number of player 1's attacks that were parried by opponent
+  player1AttacksRiposted: Int! # Number of player 1's attacks that were riposted by opponent
+  
+  # Player 1 Calculated Stats (from decoded player data)
+  player1MaxHealth: Int!       # Player 1's maximum health at start of combat
+  player1MaxStamina: Int!      # Player 1's maximum stamina at start of combat
+  player1EndingHealth: Int!    # Player 1's health at end of combat (maxHealth - damage taken)
+  player1EndingStamina: Int!   # Player 1's stamina at end of combat (maxStamina - stamina lost)
+  
+  # Player 2 Statistics (mirror of player 1)
+  player2TotalDamage: Int!
+  player2TotalStaminaLost: Int!
+  player2Attacks: Int!
+  player2Hits: Int!
+  player2Misses: Int!
+  player2Crits: Int!
+  player2Blocks: Int!
+  player2Counters: Int!
+  player2Dodges: Int!
+  player2Parries: Int!
+  player2Ripostes: Int!
+  player2DefensiveActions: Int!
+  player2MaxDamage: Int!
+  
+  # Player 2 Failed Attack Types (attacks that didn't land due to opponent's defense)
+  player2AttacksBlocked: Int!  # Number of player 2's attacks that were blocked by opponent
+  player2AttacksCountered: Int! # Number of player 2's attacks that were countered by opponent  
+  player2AttacksDodged: Int!   # Number of player 2's attacks that were dodged by opponent
+  player2AttacksParried: Int!  # Number of player 2's attacks that were parried by opponent
+  player2AttacksRiposted: Int! # Number of player 2's attacks that were riposted by opponent
+  
+  # Player 2 Calculated Stats (from decoded player data)
+  player2MaxHealth: Int!       # Player 2's maximum health at start of combat
+  player2MaxStamina: Int!      # Player 2's maximum stamina at start of combat
+  player2EndingHealth: Int!    # Player 2's health at end of combat (maxHealth - damage taken)
+  player2EndingStamina: Int!   # Player 2's stamina at end of combat (maxStamina - stamina lost)
+  
+  # NEW: Damage mitigation metrics (for defensive analytics)
+  player1DamageTaken: Int!     # Total damage player1 received (player2TotalDamage)
+  player1HealthLost: Int!      # Health lost by player1 (maxHealth - endingHealth)
+  player2DamageTaken: Int!     # Total damage player2 received (player1TotalDamage)
+  player2HealthLost: Int!      # Health lost by player2 (maxHealth - endingHealth)
 }
 
 type FeesWithdrawn @entity(immutable: true) {
@@ -1011,6 +1090,90 @@ type PlayerVsRecord @entity {
   player2WinsAgainst1: Boolean!  # Has player2 ever beaten player1?
   firstPlayer1Win: BigInt        # When player1 first beat player2 (null if never)
   firstPlayer2Win: BigInt        # When player2 first beat player1 (null if never)
+  
+  # NEW: Actual win/loss counts
+  player1TotalWinsAgainst2: Int!    # Total times player1 beat player2
+  player2TotalWinsAgainst1: Int!    # Total times player2 beat player1
+  totalMatchups: Int!               # Total fights between these players
+  lastMatchup: BigInt!              # Timestamp of most recent fight
+}
+
+type SkinCombatStat @entity {
+  id: ID!
+  skin: Skin
+  skinCollectionId: BigInt!
+  skinTokenId: Int!
+  stance: Int!
+  totalCombats: Int!
+  wins: Int!
+  losses: Int!
+  kills: Int!
+  deaths: Int!
+  knockouts: Int!
+  knockedOut: Int!
+  exhaustions: Int!
+  exhausted: Int!
+  maxRoundWins: Int!
+  maxRoundLosses: Int!
+  killRate: BigDecimal!
+  deathRate: BigDecimal!
+  killDeathRatio: BigDecimal!
+  winRate: BigDecimal!
+  totalDamageDealt: Int!
+  averageDamageDealt: BigDecimal!
+  maxDamageDealt: Int!
+  totalDamageTaken: Int!
+  averageDamageTaken: BigDecimal!
+  totalHealthLost: Int!
+  averageHealthLost: BigDecimal!
+  minDamageTaken: Int!
+  damageEfficiency: BigDecimal!
+  survivalRate: BigDecimal!
+  firstCombat: BigInt!
+  lastCombat: BigInt!
+  lastUpdated: BigInt!
+}
+
+type PlayerSkinCombatStat @entity {
+  id: ID!  # Format: "playerId-skinCollectionId-tokenId-stance"
+  
+  # Entity references + raw IDs for fast lookups
+  player: Player!              # Reference to Player entity
+  playerId: BigInt!            # Raw ID for fast filtering on player details page
+  skin: Skin                   # Reference to Skin entity (nullable)
+  skinCollectionId: BigInt!    # Raw ID for fast filtering
+  skinTokenId: Int!            # Raw ID for fast filtering
+  stance: Int!
+  
+  # EXACT SAME FIELDS as SkinCombatStat for consistency
+  totalCombats: Int!
+  wins: Int!
+  losses: Int!
+  kills: Int!
+  deaths: Int!
+  knockouts: Int!
+  knockedOut: Int!
+  exhaustions: Int!
+  exhausted: Int!
+  maxRoundWins: Int!
+  maxRoundLosses: Int!
+  killRate: BigDecimal!
+  deathRate: BigDecimal!
+  killDeathRatio: BigDecimal!
+  winRate: BigDecimal!
+  totalDamageDealt: Int!
+  averageDamageDealt: BigDecimal!
+  maxDamageDealt: Int!
+  totalDamageTaken: Int!
+  averageDamageTaken: BigDecimal!
+  totalHealthLost: Int!
+  averageHealthLost: BigDecimal!
+  minDamageTaken: Int!
+  damageEfficiency: BigDecimal!
+  survivalRate: BigDecimal!
+  firstCombat: BigInt!
+  lastCombat: BigInt!
+  lastUpdated: BigInt!
 }
 
 # ==========================================================

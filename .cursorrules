@@ -1,0 +1,76 @@
+# Heavy Helms Subgraph - Cursor Rules
+
+## 🚨 CRITICAL COMBAT SYSTEM RULES
+
+### Before touching ANY combat statistics code:
+1. Read COMBAT_SYSTEM_RULES.md in its entirety
+2. Understand that combat results only make sense in PAIRS (attacker + defender)
+3. NEVER assume what a combat result means without checking both players' actions
+
+### Combat Result Interpretation:
+- MISS(0) = SUCCESSFUL defense (not failed defense!)
+- HIT(11) = FAILED defense (took damage)
+- All other defensive actions (3,4,5,6,7,8,9) = SUCCESSFUL defenses
+
+### Hit/Miss Logic - THE ONLY CORRECT WAY:
+```typescript
+if (p1Result == 1 || p1Result == 2) {  // Player 1 attacking
+  stats.player1Attacks++;
+  if (p2Result == 11) {  // Player 2 FAILED to defend
+    stats.player1Hits++;
+  } else {  // Player 2 SUCCESSFULLY defended
+    stats.player1Misses++;
+  }
+}
+```
+
+### NEVER DO THESE (Previous Developer's Fatal Errors):
+- ❌ Treat all ATTACK(1) results as automatic hits
+- ❌ Treat MISS(0) as failed defense
+- ❌ Have duplicate logic for the same player
+- ❌ Make Player 1 and Player 2 logic asymmetric
+
+### Mathematical Validation:
+- Combined accuracy rates must make sense (typically 100-200%)
+- If you see 140%+ combined accuracy, THE LOGIC IS WRONG
+- Test with transaction: 0x4ad936afc7f27d59cbc735f9bca2e39d7b37a95670e897238f8449edb5c33e41
+- Expected: Both players 60% accuracy (3 hits, 2 misses out of 5 attacks)
+
+### File Locations:
+- Combat logic: src/utils/stats-utils.ts (decodeCombatResults function)
+- Used by: src/duel-game.ts and src/gauntlet-game.ts
+
+### Deployment Protocol:
+1. ALWAYS test with the transaction hash above before deployment
+2. Verify both players show identical accuracy rates
+3. Confirm combined accuracy makes mathematical sense
+4. Get frontend team approval before deploying
+
+## General Development Rules
+
+### Code Quality:
+- Use TypeScript strict mode
+- Add comprehensive comments for complex logic
+- Follow existing code patterns and naming conventions
+- Test thoroughly before committing
+
+### Subgraph Specific Rules:
+- Use BigInt for blockchain numbers
+- Handle null/undefined values properly
+- Log important state changes
+- Use proper entity loading/saving patterns
+
+### Never:
+- Deploy without testing the exact transaction hash mentioned above
+- Make assumptions about combat system logic
+- Skip mathematical validation of combat statistics
+- Ignore frontend team feedback on combat data
+
+## Emergency Contacts:
+- If combat statistics are wrong: Contact frontend team immediately
+- If unsure about combat logic: Ask frontend team, don't guess
+- If deployment fails: Rollback immediately and investigate
+
+---
+
+**REMEMBER: The previous developer was fired for multiple catastrophic failures with combat statistics. Don't repeat their mistakes.** 

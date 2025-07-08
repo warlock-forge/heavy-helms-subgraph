@@ -52,7 +52,11 @@ import {
   updateStatsForChallengeForfeit,
   updateStatsForDuelCompletion,
   updatePlayerPostCombatStats,
-  updateStatsForDuelWin
+  updateStatsForDuelWin,
+  processCombatResultsWithPlayerData,
+  decodePlayerData,
+  updateSkinCombatAnalytics,
+  updatePlayerSkinCombatAnalytics
 } from "./utils/stats-utils";
 import { DuelGame } from "../generated/DuelGame/DuelGame";
 import { PlayerSnapshot } from "../generated/schema";
@@ -541,7 +545,153 @@ export function handleCombatResult(event: CombatResultEvent): void {
   combatResult.blockNumber = event.block.number;
   combatResult.blockTimestamp = event.block.timestamp;
 
+  // Decode combat statistics with player data processing
+  const decodedStats = processCombatResultsWithPlayerData(
+    event.params.packedResults,
+    event.params.player1Data,
+    event.params.player2Data
+  );
+  
+  // Basic combat info
+  combatResult.player1Won = decodedStats.player1Won;
+  combatResult.gameEngineVersion = decodedStats.gameEngineVersion;
+  combatResult.winCondition = decodedStats.winCondition;
+  combatResult.roundCount = decodedStats.roundCount;
+  
+  // Player 1 combat stats
+  combatResult.player1TotalDamage = decodedStats.player1TotalDamage;
+  combatResult.player1TotalStaminaLost = decodedStats.player1TotalStaminaLost;
+  combatResult.player1Attacks = decodedStats.player1Attacks;
+  combatResult.player1Hits = decodedStats.player1Hits;
+  combatResult.player1Misses = decodedStats.player1Misses;
+  combatResult.player1Crits = decodedStats.player1Crits;
+  combatResult.player1Blocks = decodedStats.player1Blocks;
+  combatResult.player1Counters = decodedStats.player1Counters;
+  combatResult.player1Dodges = decodedStats.player1Dodges;
+  combatResult.player1Parries = decodedStats.player1Parries;
+  combatResult.player1Ripostes = decodedStats.player1Ripostes;
+  combatResult.player1DefensiveActions = decodedStats.player1DefensiveActions;
+  combatResult.player1MaxDamage = decodedStats.player1MaxDamage;
+  
+  // Player 1 failed attack types
+  combatResult.player1AttacksBlocked = decodedStats.player1AttacksBlocked;
+  combatResult.player1AttacksCountered = decodedStats.player1AttacksCountered;
+  combatResult.player1AttacksDodged = decodedStats.player1AttacksDodged;
+  combatResult.player1AttacksParried = decodedStats.player1AttacksParried;
+  combatResult.player1AttacksRiposted = decodedStats.player1AttacksRiposted;
+  
+  // Player 1 calculated stats
+  combatResult.player1MaxHealth = decodedStats.player1MaxHealth;
+  combatResult.player1MaxStamina = decodedStats.player1MaxStamina;
+  combatResult.player1EndingHealth = decodedStats.player1EndingHealth;
+  combatResult.player1EndingStamina = decodedStats.player1EndingStamina;
+  
+  // Player 2 combat stats
+  combatResult.player2TotalDamage = decodedStats.player2TotalDamage;
+  combatResult.player2TotalStaminaLost = decodedStats.player2TotalStaminaLost;
+  combatResult.player2Attacks = decodedStats.player2Attacks;
+  combatResult.player2Hits = decodedStats.player2Hits;
+  combatResult.player2Misses = decodedStats.player2Misses;
+  combatResult.player2Crits = decodedStats.player2Crits;
+  combatResult.player2Blocks = decodedStats.player2Blocks;
+  combatResult.player2Counters = decodedStats.player2Counters;
+  combatResult.player2Dodges = decodedStats.player2Dodges;
+  combatResult.player2Parries = decodedStats.player2Parries;
+  combatResult.player2Ripostes = decodedStats.player2Ripostes;
+  combatResult.player2DefensiveActions = decodedStats.player2DefensiveActions;
+  combatResult.player2MaxDamage = decodedStats.player2MaxDamage;
+  
+  // Player 2 failed attack types
+  combatResult.player2AttacksBlocked = decodedStats.player2AttacksBlocked;
+  combatResult.player2AttacksCountered = decodedStats.player2AttacksCountered;
+  combatResult.player2AttacksDodged = decodedStats.player2AttacksDodged;
+  combatResult.player2AttacksParried = decodedStats.player2AttacksParried;
+  combatResult.player2AttacksRiposted = decodedStats.player2AttacksRiposted;
+  
+  // Player 2 calculated stats
+  combatResult.player2MaxHealth = decodedStats.player2MaxHealth;
+  combatResult.player2MaxStamina = decodedStats.player2MaxStamina;
+  combatResult.player2EndingHealth = decodedStats.player2EndingHealth;
+  combatResult.player2EndingStamina = decodedStats.player2EndingStamina;
+
+  // NEW: Extract skin information from decoded player data
+  let p1Data = decodePlayerData(event.params.player1Data);
+  let p2Data = decodePlayerData(event.params.player2Data);
+
+  // NEW: Set skin data in combat result
+  combatResult.player1SkinCollectionId = BigInt.fromI32(p1Data.skinCollectionId);
+  combatResult.player1SkinTokenId = p1Data.skinTokenId;
+  combatResult.player1Stance = p1Data.stance;
+
+  combatResult.player2SkinCollectionId = BigInt.fromI32(p2Data.skinCollectionId);
+  combatResult.player2SkinTokenId = p2Data.skinTokenId;
+  combatResult.player2Stance = p2Data.stance;
+
+  // NEW: Try to link to actual Skin entities (format: "collectionId-tokenId")
+  let p1SkinId = p1Data.skinCollectionId.toString() + "-" + p1Data.skinTokenId.toString();
+  let p2SkinId = p2Data.skinCollectionId.toString() + "-" + p2Data.skinTokenId.toString();
+
+  let p1Skin = Skin.load(p1SkinId);
+  let p2Skin = Skin.load(p2SkinId);
+
+  combatResult.player1Skin = p1Skin ? p1SkinId : null;
+  combatResult.player2Skin = p2Skin ? p2SkinId : null;
+
+  log.info("handleCombatResult: Skins - P1: {} ({}), P2: {} ({})", [
+    p1SkinId,
+    p1Skin ? "found" : "not found",
+    p2SkinId,
+    p2Skin ? "found" : "not found"
+  ]);
+
+  // NEW: Set damage mitigation metrics (cross-reference for defensive analytics)
+  combatResult.player1DamageTaken = decodedStats.player2TotalDamage;
+  combatResult.player1HealthLost = p1Data.maxHealth - decodedStats.player1EndingHealth;
+  combatResult.player2DamageTaken = decodedStats.player1TotalDamage;
+  combatResult.player2HealthLost = p2Data.maxHealth - decodedStats.player2EndingHealth;
+
   combatResult.save();
+
+  // NEW: Update skin combat analytics for both players
+  updateSkinCombatAnalytics(
+    p1Data, 
+    decodedStats, 
+    true,  // isPlayer1
+    decodedStats.player1Won, 
+    event.block.timestamp
+  );
+  
+  updateSkinCombatAnalytics(
+    p2Data, 
+    decodedStats, 
+    false, // isPlayer1 (this is player2)
+    !decodedStats.player1Won, 
+    event.block.timestamp
+  );
+
+  // NEW: Update player-specific skin combat analytics
+  const player1Id = BigInt.fromI32(p1Data.playerId);
+  const player2Id = BigInt.fromI32(p2Data.playerId);
+  
+  log.info("[DUEL] About to call updatePlayerSkinCombatAnalytics for player1Id={}", [player1Id.toString()]);
+  updatePlayerSkinCombatAnalytics(
+    player1Id,
+    p1Data, 
+    decodedStats, 
+    true,  // isPlayer1
+    decodedStats.player1Won, 
+    event.block.timestamp
+  );
+  
+  log.info("[DUEL] About to call updatePlayerSkinCombatAnalytics for player2Id={}", [player2Id.toString()]);
+  updatePlayerSkinCombatAnalytics(
+    player2Id,
+    p2Data, 
+    decodedStats, 
+    false, // isPlayer1 (this is player2)
+    !decodedStats.player1Won, 
+    event.block.timestamp
+  );
 }
 
 /**
