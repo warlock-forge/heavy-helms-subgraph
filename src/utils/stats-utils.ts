@@ -1239,7 +1239,7 @@ export function decodePlayerData(data: Bytes): PlayerData {
  * For versions <= 22, use the provided calculation formulas
  */
 export function calculatePlayerStats(playerData: PlayerData, gameEngineVersion: i32): PlayerData {
-  if (gameEngineVersion <= 22) {
+  if (gameEngineVersion <= 25) {
     // Health calculation (unchanged from contract)
     let healthBase = 50;
     let healthFromCon = playerData.constitution * 15;
