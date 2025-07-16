@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a **Heavy Helms Subgraph** - a Graph Protocol subgraph that indexes blockchain events from Heavy Helms gaming contracts on Base Sepolia network. The subgraph tracks player data, combat results, skins, monsters, and various game modes including duels, gauntlets, and practice games.
 
+## Commit Message Rules
+
+**IMPORTANT**: When creating git commits, DO NOT include any self-promotional content like "Generated with Claude Code" or "Co-Authored-By: Claude" in commit messages. Keep commit messages clean and professional.
+
 ## Common Commands
 
 ### Core Development Commands
