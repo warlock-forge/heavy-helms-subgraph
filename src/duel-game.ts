@@ -3,17 +3,10 @@ import {
   ChallengeCreated as ChallengeCreatedEvent,
   ChallengeAccepted as ChallengeAcceptedEvent,
   ChallengeCancelled as ChallengeCancelledEvent,
-  ChallengeForfeited as ChallengeForfeitedEvent,
   DuelComplete as DuelCompleteEvent,
   CombatResult as CombatResultEvent,
-  FeesWithdrawn as FeesWithdrawnEvent,
-  MinDuelFeeUpdated as MinDuelFeeUpdatedEvent,
-  MinWagerAmountUpdated as MinWagerAmountUpdatedEvent,
   GameEnabledUpdated as GameEnabledUpdatedEvent,
-  WagerFeePercentageUpdated as WagerFeePercentageUpdatedEvent,
-  WagersEnabledUpdated as WagersEnabledUpdatedEvent,
   TimeUntilExpireUpdated as TimeUntilExpireUpdatedEvent,
-  TimeUntilWithdrawUpdated as TimeUntilWithdrawUpdatedEvent,
   ChallengeRecovered as ChallengeRecoveredEvent,
   GameEngineUpdated as GameEngineUpdatedEvent,
   PlayerContractUpdated as PlayerContractUpdatedEvent,
@@ -26,17 +19,10 @@ import {
   ChallengeCreated,
   ChallengeAccepted,
   ChallengeCancelled,
-  ChallengeForfeited,
   DuelComplete,
   CombatResult,
-  FeesWithdrawn,
-  MinDuelFeeUpdated,
-  MinWagerAmountUpdated,
   GameEnabledUpdated,
-  WagerFeePercentageUpdated,
-  WagersEnabledUpdated,
   TimeUntilExpireUpdated,
-  TimeUntilWithdrawUpdated,
   ChallengeRecovered,
   GameEngineUpdated,
   PlayerContractUpdated,
@@ -45,12 +31,11 @@ import {
 } from "../generated/schema";
 
 import { log } from "@graphprotocol/graph-ts";
-import { Player, DefaultPlayer, Owner } from "../generated/schema";
+import { Player, DefaultPlayer, Owner, GameEngineUpdated } from "../generated/schema";
 import {
   updateStatsForChallengeCreation,
   updateStatsForChallengeCancellation,
   updateStatsForChallengeForfeit,
-  updateStatsForDuelCompletion,
   updatePlayerPostCombatStats,
   updateStatsForDuelWin,
   processCombatResultsWithPlayerData,
@@ -74,7 +59,6 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
   createdEvent.challengeId = event.params.challengeId;
   createdEvent.challengerId = event.params.challengerId;
   createdEvent.defenderId = event.params.defenderId;
-  createdEvent.wagerAmount = event.params.wagerAmount;
   createdEvent.challengerSkinIndex = event.params.challengerSkinIndex;
   createdEvent.challengerSkinTokenId = BigInt.fromI32(event.params.challengerSkinTokenId);
   createdEvent.challengerStance = BigInt.fromI32(event.params.challengerStance);
@@ -90,7 +74,6 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
   // Set basic challenge fields
   challenge.challengerId = event.params.challengerId;
   challenge.defenderId = event.params.defenderId;
-  challenge.wagerAmount = event.params.wagerAmount;
   challenge.createdBlock = event.block.number;
   challenge.createdAt = event.block.timestamp;
   challenge.state = "OPEN";
@@ -239,15 +222,10 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
   // Get current expiry time from contract state
   const duelGame = DuelGame.bind(event.address);
   const timeUntilExpire = duelGame.try_timeUntilExpire();
-  const timeUntilWithdraw = duelGame.try_timeUntilWithdraw();
   
   // Calculate expiry timestamps
   if (!timeUntilExpire.reverted) {
     challenge.expiresTimestamp = event.block.timestamp.plus(timeUntilExpire.value);
-  }
-  
-  if (!timeUntilWithdraw.reverted) {
-    challenge.withdrawableTimestamp = event.block.timestamp.plus(timeUntilWithdraw.value);
   }
   
   challenge.save();
@@ -434,35 +412,6 @@ export function handleChallengeCancelled(event: ChallengeCancelledEvent): void {
 /**
  * Handle ChallengeForfeited events
  */
-export function handleChallengeForfeited(event: ChallengeForfeitedEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const forfeitedEvent = new ChallengeForfeited(eventId);
-  
-  forfeitedEvent.challengeId = event.params.challengeId;
-  forfeitedEvent.amount = event.params.amount;
-  forfeitedEvent.blockNumber = event.block.number;
-  forfeitedEvent.blockTimestamp = event.block.timestamp;
-  forfeitedEvent.transactionHash = event.transaction.hash;
-  
-  // Update the DuelChallenge entity
-  const challengeId = event.params.challengeId.toString();
-  const challenge = DuelChallenge.load(challengeId);
-  
-  if (challenge) {
-    challenge.state = "FORFEITED";
-    challenge.save();
-    
-    // Set reference from event to challenge
-    forfeitedEvent.challenge = challengeId;
-  } else {
-    log.warning("Challenge not found for forfeit event: {}", [challengeId]);
-  }
-  
-  forfeitedEvent.save();
-  
-  // Update stats
-  updateStatsForChallengeForfeit(event.block.timestamp);
-}
 
 /**
  * Handle DuelComplete events
@@ -474,8 +423,6 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
   duelComplete.challengeId = event.params.challengeId;
   duelComplete.winnerId = event.params.winnerId;
   duelComplete.randomness = event.params.randomness;
-  duelComplete.winnerPayout = event.params.winnerPayout;
-  duelComplete.feeCollected = event.params.feeCollected;
   duelComplete.blockNumber = event.block.number;
   duelComplete.blockTimestamp = event.block.timestamp;
   
@@ -487,8 +434,6 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
     challenge.state = "COMPLETED";
     challenge.winnerId = event.params.winnerId;
     challenge.randomness = event.params.randomness;
-    challenge.winnerPayout = event.params.winnerPayout;
-    challenge.feeCollected = event.params.feeCollected;
     
     // Get winner ID and determine loser ID from the challenge
     const winnerId_str = event.params.winnerId.toString();
@@ -510,14 +455,6 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
     
     // Set reference from event to challenge
     duelComplete.challenge = challengeId;
-    
-    // Update general duel stats
-    updateStatsForDuelCompletion(
-      event.block.timestamp,
-      challenge.wagerAmount.times(BigInt.fromI32(2)), // Assuming wagerAmount is per player
-      event.params.winnerPayout,
-      event.params.feeCollected
-    );
   } else {
     log.warning("Challenge not found for complete event: {}", [challengeId]);
   }
@@ -695,52 +632,6 @@ export function handleCombatResult(event: CombatResultEvent): void {
 }
 
 /**
- * Handle FeesWithdrawn events
- */
-export function handleFeesWithdrawn(event: FeesWithdrawnEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const feesWithdrawn = new FeesWithdrawn(eventId);
-  
-  feesWithdrawn.amount = event.params.amount;
-  feesWithdrawn.blockNumber = event.block.number;
-  feesWithdrawn.blockTimestamp = event.block.timestamp;
-  feesWithdrawn.transactionHash = event.transaction.hash;
-  
-  feesWithdrawn.save();
-}
-
-/**
- * Handle MinDuelFeeUpdated events
- */
-export function handleMinDuelFeeUpdated(event: MinDuelFeeUpdatedEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const minDuelFeeUpdated = new MinDuelFeeUpdated(eventId);
-  
-  minDuelFeeUpdated.oldFee = event.params.oldFee;
-  minDuelFeeUpdated.newFee = event.params.newFee;
-  minDuelFeeUpdated.blockNumber = event.block.number;
-  minDuelFeeUpdated.blockTimestamp = event.block.timestamp;
-  minDuelFeeUpdated.transactionHash = event.transaction.hash;
-  
-  minDuelFeeUpdated.save();
-}
-
-/**
- * Handle MinWagerAmountUpdated events
- */
-export function handleMinWagerAmountUpdated(event: MinWagerAmountUpdatedEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const minWagerAmountUpdated = new MinWagerAmountUpdated(eventId);
-  
-  minWagerAmountUpdated.newAmount = event.params.newAmount;
-  minWagerAmountUpdated.blockNumber = event.block.number;
-  minWagerAmountUpdated.blockTimestamp = event.block.timestamp;
-  minWagerAmountUpdated.transactionHash = event.transaction.hash;
-  
-  minWagerAmountUpdated.save();
-}
-
-/**
  * Handle GameEnabledUpdated events
  */
 export function handleGameEnabledUpdated(event: GameEnabledUpdatedEvent): void {
@@ -753,37 +644,6 @@ export function handleGameEnabledUpdated(event: GameEnabledUpdatedEvent): void {
   gameEnabledUpdated.transactionHash = event.transaction.hash;
   
   gameEnabledUpdated.save();
-}
-
-/**
- * Handle WagerFeePercentageUpdated events
- */
-export function handleWagerFeePercentageUpdated(event: WagerFeePercentageUpdatedEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const wagerFeePercentageUpdated = new WagerFeePercentageUpdated(eventId);
-  
-  wagerFeePercentageUpdated.oldPercentage = event.params.oldPercentage;
-  wagerFeePercentageUpdated.newPercentage = event.params.newPercentage;
-  wagerFeePercentageUpdated.blockNumber = event.block.number;
-  wagerFeePercentageUpdated.blockTimestamp = event.block.timestamp;
-  wagerFeePercentageUpdated.transactionHash = event.transaction.hash;
-  
-  wagerFeePercentageUpdated.save();
-}
-
-/**
- * Handle WagersEnabledUpdated events
- */
-export function handleWagersEnabledUpdated(event: WagersEnabledUpdatedEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const wagersEnabledUpdated = new WagersEnabledUpdated(eventId);
-  
-  wagersEnabledUpdated.enabled = event.params.enabled;
-  wagersEnabledUpdated.blockNumber = event.block.number;
-  wagersEnabledUpdated.blockTimestamp = event.block.timestamp;
-  wagersEnabledUpdated.transactionHash = event.transaction.hash;
-  
-  wagersEnabledUpdated.save();
 }
 
 /**
@@ -803,22 +663,6 @@ export function handleTimeUntilExpireUpdated(event: TimeUntilExpireUpdatedEvent)
 }
 
 /**
- * Handle TimeUntilWithdrawUpdated events
- */
-export function handleTimeUntilWithdrawUpdated(event: TimeUntilWithdrawUpdatedEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const timeUntilWithdrawUpdated = new TimeUntilWithdrawUpdated(eventId);
-  
-  timeUntilWithdrawUpdated.oldValue = event.params.oldValue;
-  timeUntilWithdrawUpdated.newValue = event.params.newValue;
-  timeUntilWithdrawUpdated.blockNumber = event.block.number;
-  timeUntilWithdrawUpdated.blockTimestamp = event.block.timestamp;
-  timeUntilWithdrawUpdated.transactionHash = event.transaction.hash;
-  
-  timeUntilWithdrawUpdated.save();
-}
-
-/**
  * Handle ChallengeRecovered events
  */
 export function handleChallengeRecovered(event: ChallengeRecoveredEvent): void {
@@ -826,8 +670,6 @@ export function handleChallengeRecovered(event: ChallengeRecoveredEvent): void {
   const challengeRecovered = new ChallengeRecovered(eventId);
   
   challengeRecovered.challengeId = event.params.challengeId;
-  challengeRecovered.challengerRefund = event.params.challengerRefund;
-  challengeRecovered.defenderRefund = event.params.defenderRefund;
   challengeRecovered.blockNumber = event.block.number;
   challengeRecovered.blockTimestamp = event.block.timestamp;
   challengeRecovered.transactionHash = event.transaction.hash;

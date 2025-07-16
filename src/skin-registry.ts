@@ -3,9 +3,11 @@ import {
   SkinRegistered as SkinRegisteredEvent,
   SkinVerificationUpdated as SkinVerificationUpdatedEvent,
   SkinTypeUpdated,
-  RequiredNFTUpdated
+  RequiredNFTUpdated,
+  RegistrationFeeUpdated as RegistrationFeeUpdatedEvent,
+  TokensCollected as TokensCollectedEvent
 } from "../generated/PlayerSkinRegistry/PlayerSkinRegistry";
-import { SkinCollection, Skin } from "../generated/schema";
+import { SkinCollection, Skin, RegistrationFeeUpdated, TokensCollected } from "../generated/schema";
 import { 
   PlayerSkinNFT as PlayerSkinNFTTemplate,
   GameOwnedNFT as GameOwnedNFTTemplate 
@@ -170,4 +172,27 @@ export function handleRequiredNFTUpdated(event: RequiredNFTUpdated): void {
     }
     collection.save();
   }
+}
+
+export function handleRegistrationFeeUpdated(event: RegistrationFeeUpdatedEvent): void {
+  let entity = new RegistrationFeeUpdated(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.newFee = event.params.newFee;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
+}
+
+export function handleTokensCollected(event: TokensCollectedEvent): void {
+  let entity = new TokensCollected(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.token = event.params.token;
+  entity.amount = event.params.amount;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
 }

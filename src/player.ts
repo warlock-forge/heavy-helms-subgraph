@@ -21,7 +21,8 @@ import {
   RequestedRandomness as RequestedRandomnessEvent,
   SlotBatchCostUpdated as SlotBatchCostUpdatedEvent,
   StanceUpdated as StanceUpdatedEvent,
-  VrfRequestTimeoutUpdated as VrfRequestTimeoutUpdatedEvent
+  VrfRequestTimeoutUpdated as VrfRequestTimeoutUpdatedEvent,
+  RequestRecovered as RequestRecoveredEvent
 } from "../generated/Player/Player";
 
 import {
@@ -50,6 +51,7 @@ import {
   PendingPlayerCreation,
   StanceUpdated,
   VrfRequestTimeoutUpdated,
+  RequestRecovered,
   Skin
 } from "../generated/schema";
 import { loadFirstName, loadSurname, createFullName } from "./utils/fighter-utils";
@@ -727,3 +729,21 @@ function findMatchingPendingCreation(playerId: BigInt): PendingPlayerCreation | 
   // For now, return null
   return null;
 }
+
+export function handleRequestRecovered(event: RequestRecoveredEvent): void {
+  let entity = new RequestRecovered(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.requestId = event.params.requestId;
+  entity.user = event.params.user;
+  entity.amount = event.params.amount;
+  entity.adminInitiated = event.params.adminInitiated;
+  entity.recoveryTimestamp = event.params.recoveryTimestamp;
+
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+
+  entity.save();
+}
+

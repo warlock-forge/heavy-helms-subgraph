@@ -36,6 +36,7 @@ dataSources:
         - PlayerWinLossUpdated
         - RequestedRandomness
         - SlotBatchCostUpdated
+        - RequestRecovered
         # Add our custom entities
         - Player
         - Owner
@@ -90,6 +91,8 @@ dataSources:
           handler: handleStanceUpdated
         - event: VrfRequestTimeoutUpdated(uint256,uint256)
           handler: handleVrfRequestTimeoutUpdated
+        - event: RequestRecovered(indexed uint256,indexed address,uint256,bool,uint256)
+          handler: handleRequestRecovered
       file: ./src/player.ts
 
   - kind: ethereum
@@ -130,6 +133,8 @@ dataSources:
         - SkinVerificationUpdated
         - SkinTypeUpdated
         - RequiredNFTUpdated
+        - RegistrationFeeUpdated
+        - TokensCollected
         - SkinCollection
       abis:
         - name: PlayerSkinRegistry
@@ -145,6 +150,10 @@ dataSources:
           handler: handleSkinTypeUpdated
         - event: RequiredNFTUpdated(indexed uint32,address)
           handler: handleRequiredNFTUpdated
+        - event: RegistrationFeeUpdated(uint256)
+          handler: handleRegistrationFeeUpdated
+        - event: TokensCollected(indexed address,uint256)
+          handler: handleTokensCollected
       file: ./src/skin-registry.ts
 
   # Add DefaultPlayer data source
@@ -255,53 +264,40 @@ dataSources:
         - ChallengeCreated
         - ChallengeAccepted
         - ChallengeCancelled
-        - ChallengeForfeited
         - DuelComplete
         - CombatResult
-        - FeesWithdrawn
-        - MinDuelFeeUpdated
-        - MinWagerAmountUpdated
         - GameEnabledUpdated
-        - WagerFeePercentageUpdated
-        - WagersEnabledUpdated
         - TimeUntilExpireUpdated
-        - TimeUntilWithdrawUpdated
+        - VrfRequestTimeoutUpdated
+        - ChallengeRecovered
+        - PlayerContractUpdated
+        - RequestRecovered
       abis:
         - name: DuelGame
           file: ./abis/DuelGame.json
       eventHandlers:
-        - event: ChallengeCreated(indexed uint256,indexed uint32,indexed uint32,uint256,uint32,uint16,uint8)
+        - event: ChallengeCreated(indexed uint256,indexed uint32,indexed uint32,uint32,uint16,uint8)
           handler: handleChallengeCreated
         - event: ChallengeAccepted(indexed uint256,indexed uint32,uint32,uint16,uint8)
           handler: handleChallengeAccepted
         - event: ChallengeCancelled(indexed uint256)
           handler: handleChallengeCancelled
-        - event: ChallengeForfeited(indexed uint256,uint256)
-          handler: handleChallengeForfeited
-        - event: DuelComplete(indexed uint256,indexed uint32,uint256,uint256,uint256)
+        - event: DuelComplete(indexed uint256,indexed uint32,uint256)
           handler: handleDuelComplete
         - event: CombatResult(indexed bytes32,indexed bytes32,indexed uint32,bytes)
           handler: handleCombatResult
-        - event: FeesWithdrawn(uint256)
-          handler: handleFeesWithdrawn
-        - event: MinDuelFeeUpdated(uint256,uint256)
-          handler: handleMinDuelFeeUpdated
-        - event: MinWagerAmountUpdated(uint256)
-          handler: handleMinWagerAmountUpdated
         - event: GameEnabledUpdated(bool)
           handler: handleGameEnabledUpdated
-        - event: WagerFeePercentageUpdated(uint256,uint256)
-          handler: handleWagerFeePercentageUpdated
-        - event: WagersEnabledUpdated(bool)
-          handler: handleWagersEnabledUpdated
+        - event: GameEngineUpdated(indexed address,indexed address)
+          handler: handleGameEngineUpdated
         - event: TimeUntilExpireUpdated(uint256,uint256)
           handler: handleTimeUntilExpireUpdated
-        - event: TimeUntilWithdrawUpdated(uint256,uint256)
-          handler: handleTimeUntilWithdrawUpdated
-        - event: ChallengeRecovered(indexed uint256,uint256,uint256)
+        - event: ChallengeRecovered(indexed uint256)
           handler: handleChallengeRecovered
         - event: PlayerContractUpdated(indexed address,indexed address)
           handler: handlePlayerContractUpdated
+        - event: VrfRequestTimeoutUpdated(uint256,uint256)
+          handler: handleVrfRequestTimeoutUpdated
       file: ./src/duel-game.ts
 
   # Add GauntletGame data source
@@ -334,6 +330,12 @@ dataSources:
         - GauntletRecovered
         - CombatResult # Standard combat result, not gauntlet-specific
         - QueueClearedDueToGameDisabled # Add the event entity if not already implicitly covered
+        - DefaultPlayerContractSet
+        - QueueClearedDueToSettingsChange
+        - MaxDefaultPlayerSubstituteIdSet
+        - OperatorSet
+        - GameEngineUpdated
+        - PlayerContractUpdated
         # Admin Event Entities (Add if needed)
         # ...
       abis:
@@ -349,14 +351,14 @@ dataSources:
           file: ./abis/DefaultPlayer.json
       eventHandlers:
         # Queue Management
-        - event: PlayerQueued(indexed uint32,uint256,uint256)
+        - event: PlayerQueued(indexed uint32,uint256)
           handler: handlePlayerQueued
         - event: PlayerWithdrew(indexed uint32,uint256)
           handler: handlePlayerWithdrew
         # Gauntlet Lifecycle
-        - event: GauntletStarted(indexed uint256,uint8,uint256,(uint32,(uint32,(uint32,uint16),uint8))[],uint256)
+        - event: GauntletStarted(indexed uint256,uint8,(uint32,(uint32,(uint32,uint16),uint8))[],uint256)
           handler: handleGauntletStarted
-        - event: GauntletCompleted(indexed uint256,uint8,uint256,indexed uint32,uint256,uint256,uint32[],uint32[])
+        - event: GauntletCompleted(indexed uint256,uint8,indexed uint32,uint32[],uint32[])
           handler: handleGauntletCompleted
         - event: GauntletRecovered(indexed uint256)
           handler: handleGauntletRecovered
@@ -364,23 +366,59 @@ dataSources:
         - event: CombatResult(indexed bytes32,indexed bytes32,indexed uint32,bytes)
           handler: handleGauntletCombatResult # Use a specific handler
         # Admin & Settings Events
-        - event: FeesWithdrawn(uint256)
-          handler: handleFeesWithdrawn
-        - event: EntryFeeSet(uint256,uint256)
-          handler: handleEntryFeeSet
         - event: GauntletSizeSet(uint8,uint8)
           handler: handleGauntletSizeSet
-        - event: FeePercentageSet(uint256,uint256)
-          handler: handleFeePercentageSet
         - event: GameEnabledUpdated(bool)
           handler: handleGameEnabledUpdated
+        - event: GameEngineUpdated(indexed address,indexed address)
+          handler: handleGameEngineUpdated
+        - event: PlayerContractUpdated(indexed address,indexed address)
+          handler: handlePlayerContractUpdated
         # Add the handler for the updated event
         - event: QueueClearedDueToGameDisabled(uint32[],uint256) # Signature with uint32[]
           handler: handleQueueClearedDueToGameDisabled # New handler function name
         - event: MinTimeBetweenGauntletsSet(uint256)
           handler: handleMinTimeBetweenGauntletsSet
-        # ... other admin handlers ...
+        - event: DefaultPlayerContractSet(indexed address)
+          handler: handleDefaultPlayerContractSet
+        - event: QueueClearedDueToSettingsChange(uint256,uint256)
+          handler: handleQueueClearedDueToSettingsChange
+        - event: MaxDefaultPlayerSubstituteIdSet(uint32)
+          handler: handleMaxDefaultPlayerSubstituteIdSet
+        - event: OperatorSet(indexed address)
+          handler: handleOperatorSet
       file: ./src/gauntlet-game.ts # New mapping file
+
+  # Add PracticeGame data source
+  - kind: ethereum
+    name: PracticeGame
+    network: base-sepolia
+    source:
+      address: "0x0000000000000000000000000000000000000000" # TODO: Add PracticeGame contract address
+      abi: PracticeGame
+      startBlock: 24119000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - DefaultPlayerContractUpdated
+        - MonsterContractUpdated
+        - GameEngineUpdated
+        - PlayerContractUpdated
+      abis:
+        - name: PracticeGame
+          file: ./abis/PracticeGame.json
+      eventHandlers:
+        - event: DefaultPlayerContractUpdated(indexed address,indexed address)
+          handler: handleDefaultPlayerContractUpdated
+        - event: MonsterContractUpdated(indexed address,indexed address)
+          handler: handleMonsterContractUpdated
+        - event: GameEngineUpdated(indexed address,indexed address)
+          handler: handleGameEngineUpdated
+        - event: PlayerContractUpdated(indexed address,indexed address)
+          handler: handlePlayerContractUpdated
+      file: ./src/practice-game.ts
 
 templates:
   - name: PlayerSkinNFT

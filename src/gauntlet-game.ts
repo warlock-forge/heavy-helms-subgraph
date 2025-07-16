@@ -6,13 +6,16 @@ import {
   GauntletCompleted as GauntletCompletedEvent,
   GauntletRecovered as GauntletRecoveredEvent,
   CombatResult as CombatResultEvent,
-  FeesWithdrawn as FeesWithdrawnEvent,
-  EntryFeeSet as EntryFeeSetEvent,
   GauntletSizeSet as GauntletSizeSetEvent,
-  FeePercentageSet as FeePercentageSetEvent,
   GameEnabledUpdated as GameEnabledUpdatedEvent,
   QueueClearedDueToGameDisabled as QueueClearedDueToGameDisabledEvent,
-  MinTimeBetweenGauntletsSet as MinTimeBetweenGauntletsSetEvent
+  MinTimeBetweenGauntletsSet as MinTimeBetweenGauntletsSetEvent,
+  DefaultPlayerContractSet as DefaultPlayerContractSetEvent,
+  QueueClearedDueToSettingsChange as QueueClearedDueToSettingsChangeEvent,
+  MaxDefaultPlayerSubstituteIdSet as MaxDefaultPlayerSubstituteIdSetEvent,
+  OperatorSet as OperatorSetEvent,
+  GameEngineUpdated as GameEngineUpdatedEvent,
+  PlayerContractUpdated as PlayerContractUpdatedEvent
 } from "../generated/GauntletGame/GauntletGame";
 
 import { 
@@ -29,7 +32,13 @@ import {
   DefaultPlayer,
   Skin,
   SkinCollection,
-  QueueClearedDueToGameDisabled
+  QueueClearedDueToGameDisabled,
+  DefaultPlayerContractSet,
+  QueueClearedDueToSettingsChange,
+  MaxDefaultPlayerSubstituteIdSet,
+  OperatorSet,
+  GameEngineUpdated,
+  PlayerContractUpdated
 } from "../generated/schema";
 
 import { getOrCreateStats } from "./utils/stats-utils";
@@ -48,7 +57,6 @@ export function handlePlayerQueued(event: PlayerQueuedEvent): void {
   
   entity.playerId = event.params.playerId;
   entity.queueSize = event.params.queueSize;
-  entity.entryFee = event.params.entryFee;
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
   entity.transactionHash = event.transaction.hash;
@@ -56,7 +64,6 @@ export function handlePlayerQueued(event: PlayerQueuedEvent): void {
   
   const stats = getOrCreateStats();
   stats.currentGauntletQueueSize = event.params.queueSize.toI32();
-  stats.currentGauntletEntryFee = event.params.entryFee;
   stats.lastUpdated = event.block.timestamp;
   stats.save();
 
@@ -104,14 +111,11 @@ export function handleGauntletStarted(event: GauntletStartedEvent): void {
 
   const gauntlet = new Gauntlet(gauntletId);
   gauntlet.size = event.params.size;
-  gauntlet.entryFee = event.params.entryFee;
   gauntlet.state = "PENDING";
   gauntlet.vrfRequestId = event.params.vrfRequestId;
   gauntlet.vrfRequestTimestamp = event.block.timestamp;
   gauntlet.completionTimestamp = null;
   gauntlet.champion = null;
-  gauntlet.prizeAwarded = ZERO_BI;
-  gauntlet.feeCollected = ZERO_BI;
   gauntlet.startedAt = event.block.timestamp;
   gauntlet.startedTx = event.transaction.hash;
   gauntlet.completedAt = null;
@@ -196,7 +200,6 @@ export function handleGauntletStarted(event: GauntletStartedEvent): void {
   entity.gauntlet = gauntletId;
   entity.gauntletId = event.params.gauntletId;
   entity.size = event.params.size;
-  entity.entryFee = event.params.entryFee;
   entity.participantIds = participantIdsForEventEntity;
   entity.vrfRequestId = event.params.vrfRequestId;
   entity.blockNumber = event.block.number;
@@ -229,8 +232,6 @@ export function handleGauntletCompleted(event: GauntletCompletedEvent): void {
   if (gauntlet != null) {
     gauntlet.state = "COMPLETED";
     gauntlet.completionTimestamp = event.block.timestamp;
-    gauntlet.prizeAwarded = event.params.prizeAwarded;
-    gauntlet.feeCollected = event.params.feeCollected;
     gauntlet.completedAt = event.block.timestamp;
     gauntlet.completedTx = event.transaction.hash;
     
@@ -307,10 +308,7 @@ export function handleGauntletCompleted(event: GauntletCompletedEvent): void {
   entity.gauntlet = gauntletId;
   entity.gauntletId = event.params.gauntletId;
   entity.size = event.params.size;
-  entity.entryFee = event.params.entryFee;
   entity.championId = event.params.championId.toI32(); // Assuming event param championId is i32/u32
-  entity.prizeAwarded = event.params.prizeAwarded;
-  entity.feeCollected = event.params.feeCollected;
   entity.participantIds = event.params.participantIds; // Store original BigInt array from event
   // Note: Storing roundWinners on the event entity might also be useful
   // entity.roundWinners = event.params.roundWinners; 
@@ -322,8 +320,6 @@ export function handleGauntletCompleted(event: GauntletCompletedEvent): void {
   // --- (Keep existing logic to update Stats entity) ---
   const stats = getOrCreateStats();
   stats.totalGauntletsCompleted += 1;
-  stats.totalGauntletPrizeMoneyAwarded = stats.totalGauntletPrizeMoneyAwarded.plus(event.params.prizeAwarded);
-  stats.totalGauntletFeesCollected = stats.totalGauntletFeesCollected.plus(event.params.feeCollected);
   stats.lastUpdated = event.block.timestamp;
   stats.save();
 }
@@ -641,18 +637,7 @@ export function handleGauntletCombatResult(event: CombatResultEvent): void {
 
 // Admin event handlers
 
-export function handleFeesWithdrawn(event: FeesWithdrawnEvent): void {
-  const stats = getOrCreateStats();
-  stats.lastUpdated = event.block.timestamp;
-  stats.save();
-}
 
-export function handleEntryFeeSet(event: EntryFeeSetEvent): void {
-  const stats = getOrCreateStats();
-  stats.currentGauntletEntryFee = event.params.newFee;
-  stats.lastUpdated = event.block.timestamp;
-  stats.save();
-}
 
 export function handleGauntletSizeSet(event: GauntletSizeSetEvent): void {
   const stats = getOrCreateStats();
@@ -661,12 +646,6 @@ export function handleGauntletSizeSet(event: GauntletSizeSetEvent): void {
   stats.save();
 }
 
-export function handleFeePercentageSet(event: FeePercentageSetEvent): void {
-  const stats = getOrCreateStats();
-  stats.currentGauntletFeePercentage = event.params.newPercentage;
-  stats.lastUpdated = event.block.timestamp;
-  stats.save();
-}
 
 export function handleQueueClearedDueToGameDisabled(event: QueueClearedDueToGameDisabledEvent): void {
   log.info("[Queue Cleared] Processing QueueClearedDueToGameDisabled event in tx {}", [event.transaction.hash.toHex()]);
@@ -747,4 +726,85 @@ export function handleMinTimeBetweenGauntletsSet(event: MinTimeBetweenGauntletsS
   stats.currentMinTimeBetweenGauntlets = event.params.newMinTime; 
   stats.lastUpdated = event.block.timestamp;
   stats.save();
+}
+
+export function handleDefaultPlayerContractSet(event: DefaultPlayerContractSetEvent): void {
+  let entity = new DefaultPlayerContractSet(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.newContract = event.params.newContract;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
+}
+
+export function handleQueueClearedDueToSettingsChange(event: QueueClearedDueToSettingsChangeEvent): void {
+  let entity = new QueueClearedDueToSettingsChange(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.playersRefunded = event.params.playersRefunded;
+  entity.totalRefunded = event.params.totalRefunded;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
+}
+
+export function handleMaxDefaultPlayerSubstituteIdSet(event: MaxDefaultPlayerSubstituteIdSetEvent): void {
+  let entity = new MaxDefaultPlayerSubstituteIdSet(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.newMaxId = event.params.newMaxId;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
+}
+
+export function handleOperatorSet(event: OperatorSetEvent): void {
+  let entity = new OperatorSet(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.newOperator = event.params.newOperator;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
+}
+
+export function handleGameEngineUpdated(event: GameEngineUpdatedEvent): void {
+  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
+  const gameEngineUpdated = new GameEngineUpdated(eventId);
+  
+  gameEngineUpdated.oldEngine = event.params.oldEngine;
+  gameEngineUpdated.newEngine = event.params.newEngine;
+  gameEngineUpdated.blockNumber = event.block.number;
+  gameEngineUpdated.blockTimestamp = event.block.timestamp;
+  gameEngineUpdated.transactionHash = event.transaction.hash;
+  
+  gameEngineUpdated.save();
+  
+  log.info("GauntletGame: Game engine updated from {} to {}", [
+    event.params.oldEngine.toHexString(),
+    event.params.newEngine.toHexString()
+  ]);
+}
+
+export function handlePlayerContractUpdated(event: PlayerContractUpdatedEvent): void {
+  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
+  const playerContractUpdated = new PlayerContractUpdated(eventId);
+  
+  playerContractUpdated.oldContract = event.params.oldContract;
+  playerContractUpdated.newContract = event.params.newContract;
+  playerContractUpdated.blockNumber = event.block.number;
+  playerContractUpdated.blockTimestamp = event.block.timestamp;
+  playerContractUpdated.transactionHash = event.transaction.hash;
+  
+  playerContractUpdated.save();
+  
+  log.info("GauntletGame: Player contract updated from {} to {}", [
+    event.params.oldContract.toHexString(),
+    event.params.newContract.toHexString()
+  ]);
 } 

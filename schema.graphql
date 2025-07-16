@@ -723,7 +723,6 @@ type DuelChallenge @entity {
   id: ID!
   challengerId: BigInt!
   defenderId: BigInt!
-  wagerAmount: BigInt!
   
   # Keep owner references on the challenge for direct querying
   challengerOwner: Owner
@@ -736,15 +735,12 @@ type DuelChallenge @entity {
   createdBlock: BigInt!
   createdAt: BigInt!
   expiresTimestamp: BigInt
-  withdrawableTimestamp: BigInt
 
   state: DuelChallengeState!
   
   # Fields for completed duels
   winnerId: BigInt
   randomness: BigInt
-  winnerPayout: BigInt
-  feeCollected: BigInt
 }
 
 # Define an enum for duel states
@@ -764,7 +760,6 @@ type ChallengeCreated @entity(immutable: true) {
   challengeId: BigInt!
   challengerId: BigInt!
   defenderId: BigInt!
-  wagerAmount: BigInt!
   challengerSkinIndex: BigInt!
   challengerSkinTokenId: BigInt!
   challengerStance: BigInt!
@@ -812,8 +807,6 @@ type DuelComplete @entity(immutable: true) {
   challengeId: BigInt!
   winnerId: BigInt!
   randomness: BigInt!
-  winnerPayout: BigInt!
-  feeCollected: BigInt!
   challenge: DuelChallenge!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
@@ -910,32 +903,7 @@ type CombatResult @entity(immutable: true) {
   player2HealthLost: Int!      # Health lost by player2 (maxHealth - endingHealth)
 }
 
-type FeesWithdrawn @entity(immutable: true) {
-  id: Bytes!
-  amount: BigInt!
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
 # Administrative Events
-type MinDuelFeeUpdated @entity(immutable: true) {
-  id: Bytes!
-  oldFee: BigInt!
-  newFee: BigInt!
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type MinWagerAmountUpdated @entity(immutable: true) {
-  id: Bytes!
-  newAmount: BigInt!
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
 type GameEnabledUpdated @entity(immutable: true) {
   id: Bytes!
   enabled: Boolean!
@@ -944,33 +912,7 @@ type GameEnabledUpdated @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
-type WagerFeePercentageUpdated @entity(immutable: true) {
-  id: Bytes!
-  oldPercentage: BigInt!
-  newPercentage: BigInt!
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type WagersEnabledUpdated @entity(immutable: true) {
-  id: Bytes!
-  enabled: Boolean!
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
 type TimeUntilExpireUpdated @entity(immutable: true) {
-  id: Bytes!
-  oldValue: BigInt!
-  newValue: BigInt!
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type TimeUntilWithdrawUpdated @entity(immutable: true) {
   id: Bytes!
   oldValue: BigInt!
   newValue: BigInt!
@@ -999,18 +941,10 @@ type Stats @entity {
   
   # Duel statistics
   totalDuels: Int!
-  totalWagerDuels: Int!
-  totalNonWagerDuels: Int!
   openChallenges: Int!
   completedDuels: Int!
   cancelledDuels: Int!
   forfeitedDuels: Int!
-  
-  # Wager statistics
-  totalWageredAmount: BigInt!
-  totalFeesCollected: BigInt!
-  totalWinnerPayouts: BigInt!
-  averageWagerAmount: BigInt!
   
   # Skin statistics
   skinCollectionsCount: Int!
@@ -1027,12 +961,8 @@ type Stats @entity {
   totalGauntletsStarted: Int!
   totalGauntletsCompleted: Int!
   totalGauntletsRecovered: Int!
-  totalGauntletPrizeMoneyAwarded: BigInt!
-  totalGauntletFeesCollected: BigInt!
   currentGauntletQueueSize: Int!
-  currentGauntletEntryFee: BigInt!
   currentGauntletSize: Int!
-  currentGauntletFeePercentage: BigInt!
   currentMinTimeBetweenGauntlets: BigInt!
 }
 
@@ -1046,8 +976,6 @@ type SkinAddressMapping @entity {
 type ChallengeRecovered @entity(immutable: true) {
   id: Bytes!
   challengeId: BigInt!
-  challengerRefund: BigInt!
-  defenderRefund: BigInt!
   challenge: DuelChallenge!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
@@ -1195,7 +1123,6 @@ enum PlayerGauntletStatus {
 type Gauntlet @entity {
   id: ID!                  # Gauntlet ID (uint256 from contract)
   size: Int!               # 4, 8, 16, or 32
-  entryFee: BigInt!        # Entry fee paid by each participant
   state: GauntletState!    # PENDING or COMPLETED
   vrfRequestId: BigInt     # ID of the associated VRF request
   vrfRequestTimestamp: BigInt! # Timestamp of VRF request
@@ -1203,8 +1130,6 @@ type Gauntlet @entity {
   participants: [GauntletParticipant!]! @derivedFrom(field: "gauntlet") # List of participants (INITIAL REGISTRANTS)
   roundWinners: [String!]  # List of Fighter IDs for each round winner (size - 1)
   champion: Fighter        # Link to the final winner (Player or DefaultPlayer)
-  prizeAwarded: BigInt!    # Amount paid to the winner (0 if default wins or no payout)
-  feeCollected: BigInt!    # Amount collected as contract fees
   startedAt: BigInt!       # Timestamp GauntletStarted event occurred
   startedTx: Bytes!        # Transaction hash of GauntletStarted
   completedAt: BigInt      # Timestamp GauntletCompleted event occurred
@@ -1231,7 +1156,6 @@ type PlayerQueued @entity(immutable: true) {
   id: Bytes!               # Transaction hash
   playerId: BigInt!        # uint32 indexed playerId
   queueSize: BigInt!       # uint256 queueSize
-  entryFee: BigInt!        # uint256 entryFee
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -1250,7 +1174,6 @@ type GauntletStarted @entity(immutable: true) {
   id: Bytes!               # Transaction hash
   gauntletId: BigInt!      # uint256 indexed gauntletId
   size: Int!               # uint8 size
-  entryFee: BigInt!        # uint256 entryFee
   participantIds: [BigInt!]! # uint32[] participantIds
   vrfRequestId: BigInt!    # uint256 vrfRequestId
   blockNumber: BigInt!
@@ -1264,10 +1187,7 @@ type GauntletCompleted @entity(immutable: true) {
   id: Bytes!               # Transaction hash
   gauntletId: BigInt!      # uint256 indexed gauntletId
   size: Int!               # uint8 size
-  entryFee: BigInt!        # uint256 entryFee
   championId: Int!         # uint32 indexed championId (Keep as Int if event param is i32)
-  prizeAwarded: BigInt!    # uint256 prizeAwarded (amount paid to winner)
-  feeCollected: BigInt!    # uint256 feeCollected (amount added to contract fees)
   participantIds: [BigInt!]! # uint32[] participantIds (post-substitution)
   blockNumber: BigInt!
   blockTimestamp: BigInt!
@@ -1290,6 +1210,62 @@ type QueueClearedDueToGameDisabled @entity(immutable: true) {
   id: Bytes!               # Transaction hash (unique for this event type)
   playerIds: [String!]!    # List of player IDs removed (store as String for flexibility)
   totalRefunded: BigInt!   # Total ETH refunded
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+# ==========================================================
+#                   MISSING EVENT ENTITIES                   
+# ==========================================================
+
+
+type DefaultPlayerContractSet @entity(immutable: true) {
+  id: Bytes!
+  newContract: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type QueueClearedDueToSettingsChange @entity(immutable: true) {
+  id: Bytes!
+  playersRefunded: BigInt! # uint256
+  totalRefunded: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type MaxDefaultPlayerSubstituteIdSet @entity(immutable: true) {
+  id: Bytes!
+  newMaxId: BigInt! # uint32
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorSet @entity(immutable: true) {
+  id: Bytes!
+  newOperator: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DefaultPlayerContractUpdated @entity(immutable: true) {
+  id: Bytes!
+  oldContract: Bytes! # address
+  newContract: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type MonsterContractUpdated @entity(immutable: true) {
+  id: Bytes!
+  oldContract: Bytes! # address
+  newContract: Bytes! # address
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!

@@ -58,10 +58,6 @@ export function getOrCreateStats(): Stats {
     stats.cancelledDuels = 0
     stats.forfeitedDuels = 0
     
-    stats.totalWageredAmount = BigInt.fromI32(0)
-    stats.totalFeesCollected = BigInt.fromI32(0)
-    stats.averageWagerAmount = BigInt.fromI32(0)
-    
     stats.skinCollectionsCount = 0
     stats.verifiedSkinCollectionsCount = 0
     stats.totalSkinsCount = 0
@@ -70,20 +66,12 @@ export function getOrCreateStats(): Stats {
     
     stats.lastUpdated = BigInt.fromI32(0)
     
-    stats.totalWagerDuels = 0
-    stats.totalNonWagerDuels = 0
-    stats.totalWinnerPayouts = BigInt.fromI32(0)
-    
     // Initialize Gauntlet-related fields
     stats.totalGauntletsStarted = 0
     stats.totalGauntletsCompleted = 0
     stats.totalGauntletsRecovered = 0
-    stats.totalGauntletPrizeMoneyAwarded = BigInt.fromI32(0)
-    stats.totalGauntletFeesCollected = BigInt.fromI32(0)
     stats.currentGauntletQueueSize = 0
-    stats.currentGauntletEntryFee = BigInt.fromI32(0)
     stats.currentGauntletSize = 0
-    stats.currentGauntletFeePercentage = BigInt.fromI32(0)
     stats.currentMinTimeBetweenGauntlets = BigInt.fromI32(0)
   }
   
@@ -255,36 +243,6 @@ export function updateStatsForChallengeForfeit(timestamp: BigInt): void {
   stats.save()
 }
 
-export function updateStatsForDuelCompletion(
-    timestamp: BigInt,
-    totalWageredAmount: BigInt,
-    winnerPayout: BigInt,
-    feeCollected: BigInt
-  ): void {
-    let stats = getOrCreateStats();
-    stats.openChallenges -= 1;
-    stats.completedDuels += 1;
-    
-    // Track whether this is a wager duel
-    if (totalWageredAmount.gt(BigInt.fromI32(0))) {
-      stats.totalWagerDuels += 1;
-      stats.totalWageredAmount = stats.totalWageredAmount.plus(totalWageredAmount);
-      
-      // Update average wager amount (only for wager duels)
-      if (stats.totalWagerDuels > 0) {
-        stats.averageWagerAmount = stats.totalWageredAmount.div(BigInt.fromI32(stats.totalWagerDuels));
-      }
-    } else {
-      stats.totalNonWagerDuels += 1;
-    }
-    
-    // Track fees and payouts
-    stats.totalFeesCollected = stats.totalFeesCollected.plus(feeCollected);
-    stats.totalWinnerPayouts = stats.totalWinnerPayouts.plus(winnerPayout);
-    
-    stats.lastUpdated = timestamp;
-    stats.save();
-  }
 
 // Skin-related update methods
 export function updateStatsForSkinRegistration(timestamp: BigInt): void {
