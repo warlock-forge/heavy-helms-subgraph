@@ -1259,9 +1259,28 @@ export function calculatePlayerStats(playerData: PlayerData, gameEngineVersion: 
       playerData.maxHealth.toString(),
       playerData.maxStamina.toString()
     ]);
+  } else if (gameEngineVersion == 26 || gameEngineVersion == 27) {
+    // v26-v27 Health calculation: CON*17 (increased from 15)
+    let healthBase = 50;
+    let healthFromCon = playerData.constitution * 17;
+    let healthFromSize = playerData.size * 6;
+    let healthFromStamina = playerData.stamina * 3;
+    playerData.maxHealth = healthBase + healthFromCon + healthFromSize + healthFromStamina;
+    
+    // v26-v27 Endurance calculation: STA*20, STR*5 (increased from STA*16, STR*2)
+    let staminaBase = 35;
+    let staminaFromStamina = playerData.stamina * 20;
+    let staminaFromStrength = playerData.strength * 5;
+    playerData.maxStamina = staminaBase + staminaFromStamina + staminaFromStrength;
+    
+    log.info("calculatePlayerStats: Player {} v{} - MaxHP:{} MaxStamina:{}", [
+      playerData.playerId.toString(),
+      gameEngineVersion.toString(),
+      playerData.maxHealth.toString(),
+      playerData.maxStamina.toString()
+    ]);
   } else {
-    // For future versions, we'd need to implement different formulas
-    // For now, just log a warning and use 0 values
+    // For v28+ or unknown versions, log a warning and use 0 values
     log.warning("calculatePlayerStats: Unknown game engine version {}, cannot calculate stats", [
       gameEngineVersion.toString()
     ]);
