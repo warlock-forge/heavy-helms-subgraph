@@ -1259,7 +1259,7 @@ export function calculatePlayerStats(playerData: PlayerData, gameEngineVersion: 
       playerData.maxHealth.toString(),
       playerData.maxStamina.toString()
     ]);
-  } else if (gameEngineVersion == 26 || gameEngineVersion == 27) {
+  } else if (gameEngineVersion == 26 || gameEngineVersion == 27 || gameEngineVersion == 28) {
     // v26-v27 Health calculation: CON*17 (increased from 15)
     let healthBase = 50;
     let healthFromCon = playerData.constitution * 17;
