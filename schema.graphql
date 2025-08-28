@@ -36,6 +36,12 @@ interface Fighter {
   # Stance field (new)
   stance: Int!            # uint8 stance value
   
+  # v1.0.0 Progression fields
+  level: Int!             # uint8 level (1-10)
+  currentXP: Int!         # uint16 current experience points
+  weaponSpecialization: Int! # uint8 weapon class specialization (255 = none)
+  armorSpecialization: Int!  # uint8 armor specialization (255 = none)
+  
   createdAt: BigInt!
   lastUpdatedAt: BigInt!
 }
@@ -79,6 +85,12 @@ type Player implements Fighter @entity {
   
   # Stance field (new)
   stance: Int!            # uint8 stance value, defaults to 1
+  
+  # v1.0.0 Progression fields
+  level: Int!             # uint8 level (1-10)
+  currentXP: Int!         # uint16 current experience points
+  weaponSpecialization: Int! # uint8 weapon class specialization (255 = none)
+  armorSpecialization: Int!  # uint8 armor specialization (255 = none)
   
   createdAt: BigInt!
   lastUpdatedAt: BigInt!
@@ -126,6 +138,12 @@ type PlayerSnapshot implements Fighter @entity {
   # Stance field (from event)
   stance: Int!
   
+  # v1.0.0 Progression fields
+  level: Int!             # uint8 level (1-10)
+  currentXP: Int!         # uint16 current experience points
+  weaponSpecialization: Int! # uint8 weapon class specialization (255 = none)
+  armorSpecialization: Int!  # uint8 armor specialization (255 = none)
+  
   # Snapshot timestamp
   snapshotTimestamp: BigInt!
   
@@ -169,6 +187,12 @@ type DefaultPlayer implements Fighter @entity {
   # Stance field (new)
   stance: Int!            # uint8 stance value, set on creation
   
+  # v1.0.0 Progression fields
+  level: Int!             # uint8 level (1-10)
+  currentXP: Int!         # uint16 current experience points
+  weaponSpecialization: Int! # uint8 weapon class specialization (255 = none)
+  armorSpecialization: Int!  # uint8 armor specialization (255 = none)
+  
   createdAt: BigInt!
   lastUpdatedAt: BigInt!
 }
@@ -208,6 +232,12 @@ type Monster implements Fighter @entity {
   
   # Stance field (new)
   stance: Int!            # uint8 stance value, set on creation
+  
+  # v1.0.0 Progression fields
+  level: Int!             # uint8 level (1-10)
+  currentXP: Int!         # uint16 current experience points
+  weaponSpecialization: Int! # uint8 weapon class specialization (255 = none)
+  armorSpecialization: Int!  # uint8 armor specialization (255 = none)
   
   createdAt: BigInt!
   lastUpdatedAt: BigInt!
@@ -1266,6 +1296,242 @@ type MonsterContractUpdated @entity(immutable: true) {
   id: Bytes!
   oldContract: Bytes! # address
   newContract: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+# ==========================================================
+#                   v1.0.0 PROGRESSION EVENTS                         
+# ==========================================================
+
+type ExperienceGained @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  playerId: BigInt!        # uint32 indexed playerId
+  xpGained: Int!           # uint16 xpGained
+  newXP: Int!              # uint16 newXP
+  player: Player!          # Link to Player entity
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerLevelUp @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index  
+  playerId: BigInt!        # uint32 indexed playerId
+  newLevel: Int!           # uint8 newLevel
+  attributePointsAwarded: Int! # uint8 attributePointsAwarded
+  player: Player!          # Link to Player entity
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type AttributePointAwarded @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  to: Bytes!               # address indexed to
+  totalCharges: BigInt!    # uint256 totalCharges
+  owner: Owner!            # Link to Owner entity
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerAttributePointUsed @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  playerId: BigInt!        # uint32 indexed playerId
+  attribute: Int!          # uint8 attribute (enum)
+  newValue: Int!           # uint8 newValue
+  remainingPoints: BigInt! # uint256 remainingPoints
+  player: Player!          # Link to Player entity
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerWeaponSpecializationChanged @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  playerId: BigInt!        # uint32 indexed playerId
+  weaponClass: Int!        # uint8 weaponClass
+  player: Player!          # Link to Player entity
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerArmorSpecializationChanged @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  playerId: BigInt!        # uint32 indexed playerId
+  armorType: Int!          # uint8 armorType
+  player: Player!          # Link to Player entity
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type SeasonStarted @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  seasonId: BigInt!        # uint256 indexed seasonId
+  startTimestamp: BigInt!  # uint256 startTimestamp
+  startBlock: BigInt!      # uint256 startBlock
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type SeasonLengthUpdated @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  oldLength: BigInt!       # uint256 oldLength
+  newLength: BigInt!       # uint256 newLength
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type VRFConfigUpdated @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  keyHash: Bytes!          # bytes32 keyHash
+  callbackGasLimit: BigInt! # uint32 callbackGasLimit
+  requestConfirmations: Int! # uint16 requestConfirmations
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type SubscriptionIdUpdated @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  oldSubscriptionId: BigInt! # uint256 oldSubscriptionId
+  newSubscriptionId: BigInt! # uint256 newSubscriptionId
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+# ==========================================================
+#                   v1.0.0 GAUNTLET PROGRESSION EVENTS                       
+# ==========================================================
+
+type GauntletXPAwarded @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  gauntletId: BigInt!      # uint256 indexed gauntletId  
+  bracket: Int!            # uint8 bracket (enum)
+  playerIds: [BigInt!]!    # uint32[] playerIds
+  xpAmounts: [Int!]!       # uint16[] xpAmounts
+  gauntlet: Gauntlet!      # Link to Gauntlet entity
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type GauntletRewardDistributed @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  gauntletId: BigInt!      # uint256 indexed gauntletId
+  playerId: BigInt!        # uint32 indexed playerId
+  rewardType: Int!         # uint8 rewardType (enum)
+  ticketId: BigInt!        # uint256 ticketId
+  gauntlet: Gauntlet!      # Link to Gauntlet entity
+  player: Player!          # Link to Player entity
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DailyLimitReset @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  playerId: BigInt!        # uint32 indexed playerId
+  payer: Bytes!            # address indexed payer
+  dayNumber: BigInt!       # uint256 dayNumber
+  amountPaid: BigInt!      # uint256 amountPaid
+  player: Player!          # Link to Player entity
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DailyResetCostUpdated @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  oldCost: BigInt!         # uint256 oldCost
+  newCost: BigInt!         # uint256 newCost
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DailyGauntletLimitUpdated @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  oldLimit: Int!           # uint8 oldLimit
+  newLimit: Int!           # uint8 newLimit
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+# ==========================================================
+#                   v1.0.0 PLAYERTICKETS & TOURNAMENT EVENTS                       
+# ==========================================================
+
+type PlayerTicket @entity {
+  id: ID!                  # Token ID as string
+  tokenId: BigInt!         # uint256 token ID
+  ticketType: Int!         # Type of ticket (CREATE_PLAYER_TICKET, etc.)
+  owner: Owner!            # Current owner
+  mintedAt: BigInt!        # Timestamp minted
+  mintedTx: Bytes!         # Transaction hash of mint
+}
+
+type NameChangeNFTMinted @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  tokenId: BigInt!         # uint256 indexed tokenId
+  to: Bytes!               # address indexed to
+  firstNameIndex: Int!     # uint16 firstNameIndex
+  surnameIndex: Int!       # uint16 surnameIndex
+  owner: Owner!            # Link to Owner entity
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Tournament @entity {
+  id: ID!                  # Tournament ID as string
+  tournamentId: BigInt!    # uint256 tournament ID
+  participants: [TournamentParticipant!]! @derivedFrom(field: "tournament")
+  rewards: [RewardDistributed!]! @derivedFrom(field: "tournament")
+  createdAt: BigInt!
+  createdTx: Bytes!
+}
+
+type TournamentParticipant @entity {
+  id: ID!                  # tournamentId + playerId
+  tournament: Tournament!  # Link to Tournament
+  player: Player!          # Link to Player
+  joinedAt: BigInt!
+  joinedTx: Bytes!
+}
+
+type RewardDistributed @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  tournamentId: BigInt!    # uint256 indexed tournamentId
+  playerId: BigInt!        # uint32 indexed playerId
+  rewardType: Int!         # uint8 rewardType (enum)
+  ticketId: BigInt!        # uint256 ticketId
+  tournament: Tournament!  # Link to Tournament entity
+  player: Player!          # Link to Player entity
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type RewardConfigUpdated @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  configName: String!      # string configName
+  nonePercent: Int!        # uint16 nonePercent
+  attributeSwapPercent: Int! # uint16 attributeSwapPercent
+  createPlayerPercent: Int! # uint16 createPlayerPercent
+  playerSlotPercent: Int!  # uint16 playerSlotPercent
+  weaponSpecPercent: Int!  # uint16 weaponSpecPercent
+  armorSpecPercent: Int!   # uint16 armorSpecPercent
+  duelTicketPercent: Int!  # uint16 duelTicketPercent
+  nameChangePercent: Int!  # uint16 nameChangePercent
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!

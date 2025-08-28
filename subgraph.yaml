@@ -11,7 +11,7 @@ dataSources:
     source:
       address: "0x2d248A737e3eCB013e2a62fD8959a0A3D7eCf9F3"
       abi: Player
-      startBlock: 24119000
+      startBlock: 30203920
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -113,7 +113,7 @@ dataSources:
     source:
       address: "0x7224Ff906a60E96725D019E84f3B23540442A898"
       abi: PlayerNameRegistry
-      startBlock: 24119000
+      startBlock: 30203920
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -135,7 +135,7 @@ dataSources:
     source:
       address: "0xaA8c214bA0efFd88CdE442946B518b91a437b4e3"
       abi: PlayerSkinRegistry
-      startBlock: 24119000
+      startBlock: 30203920
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -175,7 +175,7 @@ dataSources:
     source:
       address: "0xcE8129957D8B64813D9E936921819741a54649Fc"
       abi: DefaultPlayer
-      startBlock: 24119000
+      startBlock: 30203920
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -203,7 +203,7 @@ dataSources:
     source:
       address: "0x3feae9A9788c3d48C06F15d9115fA47b536EA66F"
       abi: Monster
-      startBlock: 24119000
+      startBlock: 30203920
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -243,7 +243,7 @@ dataSources:
     source:
       address: "0xacD57159a8A02b59E923FCE01Ca8A21f16C2042A"
       abi: MonsterNameRegistry
-      startBlock: 24119000
+      startBlock: 30203920
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -266,7 +266,7 @@ dataSources:
     source:
       address: "0x86f776A0d39F5640a276696A868814f99a58b4D2"
       abi: DuelGame
-      startBlock: 24119000
+      startBlock: 30203920
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -320,7 +320,7 @@ dataSources:
     source:
       address: "0xDF4Dca458939d95C64B5d610B6867d794C3FeC3f" # Levels 1-4
       abi: GauntletGame
-      startBlock: 24119000
+      startBlock: 30203920
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -406,7 +406,7 @@ dataSources:
     source:
       address: "0x7AC1E825dDB7501b7F886704f85d9E62B3E19DD41" # Levels 5-9
       abi: GauntletGame
-      startBlock: 24119000
+      startBlock: 30203920
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -492,7 +492,7 @@ dataSources:
     source:
       address: "0x6E8266C2264c84e7552DA3f4eE9DC4634a90fA7c" # Level 10
       abi: GauntletGame
-      startBlock: 24119000
+      startBlock: 30203920
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -578,7 +578,7 @@ dataSources:
     source:
       address: "0xa1Ff9Cf87Ec73F30d6AD5A5a963809D0806C9852"
       abi: PracticeGame
-      startBlock: 24119000
+      startBlock: 30203920
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -609,7 +609,7 @@ dataSources:
     source:
       address: "0x742af1F015920cF7eAd4ca68697c77e631489336"
       abi: TournamentGame
-      startBlock: 24119000
+      startBlock: 30203920
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -639,7 +639,7 @@ dataSources:
     source:
       address: "0xc0e8973f7AF2e7Ab5F5749419934A04e1A90c6cB"
       abi: PlayerTickets
-      startBlock: 24119000
+      startBlock: 30203920
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
