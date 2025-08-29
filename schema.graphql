@@ -91,6 +91,7 @@ type Player implements Fighter @entity {
   currentXP: Int!         # uint16 current experience points
   weaponSpecialization: Int! # uint8 weapon class specialization (255 = none)
   armorSpecialization: Int!  # uint8 armor specialization (255 = none)
+  attributePoints: BigInt!   # Available attribute points from leveling
   
   createdAt: BigInt!
   lastUpdatedAt: BigInt!
@@ -102,55 +103,6 @@ type Player implements Fighter @entity {
   currentGauntlet: Gauntlet # Link to Gauntlet if IN_GAUNTLET
 }
 
-type PlayerSnapshot implements Fighter @entity {
-  id: ID!                 # Format: "fighterId-skinIndex-skinTokenId-stance"
-  fighterId: BigInt!      # This already serves as the player ID
-  fighterType: String!    # Will be "PlayerSnapshot"
-  owner: Owner!
-  isRetired: Boolean!
-  isImmortal: Boolean!
-  
-  # Common attributes from Fighter
-  strength: Int!
-  constitution: Int!
-  size: Int!
-  agility: Int!
-  stamina: Int!
-  luck: Int!
-  
-  # Name fields
-  firstNameIndex: Int!
-  surnameIndex: Int!
-  firstName: String
-  surname: String
-  fullName: String
-  
-  # Skin information (required by Fighter interface)
-  currentSkin: Skin
-  
-  # Record fields
-  wins: Int!
-  losses: Int!
-  kills: Int!
-  gauntletWins: Int!       # Number of gauntlets won (snapshot value)
-  duelWins: Int!           # Number of duels won (snapshot value)
-  
-  # Stance field (from event)
-  stance: Int!
-  
-  # v1.0.0 Progression fields
-  level: Int!             # uint8 level (1-10)
-  currentXP: Int!         # uint16 current experience points
-  weaponSpecialization: Int! # uint8 weapon class specialization (255 = none)
-  armorSpecialization: Int!  # uint8 armor specialization (255 = none)
-  
-  # Snapshot timestamp
-  snapshotTimestamp: BigInt!
-  
-  # Required by Fighter interface
-  createdAt: BigInt!
-  lastUpdatedAt: BigInt!
-}
 
 # New type for default players
 type DefaultPlayer implements Fighter @entity {
@@ -260,7 +212,7 @@ type Owner @entity {
 # Entity to track pending player creation requests
 type PendingPlayerCreation @entity {
   id: ID! # requestId
-  requester: Bytes! # address of the requester (future owner)
+  owner: Bytes! # address of the owner requesting the player
   fulfilled: Boolean!
   playerId: BigInt # set when fulfilled
   createdAt: BigInt!
@@ -320,7 +272,7 @@ type Skin @entity {
 type PlayerCreationRequested @entity(immutable: true) {
   id: Bytes!
   requestId: BigInt! # uint256
-  requester: Bytes! # address
+  owner: Bytes! # address
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -512,9 +464,9 @@ type GameContractPermissionsUpdated @entity(immutable: true) {
   gameContract: Bytes! # address
   permissions_record: Boolean! # bool
   permissions_retire: Boolean! # bool
-  permissions_name: Boolean! # bool
   permissions_attributes: Boolean! # bool
   permissions_immortal: Boolean! # bool
+  permissions_experience: Boolean! # bool
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -758,9 +710,9 @@ type DuelChallenge @entity {
   challengerOwner: Owner
   defenderOwner: Owner
   
-  # References to PlayerSnapshot entities
-  challengerSnapshot: PlayerSnapshot!
-  defenderSnapshot: PlayerSnapshot
+  # Direct references to Player entities (no more snapshots!)
+  challenger: Player!
+  defender: Player
   
   createdBlock: BigInt!
   createdAt: BigInt!

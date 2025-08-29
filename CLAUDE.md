@@ -51,6 +51,23 @@ Event handlers are organized by contract in separate files:
 - `src/skin-registry.ts` - Skin registration and verification
 - `src/monster.ts` - Monster creation and management
 
+## Important Event Disambiguation
+
+### GameContractPermissionsUpdated Events
+There are TWO different `GameContractPermissionsUpdated` events in the system:
+
+1. **Player Contract** (`0x2d248A737e3eCB013e2a62fD8959a0A3D7eCf9F3`):
+   - Event signature: `GameContractPermissionsUpdated(indexed address,(bool,bool,bool,bool,bool))`
+   - Tuple contains 5 booleans: `record, retire, attributes, immortal, experience`
+   - Handled in `src/player.ts`
+
+2. **PlayerTickets Contract** (`0xc0e8973f7AF2e7Ab5F5749419934A04e1A90c6cB`):
+   - Event signature: `GameContractPermissionsUpdated(indexed address,(bool,bool,bool,bool,bool,bool))`
+   - Tuple contains 6 booleans (includes additional permissions)
+   - Would be handled in `src/player-tickets.ts` (currently commented out)
+
+**IMPORTANT**: Always check which contract's event you're handling before accessing tuple fields!
+
 ## Critical Combat System Rules
 
 ⚠️ **IMPORTANT**: Before modifying any combat statistics code, understand these rules:

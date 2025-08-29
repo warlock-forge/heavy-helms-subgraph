@@ -38,9 +38,9 @@ export function handleDefaultPlayerCreated(event: DefaultPlayerCreatedEvent): vo
   createdEvent.skinTokenId = event.params.stats.skin.skinTokenId;
   createdEvent.firstNameIndex = event.params.stats.name.firstNameIndex;
   createdEvent.surnameIndex = event.params.stats.name.surnameIndex;
-  createdEvent.wins = event.params.stats.record.wins;
-  createdEvent.losses = event.params.stats.record.losses;
-  createdEvent.kills = event.params.stats.record.kills;
+  createdEvent.wins = 0;
+  createdEvent.losses = 0;
+  createdEvent.kills = 0;
   createdEvent.stance = event.params.stats.stance;
   createdEvent.blockNumber = event.block.number;
   createdEvent.blockTimestamp = event.block.timestamp;
@@ -75,14 +75,20 @@ export function handleDefaultPlayerCreated(event: DefaultPlayerCreatedEvent): vo
   defaultPlayer.fullName = createFullName(firstName, surname);
   
   // Set record fields (always 0 for default players)
-  defaultPlayer.wins = event.params.stats.record.wins;
-  defaultPlayer.losses = event.params.stats.record.losses;
-  defaultPlayer.kills = event.params.stats.record.kills;
+  defaultPlayer.wins = 0;
+  defaultPlayer.losses = 0;
+  defaultPlayer.kills = 0;
   defaultPlayer.gauntletWins = 0; // Initialize gauntlet wins counter
   defaultPlayer.duelWins = 0; // Initialize duel wins counter
   
   // Set stance
   defaultPlayer.stance = event.params.stats.stance;
+  
+  // Set v1.0.0 progression fields (from level 1 stats by default)
+  defaultPlayer.level = event.params.stats.level;
+  defaultPlayer.currentXP = event.params.stats.currentXP;
+  defaultPlayer.weaponSpecialization = event.params.stats.weaponSpecialization;
+  defaultPlayer.armorSpecialization = event.params.stats.armorSpecialization;
   
   // Set timestamps
   defaultPlayer.createdAt = event.block.timestamp;
@@ -122,9 +128,9 @@ export function handleDefaultPlayerStatsUpdated(event: DefaultPlayerStatsUpdated
   updatedEvent.skinTokenId = event.params.stats.skin.skinTokenId;
   updatedEvent.firstNameIndex = event.params.stats.name.firstNameIndex;
   updatedEvent.surnameIndex = event.params.stats.name.surnameIndex;
-  updatedEvent.wins = event.params.stats.record.wins;
-  updatedEvent.losses = event.params.stats.record.losses;
-  updatedEvent.kills = event.params.stats.record.kills;
+  updatedEvent.wins = 0;
+  updatedEvent.losses = 0;
+  updatedEvent.kills = 0;
   updatedEvent.stance = event.params.stats.stance;
   updatedEvent.blockNumber = event.block.number;
   updatedEvent.blockTimestamp = event.block.timestamp;
@@ -162,12 +168,18 @@ export function handleDefaultPlayerStatsUpdated(event: DefaultPlayerStatsUpdated
   defaultPlayer.fullName = createFullName(firstName, surname);
   
   // Update record fields
-  defaultPlayer.wins = event.params.stats.record.wins;
-  defaultPlayer.losses = event.params.stats.record.losses;
-  defaultPlayer.kills = event.params.stats.record.kills;
+  defaultPlayer.wins = 0;
+  defaultPlayer.losses = 0;
+  defaultPlayer.kills = 0;
   
   // Update stance
   defaultPlayer.stance = event.params.stats.stance;
+  
+  // Update v1.0.0 progression fields
+  defaultPlayer.level = event.params.stats.level;
+  defaultPlayer.currentXP = event.params.stats.currentXP;
+  defaultPlayer.weaponSpecialization = event.params.stats.weaponSpecialization;
+  defaultPlayer.armorSpecialization = event.params.stats.armorSpecialization;
   
   // Update timestamp
   defaultPlayer.lastUpdatedAt = event.block.timestamp;

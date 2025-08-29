@@ -44,7 +44,6 @@ import {
   updatePlayerSkinCombatAnalytics
 } from "./utils/stats-utils";
 import { DuelGame } from "../generated/DuelGame/DuelGame";
-import { PlayerSnapshot } from "../generated/schema";
 import { Skin } from "../generated/schema";
 import { PlayerVsRecord } from "../generated/schema";
 
@@ -88,74 +87,12 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
       challenge.challengerOwner = challengerPlayer.owner;
     }
     
-    // Create a duel-specific snapshot ID
-    const snapshotId = `${challengeId}-${challengerId}`;
+    // Link player directly to challenge (no more snapshot!)
+    challenge.challenger = challengerId;
     
-    // Create the snapshot entity
-    let playerSnapshot = new PlayerSnapshot(snapshotId);
-    
-    // Copy all fields from original player
-    playerSnapshot.fighterId = challengerPlayer.fighterId;
-    playerSnapshot.fighterType = "PlayerSnapshot";
-    playerSnapshot.owner = challengerPlayer.owner;
-    playerSnapshot.isRetired = challengerPlayer.isRetired;
-    playerSnapshot.isImmortal = challengerPlayer.isImmortal;
-    
-    // Copy attributes
-    playerSnapshot.strength = challengerPlayer.strength;
-    playerSnapshot.constitution = challengerPlayer.constitution;
-    playerSnapshot.size = challengerPlayer.size;
-    playerSnapshot.agility = challengerPlayer.agility;
-    playerSnapshot.stamina = challengerPlayer.stamina;
-    playerSnapshot.luck = challengerPlayer.luck;
-    
-    // Copy name fields
-    playerSnapshot.firstNameIndex = challengerPlayer.firstNameIndex;
-    playerSnapshot.surnameIndex = challengerPlayer.surnameIndex;
-    playerSnapshot.firstName = challengerPlayer.firstName;
-    playerSnapshot.surname = challengerPlayer.surname;
-    playerSnapshot.fullName = challengerPlayer.fullName;
-    
-    // Copy record
-    playerSnapshot.wins = challengerPlayer.wins;
-    playerSnapshot.losses = challengerPlayer.losses;
-    playerSnapshot.kills = challengerPlayer.kills;
-    playerSnapshot.gauntletWins = challengerPlayer.gauntletWins;
-    playerSnapshot.duelWins = challengerPlayer.duelWins;
-    
-    // Set skin information using consistent ID format
-    const skinIndex = event.params.challengerSkinIndex;
-    const skinTokenId = event.params.challengerSkinTokenId;
-    const skinId = skinIndex.toString() + "-" + skinTokenId.toString(); // Use collectionId-tokenId
-
-    log.info("handleChallengeCreated: Looking up skin {} for challenger snapshot {}", [skinId, snapshotId]);
-    const skin = Skin.load(skinId); // Load using consistent ID
-
-    if (skin !== null) {
-      // Skin found, assign the ID
-      playerSnapshot.currentSkin = skinId;
-      log.info("handleChallengeCreated: Set skin for player snapshot: {} -> {}", [playerSnapshot.id, skinId]);
-    } else {
-      // Skin NOT found. Log warning and set link to null. DO NOT CREATE PLACEHOLDER.
-      log.warning("handleChallengeCreated: Skin {} not found. Setting currentSkin to null for snapshot {}", [
-        skinId,
-        snapshotId
-      ]);
-      playerSnapshot.currentSkin = null; // Assign null
-    }
-    
-    // Update stance and timestamps
-    playerSnapshot.stance = event.params.challengerStance;
-    playerSnapshot.snapshotTimestamp = event.block.timestamp;
-    playerSnapshot.createdAt = event.block.timestamp;
-    playerSnapshot.lastUpdatedAt = event.block.timestamp;
-    
-    playerSnapshot.save();
-    
-    // Link snapshot to challenge
-    challenge.challengerSnapshot = snapshotId;
-    
-    log.info("Created challenger snapshot with ID: {}", [snapshotId]);
+    log.info("Linked challenger player {} to challenge {}", [challengerId, challengeId]);
+  } else {
+    log.warning("Challenger player {} not found for challenge {}", [challengerId, challengeId]);
   }
   
   // Get the Player entity for defender
@@ -169,54 +106,10 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
       challenge.defenderOwner = defenderPlayer.owner;
     }
     
-    // Create a preloaded defender snapshot using current player state
-    const defenderSnapshotId = `${challengeId}-${defenderId}`;
-    let defenderSnapshot = new PlayerSnapshot(defenderSnapshotId);
+    // Link defender player directly to challenge (no more snapshot!)
+    challenge.defender = defenderId;
     
-    // Copy all fields from original player
-    defenderSnapshot.fighterId = defenderPlayer.fighterId;
-    defenderSnapshot.fighterType = "PlayerSnapshot";
-    defenderSnapshot.owner = defenderPlayer.owner;
-    defenderSnapshot.isRetired = defenderPlayer.isRetired;
-    defenderSnapshot.isImmortal = defenderPlayer.isImmortal;
-    
-    // Copy attributes
-    defenderSnapshot.strength = defenderPlayer.strength;
-    defenderSnapshot.constitution = defenderPlayer.constitution;
-    defenderSnapshot.size = defenderPlayer.size;
-    defenderSnapshot.agility = defenderPlayer.agility;
-    defenderSnapshot.stamina = defenderPlayer.stamina;
-    defenderSnapshot.luck = defenderPlayer.luck;
-    
-    // Copy name fields
-    defenderSnapshot.firstNameIndex = defenderPlayer.firstNameIndex;
-    defenderSnapshot.surnameIndex = defenderPlayer.surnameIndex;
-    defenderSnapshot.firstName = defenderPlayer.firstName;
-    defenderSnapshot.surname = defenderPlayer.surname;
-    defenderSnapshot.fullName = defenderPlayer.fullName;
-    
-    // Copy record
-    defenderSnapshot.wins = defenderPlayer.wins;
-    defenderSnapshot.losses = defenderPlayer.losses;
-    defenderSnapshot.kills = defenderPlayer.kills;
-    defenderSnapshot.gauntletWins = defenderPlayer.gauntletWins;
-    defenderSnapshot.duelWins = defenderPlayer.duelWins;
-    
-    // Use the player's current skin and stance - not from event parameters
-    defenderSnapshot.currentSkin = defenderPlayer.currentSkin;
-    defenderSnapshot.stance = defenderPlayer.stance;
-    
-    // Set timestamps
-    defenderSnapshot.snapshotTimestamp = event.block.timestamp;
-    defenderSnapshot.createdAt = event.block.timestamp;
-    defenderSnapshot.lastUpdatedAt = event.block.timestamp;
-    
-    defenderSnapshot.save();
-    
-    // Link preloaded snapshot to challenge
-    challenge.defenderSnapshot = defenderSnapshotId;
-    
-    log.info("Created preloaded defender snapshot with ID: {}", [defenderSnapshotId]);
+    log.info("Linked defender player {} to challenge {}", [defenderId, challengeId]);
   }
   
   // Get current expiry time from contract state
@@ -274,96 +167,12 @@ export function handleChallengeAccepted(event: ChallengeAcceptedEvent): void {
         challenge.defenderOwner = defenderPlayer.owner;
       }
       
-      // Create a duel-specific snapshot ID
-      const snapshotId = `${challengeId}-${defenderId}`;
+      // Link player directly to challenge (no more snapshot!)
+      challenge.defender = defenderId;
       
-      // Get the existing preloaded snapshot
-      let playerSnapshot = PlayerSnapshot.load(snapshotId);
-      
-      // Add null check before accessing properties
-      if (playerSnapshot !== null) {
-        // Update with the chosen skin and stance for the duel
-        const skinIndex = event.params.defenderSkinIndex;
-        const skinTokenId = event.params.defenderSkinTokenId;
-        const skinId = skinIndex.toString() + "-" + skinTokenId.toString(); // Use collectionId-tokenId
-
-        log.info("handleChallengeAccepted: Looking up skin {} for defender snapshot {}", [skinId, snapshotId]);
-        const skin = Skin.load(skinId); // Load using consistent ID
-
-        if (skin !== null) {
-          // Skin found, assign the ID
-          playerSnapshot.currentSkin = skinId;
-          log.info("handleChallengeAccepted: Updated skin for defender snapshot: {} -> {}", [playerSnapshot.id, skinId]);
-        } else {
-          // Skin NOT found. Log warning and set link to null. DO NOT CREATE PLACEHOLDER.
-          log.warning("handleChallengeAccepted: Skin {} not found. Setting currentSkin to null for snapshot {}", [
-            skinId,
-            snapshotId
-          ]);
-          playerSnapshot.currentSkin = null; // Assign null
-        }
-        
-        // Update stance and timestamps
-        playerSnapshot.stance = event.params.defenderStance;
-        playerSnapshot.snapshotTimestamp = event.block.timestamp;
-        playerSnapshot.lastUpdatedAt = event.block.timestamp;
-        
-        playerSnapshot.save();
-        
-        // Link is already set during creation, no need to update
-      } else {
-        // Snapshot doesn't exist, need to create one
-        log.warning("Defender snapshot not found: {}. Creating new one...", [snapshotId]);
-        
-        // Create the snapshot entity if it doesn't exist
-        let newSnapshot = new PlayerSnapshot(snapshotId);
-        
-        // Copy fields from defender player
-        if (defenderPlayer) {
-          newSnapshot.fighterId = defenderPlayer.fighterId;
-          newSnapshot.fighterType = "PlayerSnapshot";
-          newSnapshot.owner = defenderPlayer.owner;
-          newSnapshot.isRetired = defenderPlayer.isRetired;
-          newSnapshot.isImmortal = defenderPlayer.isImmortal;
-          
-          // Copy attributes
-          newSnapshot.strength = defenderPlayer.strength;
-          newSnapshot.constitution = defenderPlayer.constitution;
-          newSnapshot.size = defenderPlayer.size;
-          newSnapshot.agility = defenderPlayer.agility;
-          newSnapshot.stamina = defenderPlayer.stamina;
-          newSnapshot.luck = defenderPlayer.luck;
-          
-          // Copy name fields
-          newSnapshot.firstNameIndex = defenderPlayer.firstNameIndex;
-          newSnapshot.surnameIndex = defenderPlayer.surnameIndex;
-          newSnapshot.firstName = defenderPlayer.firstName;
-          newSnapshot.surname = defenderPlayer.surname;
-          newSnapshot.fullName = defenderPlayer.fullName;
-          
-          // Copy record
-          newSnapshot.wins = defenderPlayer.wins;
-          newSnapshot.losses = defenderPlayer.losses;
-          newSnapshot.kills = defenderPlayer.kills;
-          newSnapshot.gauntletWins = defenderPlayer.gauntletWins;
-          newSnapshot.duelWins = defenderPlayer.duelWins;
-          
-          // Set for this duel
-          const skinId = event.params.defenderSkinIndex.toString() + "-" + event.params.defenderSkinTokenId.toString();
-          newSnapshot.currentSkin = skinId;
-          newSnapshot.stance = event.params.defenderStance;
-          
-          // Set timestamps
-          newSnapshot.snapshotTimestamp = event.block.timestamp;
-          newSnapshot.createdAt = event.block.timestamp;
-          newSnapshot.lastUpdatedAt = event.block.timestamp;
-          
-          newSnapshot.save();
-          
-          // Link snapshot to challenge
-          challenge.defenderSnapshot = snapshotId;
-        }
-      }
+      log.info("Linked defender player {} to challenge {}", [defenderId, challengeId]);
+    } else {
+      log.warning("Defender player {} not found for challenge {}", [defenderId, challengeId]);
     }
     
     challenge.state = "PENDING";

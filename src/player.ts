@@ -8,7 +8,6 @@ import {
   OwnershipTransferred as OwnershipTransferredEvent,
   PausedStateChanged as PausedStateChangedEvent,
   PlayerAttributesSwapped as PlayerAttributesSwappedEvent,
-  PlayerAttributesUpdated as PlayerAttributesUpdatedEvent,
   PlayerCreationComplete as PlayerCreationCompleteEvent,
   PlayerCreationRequested as PlayerCreationRequestedEvent,
   PlayerImmortalityChanged as PlayerImmortalityChangedEvent,
@@ -18,11 +17,20 @@ import {
   PlayerSkinEquipped as PlayerSkinEquippedEvent,
   PlayerSlotsPurchased as PlayerSlotsPurchasedEvent,
   PlayerWinLossUpdated as PlayerWinLossUpdatedEvent,
-  RequestedRandomness as RequestedRandomnessEvent,
   SlotBatchCostUpdated as SlotBatchCostUpdatedEvent,
   StanceUpdated as StanceUpdatedEvent,
   VrfRequestTimeoutUpdated as VrfRequestTimeoutUpdatedEvent,
-  RequestRecovered as RequestRecoveredEvent
+  RequestRecovered as RequestRecoveredEvent,
+  ExperienceGained as ExperienceGainedEvent,
+  PlayerLevelUp as PlayerLevelUpEvent,
+  AttributePointAwarded as AttributePointAwardedEvent,
+  PlayerAttributePointUsed as PlayerAttributePointUsedEvent,
+  PlayerWeaponSpecializationChanged as PlayerWeaponSpecializationChangedEvent,
+  PlayerArmorSpecializationChanged as PlayerArmorSpecializationChangedEvent,
+  SeasonStarted as SeasonStartedEvent,
+  SeasonLengthUpdated as SeasonLengthUpdatedEvent,
+  VRFConfigUpdated as VRFConfigUpdatedEvent,
+  SubscriptionIdUpdated as SubscriptionIdUpdatedEvent
 } from "../generated/Player/Player";
 
 import {
@@ -34,7 +42,6 @@ import {
   OwnershipTransferred,
   PausedStateChanged,
   PlayerAttributesSwapped,
-  PlayerAttributesUpdated,
   PlayerCreationComplete,
   PlayerCreationRequested,
   PlayerImmortalityChanged,
@@ -44,7 +51,6 @@ import {
   PlayerSkinEquipped,
   PlayerSlotsPurchased,
   PlayerWinLossUpdated,
-  RequestedRandomness,
   SlotBatchCostUpdated,
   Player,
   Owner,
@@ -52,7 +58,17 @@ import {
   StanceUpdated,
   VrfRequestTimeoutUpdated,
   RequestRecovered,
-  Skin
+  Skin,
+  ExperienceGained,
+  PlayerLevelUp,
+  AttributePointAwarded,
+  PlayerAttributePointUsed,
+  PlayerWeaponSpecializationChanged,
+  PlayerArmorSpecializationChanged,
+  SeasonStarted,
+  SeasonLengthUpdated,
+  VRFConfigUpdated,
+  SubscriptionIdUpdated
 } from "../generated/schema";
 import { loadFirstName, loadSurname, createFullName } from "./utils/fighter-utils";
 import { 
@@ -122,11 +138,14 @@ export function handleGameContractPermissionsUpdated(
     event.transaction.hash.concatI32(event.logIndex.toI32())
   );
   entity.gameContract = event.params.gameContract;
-  entity.permissions_record = event.params.permissions.record;
-  entity.permissions_retire = event.params.permissions.retire;
-  entity.permissions_name = event.params.permissions.name;
-  entity.permissions_attributes = event.params.permissions.attributes;
-  entity.permissions_immortal = event.params.permissions.immortal;
+  // Map permissions tuple to individual boolean fields
+  // Player contract has: record, retire, attributes, immortal, experience
+  const permissions = event.params.permissions;
+  entity.permissions_record = permissions[0].toBoolean();
+  entity.permissions_retire = permissions[1].toBoolean();
+  entity.permissions_attributes = permissions[2].toBoolean();
+  entity.permissions_immortal = permissions[3].toBoolean();
+  entity.permissions_experience = permissions[4].toBoolean();
 
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
@@ -162,8 +181,8 @@ export function handleOwnershipTransferred(
   let entity = new OwnershipTransferred(
     event.transaction.hash.concatI32(event.logIndex.toI32())
   );
-  entity.user = event.params.user;
-  entity.newOwner = event.params.newOwner;
+  entity.user = event.params.from;
+  entity.newOwner = event.params.to;
 
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
@@ -205,66 +224,30 @@ export function handlePlayerAttributesSwapped(
 
   entity.save();
 
-  // Update player attributes
+  // Update player attributes based on which attributes were swapped
   let player = Player.load(event.params.playerId.toString());
   if (player) {
-    // Update the appropriate attributes based on attribute enum type
-    // 0: STRENGTH, 1: CONSTITUTION, 2: SIZE, 3: AGILITY, 4: STAMINA, 5: LUCK
-    let decreaseAttr = event.params.decreaseAttribute;
-    let increaseAttr = event.params.increaseAttribute;
-
-    if (decreaseAttr == 0) player.strength = event.params.newDecreaseValue;
-    else if (decreaseAttr == 1) player.constitution = event.params.newDecreaseValue;
-    else if (decreaseAttr == 2) player.size = event.params.newDecreaseValue;
-    else if (decreaseAttr == 3) player.agility = event.params.newDecreaseValue;
-    else if (decreaseAttr == 4) player.stamina = event.params.newDecreaseValue;
-    else if (decreaseAttr == 5) player.luck = event.params.newDecreaseValue;
-
-    if (increaseAttr == 0) player.strength = event.params.newIncreaseValue;
-    else if (increaseAttr == 1) player.constitution = event.params.newIncreaseValue;
-    else if (increaseAttr == 2) player.size = event.params.newIncreaseValue;
-    else if (increaseAttr == 3) player.agility = event.params.newIncreaseValue;
-    else if (increaseAttr == 4) player.stamina = event.params.newIncreaseValue;
-    else if (increaseAttr == 5) player.luck = event.params.newIncreaseValue;
-
+    // Update the specific attributes that were modified
+    // Attribute enum: 0=strength, 1=constitution, 2=size, 3=agility, 4=stamina, 5=luck
+    if (event.params.decreaseAttribute == 0) player.strength = event.params.newDecreaseValue;
+    else if (event.params.decreaseAttribute == 1) player.constitution = event.params.newDecreaseValue;
+    else if (event.params.decreaseAttribute == 2) player.size = event.params.newDecreaseValue;
+    else if (event.params.decreaseAttribute == 3) player.agility = event.params.newDecreaseValue;
+    else if (event.params.decreaseAttribute == 4) player.stamina = event.params.newDecreaseValue;
+    else if (event.params.decreaseAttribute == 5) player.luck = event.params.newDecreaseValue;
+    
+    if (event.params.increaseAttribute == 0) player.strength = event.params.newIncreaseValue;
+    else if (event.params.increaseAttribute == 1) player.constitution = event.params.newIncreaseValue;
+    else if (event.params.increaseAttribute == 2) player.size = event.params.newIncreaseValue;
+    else if (event.params.increaseAttribute == 3) player.agility = event.params.newIncreaseValue;
+    else if (event.params.increaseAttribute == 4) player.stamina = event.params.newIncreaseValue;
+    else if (event.params.increaseAttribute == 5) player.luck = event.params.newIncreaseValue;
+    
     player.lastUpdatedAt = event.block.timestamp;
     player.save();
   }
 }
 
-export function handlePlayerAttributesUpdated(
-  event: PlayerAttributesUpdatedEvent
-): void {
-  let entity = new PlayerAttributesUpdated(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  );
-  entity.playerId = event.params.playerId;
-  entity.strength = event.params.strength;
-  entity.constitution = event.params.constitution;
-  entity.size = event.params.size;
-  entity.agility = event.params.agility;
-  entity.stamina = event.params.stamina;
-  entity.luck = event.params.luck;
-
-  entity.blockNumber = event.block.number;
-  entity.blockTimestamp = event.block.timestamp;
-  entity.transactionHash = event.transaction.hash;
-
-  entity.save();
-
-  // Update player attributes
-  let player = Player.load(event.params.playerId.toString());
-  if (player) {
-    player.strength = event.params.strength;
-    player.constitution = event.params.constitution;
-    player.size = event.params.size;
-    player.agility = event.params.agility;
-    player.stamina = event.params.stamina;
-    player.luck = event.params.luck;
-    player.lastUpdatedAt = event.block.timestamp;
-    player.save();
-  }
-}
 
 export function handlePlayerCreationComplete(
   event: PlayerCreationCompleteEvent
@@ -323,7 +306,6 @@ export function handlePlayerCreationComplete(
   // Load and set names using utility functions
   const firstName = loadFirstName(event.params.firstNameIndex);
   const surname = loadSurname(event.params.surnameIndex);
-
   player.firstName = firstName;
   player.surname = surname;
   player.fullName = createFullName(firstName, surname);
@@ -332,28 +314,29 @@ export function handlePlayerCreationComplete(
   const skinIndex = BigInt.fromI32(0);
   const skinTokenId = 1;
   const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
-
+  
   // Check if the skin exists before assigning it
   const skin = Skin.load(skinId);
   if (skin !== null) {
     player.currentSkin = skinId;
     log.info("Set default skin for new player: {}", [player.id]);
   } else {
-    log.warning("Skin does not exist: {}. Cannot associate with new player: {}", [
-      skinId, 
-      player.id
-    ]);
+    log.warning("Default skin not found: {}", [skinId]);
+    player.currentSkin = null;
   }
   
-  // Initialize the new unique wins/losses counters
-  player.uniqueWins = 0;
-  player.uniqueLosses = 0;
-  player.battleRating = 0; // Initialize battleRating
   player.gauntletWins = 0; // Initialize gauntlet wins counter
   player.duelWins = 0; // Initialize duel wins counter
   
   // Set gauntlet status to NONE by default
   player.gauntletStatus = "NONE";
+  
+  // Initialize progression fields
+  player.level = 1;
+  player.currentXP = 0;
+  player.weaponSpecialization = 255; // 255 = none
+  player.armorSpecialization = 255; // 255 = none
+  player.attributePoints = BigInt.fromI32(0); // No attribute points at creation
   
   // Save the player with all data set
   player.save();
@@ -366,7 +349,7 @@ export function handlePlayerCreationComplete(
     pendingCreation.save();
   }
 
-  // Update stats
+  // Update stats for new player creation
   updateStatsForPlayerCreation(
     event.block.timestamp,
     event.params.owner
@@ -380,29 +363,20 @@ export function handlePlayerCreationRequested(
     event.transaction.hash.concatI32(event.logIndex.toI32())
   );
   entity.requestId = event.params.requestId;
-  entity.requester = event.params.requester;
+  entity.owner = event.params.requester;
 
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
   entity.transactionHash = event.transaction.hash;
 
   entity.save();
-  
-  // Create or update owner entity for the requester
-  let owner = getOrCreateOwner(event.params.requester);
-  owner.save();
-  
-  // Create a PendingPlayerCreation entity to track this request
+
+  // Create a PendingPlayerCreation entity to track unfulfilled requests
   let pendingCreation = new PendingPlayerCreation(event.params.requestId.toString());
-  pendingCreation.requester = event.params.requester;
-  pendingCreation.fulfilled = false;
+  pendingCreation.owner = event.params.requester;
   pendingCreation.createdAt = event.block.timestamp;
+  pendingCreation.fulfilled = false;
   pendingCreation.save();
-  
-  log.info(
-    "PlayerCreationRequested - RequestID: {}, Requester: {}",
-    [event.params.requestId.toString(), event.params.requester.toHexString()]
-  );
 }
 
 export function handlePlayerImmortalityChanged(
@@ -412,7 +386,6 @@ export function handlePlayerImmortalityChanged(
     event.transaction.hash.concatI32(event.logIndex.toI32())
   );
   entity.playerId = event.params.playerId;
-  entity.caller = event.params.caller;
   entity.immortal = event.params.immortal;
 
   entity.blockNumber = event.block.number;
@@ -445,17 +418,10 @@ export function handlePlayerKillUpdated(
 
   entity.save();
 
-  // Update player kills
+  // Update player entity
   let player = Player.load(event.params.playerId.toString());
   if (player) {
-    let killsDelta = event.params.kills - player.kills;
-    
-    // Update stats
-    updateStatsForKills(
-      event.block.timestamp,
-      killsDelta
-    );
-    
+    let previousKills = player.kills;
     player.kills = event.params.kills;
     player.lastUpdatedAt = event.block.timestamp;
     player.save();
@@ -478,17 +444,14 @@ export function handlePlayerNameUpdated(
 
   entity.save();
 
-  // Update player name indices
+  // Update player entity with new name
   let player = Player.load(event.params.playerId.toString());
   if (player) {
     player.firstNameIndex = event.params.firstNameIndex;
     player.surnameIndex = event.params.surnameIndex;
-    player.lastUpdatedAt = event.block.timestamp;
     
-    // Update name fields using utility functions
     const firstName = loadFirstName(event.params.firstNameIndex);
     const surname = loadSurname(event.params.surnameIndex);
-
     player.firstName = firstName;
     player.surname = surname;
     player.fullName = createFullName(firstName, surname);
@@ -502,7 +465,6 @@ export function handlePlayerRetired(event: PlayerRetiredEvent): void {
     event.transaction.hash.concatI32(event.logIndex.toI32())
   );
   entity.playerId = event.params.playerId;
-  entity.caller = event.params.caller;
   entity.retired = event.params.retired;
 
   entity.blockNumber = event.block.number;
@@ -511,7 +473,7 @@ export function handlePlayerRetired(event: PlayerRetiredEvent): void {
 
   entity.save();
 
-  // Update player retirement status
+  // Update player entity
   let player = Player.load(event.params.playerId.toString());
   if (player) {
     player.isRetired = event.params.retired;
@@ -535,7 +497,6 @@ export function handlePlayerSkinEquipped(
   entity.playerId = event.params.playerId;
   entity.skinIndex = event.params.skinIndex;
   entity.tokenId = event.params.tokenId;
-  entity.stance = event.params.stance; // New stance parameter
 
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
@@ -543,21 +504,20 @@ export function handlePlayerSkinEquipped(
 
   entity.save();
 
-  // Update player's skin reference and stance
+  // Update player entity with new skin
   let player = Player.load(event.params.playerId.toString());
   if (player) {
-    // Construct the consistent skin ID
-    const skinIndex = event.params.skinIndex;
-    const skinTokenId = event.params.tokenId;
-    const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
-
-    // Directly assign the skin ID. The link will resolve if the Skin entity exists or is created later.
-    player.currentSkin = skinId; 
-    log.info("Assigning currentSkin ID '{}' to Player '{}'", [skinId, player.id]);
+    // Construct skin ID from collection index and token ID
+    const skinId = event.params.skinIndex.toString() + "-" + event.params.tokenId.toString();
     
-    // Update stance
-    player.stance = event.params.stance;
-    log.info("Updated player stance: {} -> {}", [player.id, event.params.stance.toString()]);
+    // Verify the skin exists before updating
+    const skin = Skin.load(skinId);
+    if (skin !== null) {
+      player.currentSkin = skinId;
+      log.info("Equipped skin {} on player {}", [skinId, player.id]);
+    } else {
+      log.warning("Attempted to equip non-existent skin: {}", [skinId]);
+    }
     
     player.lastUpdatedAt = event.block.timestamp;
     player.save();
@@ -582,10 +542,10 @@ export function handlePlayerSlotsPurchased(
   entity.transactionHash = event.transaction.hash;
 
   entity.save();
-  
-  // Update owner's player slots
+
+  // Update owner's slot count
   let owner = getOrCreateOwner(event.params.user);
-  owner.playerSlots = event.params.totalSlots;
+  owner.playerSlots = event.params.totalSlots; // totalSlots from event becomes playerSlots in entity
   owner.save();
 }
 
@@ -605,19 +565,11 @@ export function handlePlayerWinLossUpdated(
 
   entity.save();
 
-  // Update player win/loss record
+  // Update player entity
   let player = Player.load(event.params.playerId.toString());
   if (player) {
-    let winDelta = event.params.wins - player.wins;
-    let lossDelta = event.params.losses - player.losses;
-    
-    // Update stats
-    updateStatsForWinLoss(
-      event.block.timestamp,
-      winDelta,
-      lossDelta
-    );
-    
+    let previousWins = player.wins;
+    let previousLosses = player.losses;
     player.wins = event.params.wins;
     player.losses = event.params.losses;
     player.lastUpdatedAt = event.block.timestamp;
@@ -625,21 +577,6 @@ export function handlePlayerWinLossUpdated(
   }
 }
 
-export function handleRequestedRandomness(
-  event: RequestedRandomnessEvent
-): void {
-  let entity = new RequestedRandomness(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  );
-  entity.round = event.params.round;
-  entity.data = event.params.data;
-
-  entity.blockNumber = event.block.number;
-  entity.blockTimestamp = event.block.timestamp;
-  entity.transactionHash = event.transaction.hash;
-
-  entity.save();
-}
 
 export function handleSlotBatchCostUpdated(
   event: SlotBatchCostUpdatedEvent
@@ -657,20 +594,36 @@ export function handleSlotBatchCostUpdated(
   entity.save();
 }
 
-export function handleStanceUpdated(
-  event: StanceUpdatedEvent
+export function handleVrfRequestTimeoutUpdated(
+  event: VrfRequestTimeoutUpdatedEvent
 ): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const entity = new StanceUpdated(eventId);
-  
-  entity.playerId = event.params.playerId;
-  entity.stance = event.params.stance;
+  let entity = new VrfRequestTimeoutUpdated(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.oldValue = event.params.oldValue;
+  entity.newValue = event.params.newValue;
+
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
   entity.transactionHash = event.transaction.hash;
+
+  entity.save();
+}
+
+export function handleStanceUpdated(event: StanceUpdatedEvent): void {
+  let entity = new StanceUpdated(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.playerId = event.params.playerId;
+  entity.stance = event.params.stance;
+
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+
   entity.save();
 
-  // Update player's stance
+  // Update player entity with new stance
   let player = Player.load(event.params.playerId.toString());
   if (player) {
     player.stance = event.params.stance;
@@ -682,53 +635,20 @@ export function handleStanceUpdated(
   }
 }
 
-export function handleVrfRequestTimeoutUpdated(
-  event: VrfRequestTimeoutUpdatedEvent
-): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const entity = new VrfRequestTimeoutUpdated(eventId);
-  
-  entity.oldValue = event.params.oldValue;
-  entity.newValue = event.params.newValue;
-  entity.blockNumber = event.block.number;
-  entity.blockTimestamp = event.block.timestamp;
-  entity.transactionHash = event.transaction.hash;
-  
-  entity.save();
-}
-
-/**
- * Helper function to get or create an Owner entity
- */
-function getOrCreateOwner(address: Bytes): Owner {
-  let id = address.toHexString();
-  let owner = Owner.load(id);
-  
+// Helper function to get or create an owner entity
+function getOrCreateOwner(ownerAddress: Bytes): Owner {
+  let owner = Owner.load(ownerAddress.toHexString());
   if (!owner) {
-    owner = new Owner(id);
-    owner.address = address;
+    owner = new Owner(ownerAddress.toHexString());
+    owner.address = ownerAddress;
     owner.totalPlayers = 0;
-    owner.nameChangeCharges = BigInt.fromI32(0);
-    owner.attributeSwapCharges = BigInt.fromI32(0);
-    owner.playerSlots = 5; // Initialize with BASE_PLAYER_SLOTS (5)
-    owner.save();
+    owner.playerSlots = 3; // Changed from totalSlots, starts with 3
+    owner.attributeSwapCharges = BigInt.fromI32(0); // BigInt instead of 0
+    owner.nameChangeCharges = BigInt.fromI32(0); // BigInt instead of 0
   }
-  
   return owner;
 }
 
-// Helper function to find a matching pending creation
-function findMatchingPendingCreation(playerId: BigInt): PendingPlayerCreation | null {
-  // Query for fulfilled PendingPlayerCreation entities with this playerId
-  let pendingCreations = PendingPlayerCreation.load(playerId.toString());
-  if (pendingCreations) {
-    return pendingCreations;
-  }
-  
-  // If we can't find a direct match, we could try other approaches
-  // For now, return null
-  return null;
-}
 
 export function handleRequestRecovered(event: RequestRecoveredEvent): void {
   let entity = new RequestRecovered(
@@ -747,3 +667,195 @@ export function handleRequestRecovered(event: RequestRecoveredEvent): void {
   entity.save();
 }
 
+export function handleExperienceGained(event: ExperienceGainedEvent): void {
+  // Create the event entity
+  let entity = new ExperienceGained(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.playerId = event.params.playerId;
+  entity.xpGained = event.params.xpGained;
+  entity.newXP = event.params.newXP;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
+
+  // Update the player entity
+  let player = Player.load(event.params.playerId.toString());
+  if (player) {
+    player.currentXP = event.params.newXP;
+    player.lastUpdatedAt = event.block.timestamp;
+    player.save();
+  }
+}
+
+export function handlePlayerLevelUp(event: PlayerLevelUpEvent): void {
+  // Create the event entity
+  let entity = new PlayerLevelUp(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.playerId = event.params.playerId;
+  entity.newLevel = event.params.newLevel;
+  entity.attributePointsAwarded = event.params.attributePointsAwarded;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
+
+  // Update the player entity
+  let player = Player.load(event.params.playerId.toString());
+  if (player) {
+    player.level = event.params.newLevel;
+    // Award attribute points to this specific player
+    player.attributePoints = player.attributePoints.plus(BigInt.fromI32(event.params.attributePointsAwarded));
+    player.lastUpdatedAt = event.block.timestamp;
+    player.save();
+  }
+}
+
+export function handleAttributePointAwarded(event: AttributePointAwardedEvent): void {
+  // Create the event entity
+  let entity = new AttributePointAwarded(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.to = event.params.to;
+  entity.totalCharges = event.params.totalCharges;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
+
+  // Note: AttributePoints are tracked per player, not per owner
+  // The PlayerLevelUp handler will update the individual player's attributePoints
+}
+
+export function handlePlayerAttributePointUsed(event: PlayerAttributePointUsedEvent): void {
+  // Create the event entity
+  let entity = new PlayerAttributePointUsed(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.playerId = event.params.playerId;
+  entity.attribute = event.params.attribute;
+  entity.newValue = event.params.newValue;
+  entity.remainingPoints = event.params.remainingPoints;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
+
+  // Update the player entity
+  let player = Player.load(event.params.playerId.toString());
+  if (player) {
+    // Update the specific attribute based on the attribute index
+    // Assuming attribute is an index: 0=strength, 1=constitution, 2=size, 3=agility, 4=stamina, 5=luck
+    if (event.params.attribute == 0) player.strength = event.params.newValue;
+    else if (event.params.attribute == 1) player.constitution = event.params.newValue;
+    else if (event.params.attribute == 2) player.size = event.params.newValue;
+    else if (event.params.attribute == 3) player.agility = event.params.newValue;
+    else if (event.params.attribute == 4) player.stamina = event.params.newValue;
+    else if (event.params.attribute == 5) player.luck = event.params.newValue;
+    
+    player.lastUpdatedAt = event.block.timestamp;
+    
+    // Update player's remaining attribute points
+    player.attributePoints = event.params.remainingPoints;
+    
+    player.save();
+  }
+}
+
+export function handlePlayerWeaponSpecializationChanged(event: PlayerWeaponSpecializationChangedEvent): void {
+  // Create the event entity
+  let entity = new PlayerWeaponSpecializationChanged(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.playerId = event.params.playerId;
+  entity.weaponClass = event.params.weaponClass;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
+
+  // Update the player entity
+  let player = Player.load(event.params.playerId.toString());
+  if (player) {
+    player.weaponSpecialization = event.params.weaponClass;
+    player.lastUpdatedAt = event.block.timestamp;
+    player.save();
+  }
+}
+
+export function handlePlayerArmorSpecializationChanged(event: PlayerArmorSpecializationChangedEvent): void {
+  // Create the event entity
+  let entity = new PlayerArmorSpecializationChanged(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.playerId = event.params.playerId;
+  entity.armorType = event.params.armorType;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
+
+  // Update the player entity
+  let player = Player.load(event.params.playerId.toString());
+  if (player) {
+    player.armorSpecialization = event.params.armorType;
+    player.lastUpdatedAt = event.block.timestamp;
+    player.save();
+  }
+}
+
+export function handleSeasonStarted(event: SeasonStartedEvent): void {
+  // Create the event entity
+  let entity = new SeasonStarted(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.seasonId = event.params.seasonId;
+  entity.startTimestamp = event.params.startTimestamp;
+  entity.startBlock = event.params.startBlock;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
+}
+
+export function handleSeasonLengthUpdated(event: SeasonLengthUpdatedEvent): void {
+  // Create the event entity
+  let entity = new SeasonLengthUpdated(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.oldLength = event.params.oldLength;
+  entity.newLength = event.params.newLength;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
+}
+
+export function handleVRFConfigUpdated(event: VRFConfigUpdatedEvent): void {
+  // Create the event entity
+  let entity = new VRFConfigUpdated(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.keyHash = event.params.keyHash;
+  entity.callbackGasLimit = event.params.callbackGasLimit;
+  entity.requestConfirmations = event.params.requestConfirmations;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
+}
+
+export function handleSubscriptionIdUpdated(event: SubscriptionIdUpdatedEvent): void {
+  // Create the event entity
+  let entity = new SubscriptionIdUpdated(
+    event.transaction.hash.concatI32(event.logIndex.toI32())
+  );
+  entity.oldSubscriptionId = event.params.oldSubscriptionId;
+  entity.newSubscriptionId = event.params.newSubscriptionId;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
+}
