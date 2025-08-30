@@ -11,7 +11,6 @@ import {
   GameEngineUpdated as GameEngineUpdatedEvent,
   PlayerContractUpdated as PlayerContractUpdatedEvent,
   VrfRequestTimeoutUpdated as VrfRequestTimeoutUpdatedEvent,
-  RequestedRandomness as RequestedRandomnessEvent
 } from "../generated/DuelGame/DuelGame";
 
 import {
@@ -26,8 +25,7 @@ import {
   ChallengeRecovered,
   GameEngineUpdated,
   PlayerContractUpdated,
-  VrfRequestTimeoutUpdated,
-  RequestedRandomness
+  VrfRequestTimeoutUpdated
 } from "../generated/schema";
 
 import { log } from "@graphprotocol/graph-ts";
@@ -43,6 +41,7 @@ import {
   updateSkinCombatAnalytics,
   updatePlayerSkinCombatAnalytics
 } from "./utils/stats-utils";
+import { getOrCreateFighterSnapshotById } from "./utils/fighter-utils";
 import { DuelGame } from "../generated/DuelGame/DuelGame";
 import { Skin } from "../generated/schema";
 import { PlayerVsRecord } from "../generated/schema";
@@ -87,8 +86,7 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
       challenge.challengerOwner = challengerPlayer.owner;
     }
     
-    // Link player directly to challenge (no more snapshot!)
-    challenge.challenger = challengerId;
+    // Note: challenger/defender snapshots will be created when duel completes
     
     log.info("Linked challenger player {} to challenge {}", [challengerId, challengeId]);
   } else {
@@ -106,8 +104,7 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
       challenge.defenderOwner = defenderPlayer.owner;
     }
     
-    // Link defender player directly to challenge (no more snapshot!)
-    challenge.defender = defenderId;
+    // Note: challenger/defender snapshots will be created when duel completes
     
     log.info("Linked defender player {} to challenge {}", [defenderId, challengeId]);
   }
@@ -167,8 +164,7 @@ export function handleChallengeAccepted(event: ChallengeAcceptedEvent): void {
         challenge.defenderOwner = defenderPlayer.owner;
       }
       
-      // Link player directly to challenge (no more snapshot!)
-      challenge.defender = defenderId;
+      // Note: challenger/defender snapshots will be created when duel completes
       
       log.info("Linked defender player {} to challenge {}", [defenderId, challengeId]);
     } else {
@@ -234,6 +230,17 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
   duelComplete.randomness = event.params.randomness;
   duelComplete.blockNumber = event.block.number;
   duelComplete.blockTimestamp = event.block.timestamp;
+  duelComplete.transactionHash = event.transaction.hash;
+  
+  // Link to CombatResult (same transaction hash)
+  const combatResultId = event.transaction.hash.toHex() + "-0"; // Duels have logIndex 0
+  const combatResult = CombatResult.load(combatResultId);
+  if (combatResult) {
+    duelComplete.combatResult = combatResultId;
+    log.info("handleDuelComplete: Linked CombatResult {}", [combatResultId]);
+  } else {
+    log.warning("handleDuelComplete: CombatResult {} not found for duel", [combatResultId]);
+  }
   
   // Update the DuelChallenge entity
   const challengeId = event.params.challengeId.toString();
@@ -243,6 +250,23 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
     challenge.state = "COMPLETED";
     challenge.winnerId = event.params.winnerId;
     challenge.randomness = event.params.randomness;
+    
+    // Create FighterSnapshots for historical display
+    const challengerSnapshotId = getOrCreateFighterSnapshotById(challenge.challengerId.toString(), event.block.timestamp);
+    if (challengerSnapshotId) {
+      challenge.challengerSnapshot = challengerSnapshotId;
+      log.info("handleDuelComplete: Created/linked challenger snapshot {}", [challengerSnapshotId]);
+    } else {
+      log.error("handleDuelComplete: Failed to create challenger snapshot for fighter {}", [challenge.challengerId.toString()]);
+    }
+    
+    const defenderSnapshotId = getOrCreateFighterSnapshotById(challenge.defenderId.toString(), event.block.timestamp);
+    if (defenderSnapshotId) {
+      challenge.defenderSnapshot = defenderSnapshotId;
+      log.info("handleDuelComplete: Created/linked defender snapshot {}", [defenderSnapshotId]);
+    } else {
+      log.error("handleDuelComplete: Failed to create defender snapshot for fighter {}", [challenge.defenderId.toString()]);
+    }
     
     // Get winner ID and determine loser ID from the challenge
     const winnerId_str = event.params.winnerId.toString();
@@ -508,8 +532,8 @@ export function handleGameEngineUpdated(event: GameEngineUpdatedEvent): void {
   const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
   const gameEngineUpdated = new GameEngineUpdated(eventId);
   
-  gameEngineUpdated.oldEngine = event.params.oldEngine;
-  gameEngineUpdated.newEngine = event.params.newEngine;
+  gameEngineUpdated.oldEngine = event.params.oldGameEngine;
+  gameEngineUpdated.newEngine = event.params.newGameEngine;
   gameEngineUpdated.blockNumber = event.block.number;
   gameEngineUpdated.blockTimestamp = event.block.timestamp;
   gameEngineUpdated.transactionHash = event.transaction.hash;
@@ -517,8 +541,8 @@ export function handleGameEngineUpdated(event: GameEngineUpdatedEvent): void {
   gameEngineUpdated.save();
   
   log.info("Game engine updated from {} to {}", [
-    event.params.oldEngine.toHexString(),
-    event.params.newEngine.toHexString()
+    event.params.oldGameEngine.toHexString(),
+    event.params.newGameEngine.toHexString()
   ]);
 }
 
@@ -529,8 +553,8 @@ export function handlePlayerContractUpdated(event: PlayerContractUpdatedEvent): 
   const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
   const playerContractUpdated = new PlayerContractUpdated(eventId);
   
-  playerContractUpdated.oldContract = event.params.oldContract;
-  playerContractUpdated.newContract = event.params.newContract;
+  playerContractUpdated.oldContract = event.params.oldPlayerContract;
+  playerContractUpdated.newContract = event.params.newPlayerContract;
   playerContractUpdated.blockNumber = event.block.number;
   playerContractUpdated.blockTimestamp = event.block.timestamp;
   playerContractUpdated.transactionHash = event.transaction.hash;
@@ -538,8 +562,8 @@ export function handlePlayerContractUpdated(event: PlayerContractUpdatedEvent): 
   playerContractUpdated.save();
   
   log.info("Player contract updated from {} to {}", [
-    event.params.oldContract.toHexString(),
-    event.params.newContract.toHexString()
+    event.params.oldPlayerContract.toHexString(),
+    event.params.newPlayerContract.toHexString()
   ]);
 }
 
@@ -559,18 +583,3 @@ export function handleVrfRequestTimeoutUpdated(event: VrfRequestTimeoutUpdatedEv
   vrfRequestTimeoutUpdated.save();
 }
 
-/**
- * Handle RequestedRandomness events
- */
-export function handleRequestedRandomness(event: RequestedRandomnessEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const requestedRandomness = new RequestedRandomness(eventId);
-  
-  requestedRandomness.round = event.params.round;
-  requestedRandomness.data = event.params.data;
-  requestedRandomness.blockNumber = event.block.number;
-  requestedRandomness.blockTimestamp = event.block.timestamp;
-  requestedRandomness.transactionHash = event.transaction.hash;
-  
-  requestedRandomness.save();
-}

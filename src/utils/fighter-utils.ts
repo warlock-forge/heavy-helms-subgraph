@@ -1,5 +1,5 @@
-import { log } from "@graphprotocol/graph-ts";
-import { Name } from "../../generated/schema";
+import { log, BigInt } from "@graphprotocol/graph-ts";
+import { Name, Player, DefaultPlayer, Monster, FighterSnapshot } from "../../generated/schema";
 
 /**
  * Loads a fighter's first name based on index
@@ -47,4 +47,136 @@ export function createFullName(firstName: string | null, surname: string | null)
   const firstNameStr = firstName as string;
   const surnameStr = surname as string;
   return firstNameStr + " " + surnameStr;
+}
+
+/**
+ * Gets or creates a FighterSnapshot based on fighter's current state
+ * Deduplicates based on fullName + skinId + stance + level combination
+ * @param fighter The fighter entity to snapshot
+ * @param blockTimestamp The block timestamp for createdAt
+ * @returns The snapshot ID for linking to other entities, or null if fighter has no skin
+ */
+/**
+ * Gets or creates a FighterSnapshot by fighter ID - handles any fighter type
+ */
+export function getOrCreateFighterSnapshotById(fighterId: string, blockTimestamp: BigInt): string | null {
+  // Try Player first
+  let player = Player.load(fighterId);
+  if (player) {
+    return createPlayerSnapshot(player, blockTimestamp);
+  }
+  
+  // Try DefaultPlayer next
+  let defaultPlayer = DefaultPlayer.load(fighterId);
+  if (defaultPlayer) {
+    return createDefaultPlayerSnapshot(defaultPlayer, blockTimestamp);
+  }
+  
+  // Try Monster last
+  let monster = Monster.load(fighterId);
+  if (monster) {
+    return createMonsterSnapshot(monster, blockTimestamp);
+  }
+  
+  log.warning("getOrCreateFighterSnapshotById: Fighter {} not found", [fighterId]);
+  return null;
+}
+
+/**
+ * Create snapshot for Player entity
+ */
+function createPlayerSnapshot(fighter: Player, blockTimestamp: BigInt): string | null {
+  if (!fighter.currentSkin) {
+    log.warning("createPlayerSnapshot: Fighter {} has no currentSkin", [fighter.id]);
+    return null;
+  }
+  
+  const fighterName = fighter.fullName || "Unknown";
+  const fighterNameStr = fighterName as string; // Cast to non-null
+  const skinId = fighter.currentSkin as string; // Cast Skin ID to string
+  const snapshotId = fighterNameStr + "-" + skinId + "-" + fighter.stance.toString() + "-" + fighter.level.toString();
+  let snapshot = FighterSnapshot.load(snapshotId);
+  
+  if (snapshot) {
+    log.info("createPlayerSnapshot: Reusing existing snapshot {}", [snapshotId]);
+    return snapshotId;
+  }
+  
+  snapshot = new FighterSnapshot(snapshotId);
+  snapshot.fighterType = fighter.fighterType;
+  snapshot.fullName = fighterNameStr;
+  snapshot.currentSkin = fighter.currentSkin;
+  snapshot.stance = fighter.stance;
+  snapshot.level = fighter.level;
+  snapshot.createdAt = blockTimestamp;
+  snapshot.save();
+  
+  log.info("createPlayerSnapshot: Created snapshot {} for fighter {}", [snapshotId, fighter.id]);
+  return snapshotId;
+}
+
+/**
+ * Create snapshot for DefaultPlayer entity
+ */
+function createDefaultPlayerSnapshot(fighter: DefaultPlayer, blockTimestamp: BigInt): string | null {
+  if (!fighter.currentSkin) {
+    log.warning("createDefaultPlayerSnapshot: Fighter {} has no currentSkin", [fighter.id]);
+    return null;
+  }
+  
+  const fighterName = fighter.fullName || "Unknown";
+  const fighterNameStr = fighterName as string; // Cast to non-null
+  const skinId = fighter.currentSkin as string; // Cast Skin ID to string
+  const snapshotId = fighterNameStr + "-" + skinId + "-" + fighter.stance.toString() + "-" + fighter.level.toString();
+  let snapshot = FighterSnapshot.load(snapshotId);
+  
+  if (snapshot) {
+    log.info("createDefaultPlayerSnapshot: Reusing existing snapshot {}", [snapshotId]);
+    return snapshotId;
+  }
+  
+  snapshot = new FighterSnapshot(snapshotId);
+  snapshot.fighterType = fighter.fighterType;
+  snapshot.fullName = fighterNameStr;
+  snapshot.currentSkin = fighter.currentSkin;
+  snapshot.stance = fighter.stance;
+  snapshot.level = fighter.level;
+  snapshot.createdAt = blockTimestamp;
+  snapshot.save();
+  
+  log.info("createDefaultPlayerSnapshot: Created snapshot {} for fighter {}", [snapshotId, fighter.id]);
+  return snapshotId;
+}
+
+/**
+ * Create snapshot for Monster entity
+ */
+function createMonsterSnapshot(fighter: Monster, blockTimestamp: BigInt): string | null {
+  if (!fighter.currentSkin) {
+    log.warning("createMonsterSnapshot: Fighter {} has no currentSkin", [fighter.id]);
+    return null;
+  }
+  
+  const fighterName = fighter.fullName || "Unknown";
+  const fighterNameStr = fighterName as string; // Cast to non-null
+  const skinId = fighter.currentSkin as string; // Cast Skin ID to string
+  const snapshotId = fighterNameStr + "-" + skinId + "-" + fighter.stance.toString() + "-" + fighter.level.toString();
+  let snapshot = FighterSnapshot.load(snapshotId);
+  
+  if (snapshot) {
+    log.info("createMonsterSnapshot: Reusing existing snapshot {}", [snapshotId]);
+    return snapshotId;
+  }
+  
+  snapshot = new FighterSnapshot(snapshotId);
+  snapshot.fighterType = fighter.fighterType;
+  snapshot.fullName = fighterNameStr;
+  snapshot.currentSkin = fighter.currentSkin;
+  snapshot.stance = fighter.stance;
+  snapshot.level = fighter.level;
+  snapshot.createdAt = blockTimestamp;
+  snapshot.save();
+  
+  log.info("createMonsterSnapshot: Created snapshot {} for fighter {}", [snapshotId, fighter.id]);
+  return snapshotId;
 }

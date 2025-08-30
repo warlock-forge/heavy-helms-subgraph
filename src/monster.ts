@@ -1,19 +1,11 @@
 import {
   MonsterCreated as MonsterCreatedEvent,
-  MonsterStatsUpdated as MonsterStatsUpdatedEvent,
-  MonsterWinLossUpdated as MonsterWinLossUpdatedEvent,
-  MonsterKillsUpdated as MonsterKillsUpdatedEvent,
-  MonsterImmortalStatusUpdated as MonsterImmortalStatusUpdatedEvent,
-  MonsterRetired as MonsterRetiredEvent
+  MonsterStatsUpdated as MonsterStatsUpdatedEvent
 } from "../generated/Monster/Monster";
 import {
   Monster,
   MonsterCreated,
   MonsterStatsUpdated,
-  MonsterWinLossUpdated,
-  MonsterKillsUpdated,
-  MonsterImmortalStatusUpdated,
-  MonsterRetired,
   Skin
 } from "../generated/schema";
 import { 
@@ -21,10 +13,7 @@ import {
 } from "./utils/fighter-utils";
 import { log } from "@graphprotocol/graph-ts";
 import { 
-  updateStatsForMonsterCreation, 
-  updateStatsForMonsterRetirement, 
-  updateStatsForWinLoss, 
-  updateStatsForKills 
+  updateStatsForMonsterCreation
 } from "./utils/stats-utils";
 
 /**
@@ -36,7 +25,6 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
   const createdEvent = new MonsterCreated(eventId);
   
   createdEvent.monsterId = event.params.monsterId;
-  createdEvent.tier = event.params.stats.tier;
   createdEvent.strength = event.params.stats.attributes.strength;
   createdEvent.constitution = event.params.stats.attributes.constitution;
   createdEvent.size = event.params.stats.attributes.size;
@@ -46,13 +34,14 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
   createdEvent.skinIndex = event.params.stats.skin.skinIndex;
   createdEvent.skinTokenId = event.params.stats.skin.skinTokenId;
   createdEvent.nameIndex = event.params.stats.name.nameIndex;
-  createdEvent.wins = event.params.stats.record.wins;
-  createdEvent.losses = event.params.stats.record.losses;
-  createdEvent.kills = event.params.stats.record.kills;
   createdEvent.blockNumber = event.block.number;
   createdEvent.blockTimestamp = event.block.timestamp;
   createdEvent.transactionHash = event.transaction.hash;
   createdEvent.stance = event.params.stats.stance;
+  createdEvent.level = event.params.stats.level;
+  createdEvent.currentXP = event.params.stats.currentXP;
+  createdEvent.weaponSpecialization = event.params.stats.weaponSpecialization;
+  createdEvent.armorSpecialization = event.params.stats.armorSpecialization;
   createdEvent.save();
 
   // Create the Monster entity
@@ -60,8 +49,6 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
   const monster = new Monster(monsterId);
   monster.fighterId = event.params.monsterId;
   monster.fighterType = "Monster";
-  monster.isRetired = false;
-  monster.tier = event.params.stats.tier;
   
   // Set attributes
   monster.strength = event.params.stats.attributes.strength;
@@ -71,8 +58,12 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
   monster.stamina = event.params.stats.attributes.stamina;
   monster.luck = event.params.stats.attributes.luck;
   
-  // Set stance
+  // Set stance and progression fields
   monster.stance = event.params.stats.stance;
+  monster.level = event.params.stats.level;
+  monster.currentXP = event.params.stats.currentXP;
+  monster.weaponSpecialization = event.params.stats.weaponSpecialization;
+  monster.armorSpecialization = event.params.stats.armorSpecialization;
   
   // Set name fields - note that monsters use a different name structure
   monster.firstNameIndex = event.params.stats.name.nameIndex;
@@ -84,10 +75,10 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
   monster.surname = null; // No surname for monsters
   monster.fullName = monsterName; // Just use the monster name
   
-  // Set record fields
-  monster.wins = event.params.stats.record.wins;
-  monster.losses = event.params.stats.record.losses;
-  monster.kills = event.params.stats.record.kills;
+  // Set record fields - initialize to 0 since record is no longer in events
+  monster.wins = 0;
+  monster.losses = 0;
+  monster.kills = 0;
   monster.gauntletWins = 0; // Initialize gauntlet wins counter
   monster.duelWins = 0; // Initialize duel wins counter
   
@@ -101,13 +92,20 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
   const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
   
   // Directly assign the skin ID. The link will resolve if the Skin entity exists or is created later.
-  monster.currentSkin = skinId;
+  monster.currentSkin = skinId; 
   log.info("handleMonsterCreated: Assigning currentSkin ID '{}' to Monster '{}'", [skinId, monster.id]);
-
+  
   monster.save();
 
-  // Update stats
+  // Update global stats for monster creation
   updateStatsForMonsterCreation(event.block.timestamp);
+  
+  log.info("Created Monster {}: {} with skin {}-{}", [
+    monsterId,
+    monsterName ? monsterName : "Unknown",
+    skinIndex.toString(),
+    skinTokenId.toString()
+  ]);
 }
 
 /**
@@ -119,7 +117,6 @@ export function handleMonsterStatsUpdated(event: MonsterStatsUpdatedEvent): void
   const updatedEvent = new MonsterStatsUpdated(eventId);
   
   updatedEvent.monsterId = event.params.monsterId;
-  updatedEvent.tier = event.params.stats.tier;
   updatedEvent.strength = event.params.stats.attributes.strength;
   updatedEvent.constitution = event.params.stats.attributes.constitution;
   updatedEvent.size = event.params.stats.attributes.size;
@@ -129,9 +126,10 @@ export function handleMonsterStatsUpdated(event: MonsterStatsUpdatedEvent): void
   updatedEvent.skinIndex = event.params.stats.skin.skinIndex;
   updatedEvent.skinTokenId = event.params.stats.skin.skinTokenId;
   updatedEvent.nameIndex = event.params.stats.name.nameIndex;
-  updatedEvent.wins = event.params.stats.record.wins;
-  updatedEvent.losses = event.params.stats.record.losses;
-  updatedEvent.kills = event.params.stats.record.kills;
+  updatedEvent.level = event.params.stats.level;
+  updatedEvent.currentXP = event.params.stats.currentXP;
+  updatedEvent.weaponSpecialization = event.params.stats.weaponSpecialization;
+  updatedEvent.armorSpecialization = event.params.stats.armorSpecialization;
   updatedEvent.blockNumber = event.block.number;
   updatedEvent.blockTimestamp = event.block.timestamp;
   updatedEvent.transactionHash = event.transaction.hash;
@@ -148,7 +146,6 @@ export function handleMonsterStatsUpdated(event: MonsterStatsUpdatedEvent): void
   }
   
   // Update attributes
-  monster.tier = event.params.stats.tier;
   monster.strength = event.params.stats.attributes.strength;
   monster.constitution = event.params.stats.attributes.constitution;
   monster.size = event.params.stats.attributes.size;
@@ -156,8 +153,12 @@ export function handleMonsterStatsUpdated(event: MonsterStatsUpdatedEvent): void
   monster.stamina = event.params.stats.attributes.stamina;
   monster.luck = event.params.stats.attributes.luck;
   
-  // Update stance
+  // Update stance and progression fields
   monster.stance = event.params.stats.stance;
+  monster.level = event.params.stats.level;
+  monster.currentXP = event.params.stats.currentXP;
+  monster.weaponSpecialization = event.params.stats.weaponSpecialization;
+  monster.armorSpecialization = event.params.stats.armorSpecialization;
   
   // Update name indices
   monster.firstNameIndex = event.params.stats.name.nameIndex;
@@ -169,10 +170,7 @@ export function handleMonsterStatsUpdated(event: MonsterStatsUpdatedEvent): void
   monster.surname = null; // No surname for monsters
   monster.fullName = monsterName; // Just use the monster name
   
-  // Update record fields
-  monster.wins = event.params.stats.record.wins;
-  monster.losses = event.params.stats.record.losses;
-  monster.kills = event.params.stats.record.kills;
+  // Record fields are not updated from events anymore (handled by game logic)
   
   // Update timestamp
   monster.lastUpdatedAt = event.block.timestamp;
@@ -187,118 +185,4 @@ export function handleMonsterStatsUpdated(event: MonsterStatsUpdatedEvent): void
   log.info("handleMonsterStatsUpdated: Assigning currentSkin ID '{}' to Monster '{}'", [skinId, monster.id]);
 
   monster.save();
-}
-
-/**
- * Handle MonsterWinLossUpdated events
- */
-export function handleMonsterWinLossUpdated(event: MonsterWinLossUpdatedEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const updatedEvent = new MonsterWinLossUpdated(eventId);
-  updatedEvent.monsterId = event.params.monsterId;
-  updatedEvent.wins = event.params.wins;
-  updatedEvent.losses = event.params.losses;
-  updatedEvent.blockNumber = event.block.number;
-  updatedEvent.blockTimestamp = event.block.timestamp;
-  updatedEvent.transactionHash = event.transaction.hash;
-  updatedEvent.save();
-
-  // Update the Monster entity
-  const monsterId = event.params.monsterId.toString();
-  let monster = Monster.load(monsterId);
-  if (monster != null) {
-    let winDelta = event.params.wins - monster.wins;
-    let lossDelta = event.params.losses - monster.losses;
-    
-    // Update stats
-    updateStatsForWinLoss(
-      event.block.timestamp,
-      winDelta,
-      lossDelta
-    );
-    
-    // Then update the monster entity
-    monster.wins = event.params.wins;
-    monster.losses = event.params.losses;
-    monster.lastUpdatedAt = event.block.timestamp;
-    monster.save();
-  }
-}
-
-/**
- * Handle MonsterKillsUpdated events
- */
-export function handleMonsterKillsUpdated(event: MonsterKillsUpdatedEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const updatedEvent = new MonsterKillsUpdated(eventId);
-  updatedEvent.monsterId = event.params.monsterId;
-  updatedEvent.kills = event.params.kills;
-  updatedEvent.blockNumber = event.block.number;
-  updatedEvent.blockTimestamp = event.block.timestamp;
-  updatedEvent.transactionHash = event.transaction.hash;
-  updatedEvent.save();
-
-  // Update the Monster entity
-  const monsterId = event.params.monsterId.toString();
-  let monster = Monster.load(monsterId);
-  if (monster != null) {
-    let killsDelta = event.params.kills - monster.kills;
-    
-    // Update stats
-    updateStatsForKills(
-      event.block.timestamp,
-      killsDelta
-    );
-    
-    // Then update the monster entity
-    monster.kills = event.params.kills;
-    monster.lastUpdatedAt = event.block.timestamp;
-    monster.save();
-  }
-}
-
-/**
- * Handle MonsterImmortalStatusUpdated events
- */
-export function handleMonsterImmortalStatusUpdated(event: MonsterImmortalStatusUpdatedEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const updatedEvent = new MonsterImmortalStatusUpdated(eventId);
-  updatedEvent.monsterId = event.params.monsterId;
-  updatedEvent.immortal = event.params.immortal;
-  updatedEvent.blockNumber = event.block.number;
-  updatedEvent.blockTimestamp = event.block.timestamp;
-  updatedEvent.transactionHash = event.transaction.hash;
-  updatedEvent.save();
-
-  // Update the Monster entity - note that Monster doesn't have an isImmortal field
-  // so this will need to be handled in your application logic
-}
-
-/**
- * Handle MonsterRetired events
- */
-export function handleMonsterRetired(event: MonsterRetiredEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const updatedEvent = new MonsterRetired(eventId);
-  updatedEvent.monsterId = event.params.monsterId;
-  updatedEvent.retired = event.params.retired;
-  updatedEvent.blockNumber = event.block.number;
-  updatedEvent.blockTimestamp = event.block.timestamp;
-  updatedEvent.transactionHash = event.transaction.hash;
-  updatedEvent.save();
-
-  // Update the Monster entity
-  const monsterId = event.params.monsterId.toString();
-  let monster = Monster.load(monsterId);
-  if (monster != null) {
-    monster.isRetired = event.params.retired;
-    monster.lastUpdatedAt = event.block.timestamp;
-    monster.save();
-  }
-
-  // Update stats
-  updateStatsForMonsterRetirement(
-    event.block.timestamp,
-    event.params.retired
-  );
 }

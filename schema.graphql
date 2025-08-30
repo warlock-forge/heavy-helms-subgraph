@@ -6,7 +6,6 @@ interface Fighter {
   id: ID!                  # Unique identifier
   fighterId: BigInt!       # Numeric ID from contract
   fighterType: String!     # "Player", "DefaultPlayer", or "Monster"
-  isRetired: Boolean!      # Whether the fighter is retired
   
   # Common attributes
   strength: Int!
@@ -154,8 +153,6 @@ type Monster implements Fighter @entity {
   id: ID!
   fighterId: BigInt!      # The monsterId from the contract
   fighterType: String!    # Will always be "Monster"
-  isRetired: Boolean!
-  tier: Int!              # Monster-specific field
   
   # Common attributes from Fighter
   strength: Int!
@@ -553,10 +550,10 @@ type MonsterCreated @entity(immutable: true) {
   skinTokenId: Int!
   nameIndex: Int!
   stance: Int! # uint8
-  wins: Int!
-  losses: Int!
-  kills: Int!
-  tier: Int!
+  level: Int! # uint8 level (1-10)
+  currentXP: Int! # uint16 current experience points
+  weaponSpecialization: Int! # uint8 weapon class specialization (255 = none)
+  armorSpecialization: Int! # uint8 armor specialization (255 = none)
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -575,51 +572,15 @@ type MonsterStatsUpdated @entity(immutable: true) {
   skinTokenId: Int!
   nameIndex: Int!
   stance: Int! # uint8
-  wins: Int!
-  losses: Int!
-  kills: Int!
-  tier: Int!
+  level: Int! # uint8 level (1-10)
+  currentXP: Int! # uint16 current experience points
+  weaponSpecialization: Int! # uint8 weapon class specialization (255 = none)
+  armorSpecialization: Int! # uint8 armor specialization (255 = none)
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
 }
 
-type MonsterWinLossUpdated @entity(immutable: true) {
-  id: Bytes!
-  monsterId: BigInt! # uint32
-  wins: Int!
-  losses: Int!
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type MonsterKillsUpdated @entity(immutable: true) {
-  id: Bytes!
-  monsterId: BigInt! # uint32
-  kills: Int!
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type MonsterImmortalStatusUpdated @entity(immutable: true) {
-  id: Bytes!
-  monsterId: BigInt! # uint32
-  immortal: Boolean!
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type MonsterRetired @entity(immutable: true) {
-  id: Bytes!
-  monsterId: BigInt! # uint32
-  retired: Boolean!
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
 
 # ==========================================================
 #                   REGISTRY EVENTS                            
@@ -699,6 +660,27 @@ type OwnershipTransferred @entity(immutable: true) {
 }
 
 # ==========================================================
+#                   FIGHTER SNAPSHOTS                       
+# ==========================================================
+# Lean snapshot entity for historical display data
+# Deduplicates based on name+skin+stance+level combination
+type FighterSnapshot @entity(immutable: true) {
+  id: ID!                    # "fullName-skinId-stance-level"
+  
+  # Fighter identification
+  fighterType: String!       # "Player", "DefaultPlayer", or "Monster"
+  
+  # Display data
+  fullName: String!          # Computed name for UI display
+  currentSkin: Skin          # Link to skin entity
+  stance: Int!               # Stance at snapshot time
+  level: Int!                # Progression level at snapshot time
+  
+  # Snapshot metadata
+  createdAt: BigInt!         # When this combination was first seen
+}
+
+# ==========================================================
 #                   DUEL GAME ENTITIES                       
 # ==========================================================
 type DuelChallenge @entity {
@@ -710,9 +692,9 @@ type DuelChallenge @entity {
   challengerOwner: Owner
   defenderOwner: Owner
   
-  # Direct references to Player entities (no more snapshots!)
-  challenger: Player!
-  defender: Player
+  # Historical fighter snapshots (created when combat occurs)
+  challengerSnapshot: FighterSnapshot
+  defenderSnapshot: FighterSnapshot
   
   createdBlock: BigInt!
   createdAt: BigInt!
@@ -790,8 +772,13 @@ type DuelComplete @entity(immutable: true) {
   winnerId: BigInt!
   randomness: BigInt!
   challenge: DuelChallenge!
+  
+  # Direct link to combat result for detailed analysis
+  combatResult: CombatResult            # Same transaction combat data
+  
   blockNumber: BigInt!
   blockTimestamp: BigInt!
+  transactionHash: Bytes! @index        # Add for easier debugging and CombatResult linking
 }
 
 type CombatResult @entity(immutable: true) {
@@ -1106,6 +1093,7 @@ type Gauntlet @entity {
   id: ID!                  # Gauntlet ID (uint256 from contract)
   size: Int!               # 4, 8, 16, or 32
   state: GauntletState!    # PENDING or COMPLETED
+  levelBracket: Int!       # 0=LEVELS_1_TO_4, 1=LEVELS_5_TO_9, 2=LEVEL_10
   vrfRequestId: BigInt     # ID of the associated VRF request
   vrfRequestTimestamp: BigInt! # Timestamp of VRF request
   completionTimestamp: BigInt # Timestamp of completion or recovery
@@ -1156,8 +1144,8 @@ type GauntletStarted @entity(immutable: true) {
   id: Bytes!               # Transaction hash
   gauntletId: BigInt!      # uint256 indexed gauntletId
   size: Int!               # uint8 size
+  levelBracket: Int!       # uint8 levelBracket (enum)
   participantIds: [BigInt!]! # uint32[] participantIds
-  vrfRequestId: BigInt!    # uint256 vrfRequestId
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -1180,12 +1168,20 @@ type GauntletCompleted @entity(immutable: true) {
 
 type GauntletRecovered @entity(immutable: true) {
   id: Bytes!               # Transaction hash
-  gauntletId: BigInt!      # uint256 indexed gauntletId
+  commitTimestamp: BigInt! # uint256 commitTimestamp (only param in event)
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
-   # Link to the recovered Gauntlet entity
-  gauntlet: Gauntlet!
+  # TODO: Cannot link to gauntlet without gauntletId in event
+}
+
+type QueuePartiallyCleared @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  cleared: BigInt!         # uint256 cleared
+  remaining: BigInt!       # uint256 remaining
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
 }
 
 type QueueClearedDueToGameDisabled @entity(immutable: true) {
@@ -1366,7 +1362,7 @@ type SubscriptionIdUpdated @entity(immutable: true) {
 type GauntletXPAwarded @entity(immutable: true) {
   id: Bytes!               # Transaction hash + log index
   gauntletId: BigInt!      # uint256 indexed gauntletId  
-  bracket: Int!            # uint8 bracket (enum)
+  levelBracket: Int!       # uint8 levelBracket (enum)
   playerIds: [BigInt!]!    # uint32[] playerIds
   xpAmounts: [Int!]!       # uint16[] xpAmounts
   gauntlet: Gauntlet!      # Link to Gauntlet entity
@@ -1413,6 +1409,23 @@ type DailyGauntletLimitUpdated @entity(immutable: true) {
   id: Bytes!               # Transaction hash + log index
   oldLimit: Int!           # uint8 oldLimit
   newLimit: Int!           # uint8 newLimit
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type MinTimeBetweenGauntletsSet @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  newMinTime: BigInt!      # uint256 newMinTime
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type GauntletSizeSet @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  oldSize: Int!            # uint8 oldSize
+  newSize: Int!            # uint8 newSize
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!

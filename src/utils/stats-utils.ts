@@ -2,14 +2,6 @@ import { BigInt, Address, Bytes, BigDecimal } from "@graphprotocol/graph-ts"
 import { Stats, Owner, Player, PlayerVsRecord, DefaultPlayer, SkinCombatStat, PlayerSkinCombatStat, Skin } from "../../generated/schema"
 import { log } from "@graphprotocol/graph-ts"
 
-// Helper function to get stance name for logging
-function getStanceName(stance: i32): string {
-  if (stance == 0) return "Defensive";
-  if (stance == 1) return "Balanced";
-  if (stance == 2) return "Offensive";
-  return "Unknown";
-}
-
 // Little-endian helper functions
 function u32LE(data: Bytes, off: i32): i32 {
   return (data[off] as i32) |
@@ -1130,32 +1122,16 @@ export function decodePlayerData(data: Bytes): PlayerData {
   playerData.maxHealth = 0;
   playerData.maxStamina = 0;
   
+  
   // Check if we have the required 32 bytes
   if (data.length < 32) {
     log.warning("decodePlayerData: data too short ({}), expected 32 bytes", [data.length.toString()]);
     return playerData;
   }
   
-  // DEBUG: Log raw bytes for player ID (first 4 bytes)
-  log.info("decodePlayerData: Raw bytes [0-3]: {} {} {} {} (hex: 0x{} 0x{} 0x{} 0x{})", [
-    data[0].toString(),
-    data[1].toString(), 
-    data[2].toString(),
-    data[3].toString(),
-    data[0].toString(16),
-    data[1].toString(16),
-    data[2].toString(16), 
-    data[3].toString(16)
-  ]);
-  
   // FIXED: Decode playerId with proper u32 casting to prevent AssemblyScript truncation
   playerData.playerId = u32BE(data, 0);
-  
-  // DEBUG: Log the calculated player ID  
-  log.info("decodePlayerData: Calculated playerId using u32BE = {}", [
-    playerData.playerId.toString()
-  ]);
-  
+
   // Decode attributes (bytes 4-9) - Single bytes, no casting needed
   playerData.strength = data[4];
   playerData.constitution = data[5];
@@ -1171,23 +1147,20 @@ export function decodePlayerData(data: Bytes): PlayerData {
   // Decode stance (byte 16) - Single byte, no casting needed
   playerData.stance = data[16];
   
-  // Additional fields from contract (bytes 17-26) - we can add these later if needed
-  // For now, we have the essential data: playerId, attributes, skin, stance
+  // Decode name indices (bytes 17-20)
+  playerData.firstNameIndex = u16BE(data, 17);    // bytes 17-18: uint16 first name index
+  playerData.surnameIndex = u16BE(data, 19);      // bytes 19-20: uint16 surname index
   
-  log.info("decodePlayerData: Player {} - Skin: {}-{}, Stance: {} ({}), STR:{} CON:{} SIZ:{} AGI:{} STA:{} LUK:{}", [
-    playerData.playerId.toString(),
-    playerData.skinCollectionId.toString(),
-    playerData.skinTokenId.toString(),
-    playerData.stance.toString(),
-    getStanceName(playerData.stance),
-    playerData.strength.toString(),
-    playerData.constitution.toString(),
-    playerData.size.toString(),
-    playerData.agility.toString(),
-    playerData.stamina.toString(),
-    playerData.luck.toString()
-  ]);
+  // Decode seasonal record (bytes 21-26)
+  playerData.wins = u16BE(data, 21);              // bytes 21-22: uint16 wins
+  playerData.losses = u16BE(data, 23);            // bytes 23-24: uint16 losses
+  playerData.kills = u16BE(data, 25);             // bytes 25-26: uint16 kills
   
+  // v1.0.0 Progression fields (bytes 27-31)
+  playerData.level = data[27];                    // byte 27: uint8 level (1-10)
+  playerData.currentXP = u16BE(data, 28);         // bytes 28-29: uint16 current XP
+  playerData.weaponSpecialization = data[30];     // byte 30: uint8 weapon specialization
+  playerData.armorSpecialization = data[31];      // byte 31: uint8 armor specialization
   
   return playerData;
 }
@@ -1247,6 +1220,21 @@ class PlayerData {
   skinTokenId: i32;
   stance: i32;  // 0=Defensive, 1=Balanced, 2=Offensive
   
+  // Name indices (bytes 17-20)
+  firstNameIndex: i32;           // uint16 first name index
+  surnameIndex: i32;             // uint16 surname index
+  
+  // Seasonal record (bytes 21-26)
+  wins: i32;                     // uint16 wins
+  losses: i32;                   // uint16 losses  
+  kills: i32;                    // uint16 kills
+  
+  // v1.0.0 Progression fields (bytes 27-31)
+  level: i32;                    // uint8 level (1-10)
+  currentXP: i32;                // uint16 current experience points
+  weaponSpecialization: i32;     // uint8 weapon class specialization (255 = none)
+  armorSpecialization: i32;      // uint8 armor specialization (255 = none)
+  
   constructor() {
     this.playerId = 0;
     this.strength = 0;
@@ -1260,6 +1248,15 @@ class PlayerData {
     this.skinCollectionId = 0;
     this.skinTokenId = 0;
     this.stance = 0;
+    this.firstNameIndex = 0;
+    this.surnameIndex = 0;
+    this.wins = 0;
+    this.losses = 0;
+    this.kills = 0;
+    this.level = 1;
+    this.currentXP = 0;
+    this.weaponSpecialization = 255;
+    this.armorSpecialization = 255;
   }
 }
 

@@ -19,7 +19,7 @@ armorSpecialization: Int!  # uint8 armor specialization (255 = none)
 - ✅ **Player** - UPDATED with progression fields
 - ✅ **DefaultPlayer** - UPDATED with progression fields
 - ✅ **Monster** - UPDATED with progression fields  
-- ✅ **PlayerSnapshot** - UPDATED with progression fields
+- ✅ **FighterSnapshot** - NEW entity with progression fields
 
 ### Frontend Impact:
 - **ALL Fighter-related GraphQL queries must be updated**
@@ -28,7 +28,82 @@ armorSpecialization: Int!  # uint8 armor specialization (255 = none)
 
 ---
 
-## 2. New Entities Added
+## 2. Duel System Refactoring - FighterSnapshot
+**BREAKING**: Complete overhaul of how historical fighter data is stored and queried in duels.
+
+### Key Changes:
+- ❌ **PlayerSnapshot entity REMOVED** (was bloated with unused fields)
+- ✅ **FighterSnapshot entity ADDED** (lean, display-focused)
+- ✅ **DuelChallenge updated** to use FighterSnapshot instead of current Fighter references
+- ✅ **DuelComplete updated** with direct CombatResult link for analysis
+
+### New FighterSnapshot Entity:
+```graphql
+type FighterSnapshot @entity(immutable: true) {
+  id: ID!                    # Deduplication key: "fullName-skinId-stance-level"
+  fighterType: String!       # "Player", "DefaultPlayer", or "Monster"
+  fullName: String!          # Display name at snapshot time
+  currentSkin: Skin          # Link to skin entity
+  stance: Int!               # Combat stance
+  level: Int!                # Progression level
+  createdAt: BigInt!         # When first seen
+}
+```
+
+### Frontend Query Changes:
+**BEFORE** (current queries):
+```graphql
+duelCompletes {
+  challenge {
+    challengerSnapshot {
+      # 20+ fields including unused stats
+      firstName, surname, fullName
+      currentSkin { ... }
+      strength, constitution, size, agility, stamina, luck
+      wins, losses, kills, isRetired, isImmortal
+    }
+  }
+}
+```
+
+**AFTER** (new lean queries):
+```graphql
+duelCompletes {
+  challenge {
+    challengerSnapshot {
+      # Only essential display fields
+      fighterType
+      fullName
+      currentSkin { ... }
+      stance
+      level
+    }
+  }
+  # NEW: Direct combat analysis link
+  combatResult {
+    player1TotalDamage
+    winCondition
+    # ... detailed combat stats
+  }
+}
+```
+
+### Benefits:
+- ✅ **60%+ storage reduction** - only essential display data
+- ✅ **Automatic deduplication** - same fighter+skin+stance+level = 1 snapshot
+- ✅ **O(1) frontend queries** - no complex player resolution logic
+- ✅ **Unified architecture** - same pattern for duels, gauntlets, tournaments
+- ✅ **Historical accuracy** - names/skins frozen at combat time
+
+### Frontend Migration Required:
+- 🔄 **Update all duel-related GraphQL queries**
+- 🔄 **Remove unused fields from TypeScript interfaces** 
+- 🔄 **Update fighter snapshot processing logic**
+- 🔄 **Test duel list and detail views**
+
+---
+
+## 3. New Entities Added
 
 ### PlayerTickets Contract Entities
 - ✅ **PlayerTicket** - ADDED entity for ticket NFTs
@@ -54,7 +129,7 @@ armorSpecialization: Int!  # uint8 armor specialization (255 = none)
 
 ---
 
-## 3. GauntletGame Changes
+## 4. GauntletGame Changes
 
 ### Bracket System
 - Split from single GauntletGame to 3 bracket-specific contracts:
@@ -71,7 +146,7 @@ armorSpecialization: Int!  # uint8 armor specialization (255 = none)
 
 ---
 
-## 4. Contract Address Changes
+## 5. Contract Address Changes
 All contract addresses have changed for v1.0.0 deployment - may affect hardcoded addresses in frontend.
 
 ---
@@ -79,21 +154,29 @@ All contract addresses have changed for v1.0.0 deployment - may affect hardcoded
 ## Frontend TODO Checklist
 
 ### Types to Update:
-- [ ] Fighter interface/type
-- [ ] Player interface/type  
-- [ ] DefaultPlayer interface/type
-- [ ] Monster interface/type
+- [ ] Fighter interface/type (add progression fields)
+- [ ] Player interface/type (add progression fields)
+- [ ] DefaultPlayer interface/type (add progression fields)
+- [ ] Monster interface/type (add progression fields)
+- [ ] **NEW**: FighterSnapshot interface/type (lean display fields only)
 - [ ] All GraphQL query fragments using Fighter fields
-- [ ] Any components displaying fighter stats
+- [ ] Remove PlayerSnapshot type (no longer exists)
 
 ### Queries to Update:
-- [ ] All queries fetching Player entities
-- [ ] All queries fetching DefaultPlayer entities
-- [ ] All queries fetching Monster entities
+- [ ] **PRIORITY**: All duel-related queries (FighterSnapshot refactor)
+- [ ] GET_ALL_DUELS query (update snapshot field usage)
+- [ ] GET_PLAYER_DUELS query (update snapshot field usage)  
+- [ ] GET_USER_CHALLENGES query (if using snapshots)
+- [ ] All queries fetching Player entities (progression fields)
+- [ ] All queries fetching DefaultPlayer entities (progression fields)
+- [ ] All queries fetching Monster entities (progression fields)
 - [ ] Gauntlet-related queries (now bracket-specific)
 - [ ] Any queries using Fighter interface
 
 ### Components to Update:
+- [ ] **PRIORITY**: Duel list components (FighterSnapshot fields)
+- [ ] **PRIORITY**: Challenge list components (FighterSnapshot fields)
+- [ ] **PRIORITY**: Fighter snapshot processing logic (useRecentDuels hook)
 - [ ] Player stat displays (add level, XP, specializations)
 - [ ] Fighter comparison components
 - [ ] Any gauntlet-related components
@@ -105,6 +188,13 @@ All contract addresses have changed for v1.0.0 deployment - may affect hardcoded
 - [ ] Progression tracking UI
 - [ ] Tournament-related UI
 - [ ] Player tickets UI
+
+### Testing Required:
+- [ ] **CRITICAL**: Duel list display with new FighterSnapshot data
+- [ ] **CRITICAL**: Open challenges list display
+- [ ] **CRITICAL**: Duel detail views with CombatResult integration
+- [ ] Fighter snapshot deduplication behavior
+- [ ] Historical accuracy of names/skins in past duels
 
 ---
 
