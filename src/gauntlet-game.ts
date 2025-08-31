@@ -50,6 +50,7 @@ import {
 
 import { getOrCreateStats } from "./utils/stats-utils";
 import { updatePlayerPostCombatStats, updateStatsForGauntletWin, processCombatResultsWithPlayerData, decodePlayerData, updateSkinCombatAnalytics, updatePlayerSkinCombatAnalytics, u32BE } from "./utils/stats-utils";
+import { getOrCreateFighterSnapshotById } from "./utils/fighter-utils";
 
 // Define ZERO_BI directly
 const ZERO_BI = BigInt.fromI32(0);
@@ -113,7 +114,7 @@ export function handlePlayerWithdrew(event: PlayerWithdrewEvent): void {
 }
 
 // Handle the GauntletStarted event
-export function handleGauntletStarted(event: GauntletStartedEvent): void {
+export function handleGauntletStarted(event: GauntletStartedEvent, defaultPlayerLevel: i32 = 10): void {
   const gauntletId = event.params.gauntletId.toString();
 
   const gauntlet = new Gauntlet(gauntletId);
@@ -122,7 +123,7 @@ export function handleGauntletStarted(event: GauntletStartedEvent): void {
   gauntlet.levelBracket = event.params.levelBracket;
   gauntlet.vrfRequestTimestamp = event.block.timestamp;
   gauntlet.completionTimestamp = null;
-  gauntlet.champion = null;
+  gauntlet.championSnapshot = null;
   gauntlet.startedAt = event.block.timestamp;
   gauntlet.startedTx = event.transaction.hash;
   gauntlet.completedAt = null;
@@ -166,8 +167,7 @@ export function handleGauntletStarted(event: GauntletStartedEvent): void {
     let participant = new GauntletParticipant(gauntletParticipantId);
 
     participant.gauntlet = gauntletId;
-    participant.player = participantIdString; 
-    participant.stance = stance_i32;
+    // We'll create the fighter snapshot after we save the participant
 
     let skinTokenIdString = `${skinTokenId_i32}`;
     let skinId = `${collectionId}-${skinTokenIdString}`;
@@ -184,7 +184,15 @@ export function handleGauntletStarted(event: GauntletStartedEvent): void {
       log.info("[Gauntlet {}] Participant [{}]: Found existing Skin ID: {}", [gauntletId, participantIdString, skinId]);
     }
     
-    participant.skin = skin ? skinId : null; 
+    // Create fighter snapshot for this participant
+    const fighterSnapshotId = getOrCreateFighterSnapshotById(participantIdString, event.block.timestamp, defaultPlayerLevel);
+    if (fighterSnapshotId) {
+      participant.fighterSnapshot = fighterSnapshotId;
+      log.info("[Gauntlet {}] Participant [{}]: Created/linked fighter snapshot {}", [gauntletId, participantIdString, fighterSnapshotId]);
+    } else {
+      log.error("[Gauntlet {}] Participant [{}]: Failed to create fighter snapshot", [gauntletId, participantIdString]);
+      continue; // Skip this participant if we can't create a snapshot
+    }
 
     log.info("[Gauntlet {}] Participant [{}]: Attempting to save GauntletParticipant ID: {}", [gauntletId, participantIdString, gauntletParticipantId]);
     participant.save();
@@ -229,7 +237,7 @@ export function handleGauntletStarted(event: GauntletStartedEvent): void {
 }
 
 // Handle the GauntletCompleted event
-export function handleGauntletCompleted(event: GauntletCompletedEvent): void {
+export function handleGauntletCompleted(event: GauntletCompletedEvent, defaultPlayerLevel: i32 = 10): void {
   const gauntletId = event.params.gauntletId.toString();
   const gauntlet = Gauntlet.load(gauntletId);
   
@@ -244,16 +252,13 @@ export function handleGauntletCompleted(event: GauntletCompletedEvent): void {
     
     const championIdString = `${event.params.championId}`;
     
-    let playerChamp = Player.load(championIdString);
-    if (playerChamp != null) {
-      gauntlet.champion = championIdString;
+    // Create champion snapshot
+    const championSnapshotId = getOrCreateFighterSnapshotById(championIdString, event.block.timestamp, defaultPlayerLevel);
+    if (championSnapshotId) {
+      gauntlet.championSnapshot = championSnapshotId;
+      log.info("[GauntletCompleted {}] Created/linked champion snapshot {}", [gauntletId, championSnapshotId]);
     } else {
-      let defaultPlayerChamp = DefaultPlayer.load(championIdString);
-      if (defaultPlayerChamp != null) {
-        gauntlet.champion = championIdString;
-      } else {
-         log.warning("[GauntletCompleted {}] Champion ID {} not found as Player or DefaultPlayer.", [gauntletId, championIdString]);
-      }
+      log.warning("[GauntletCompleted {}] Failed to create champion snapshot for fighter {}", [gauntletId, championIdString]);
     }
     
     // --- Populate finalParticipantIds from event.params ---
@@ -908,8 +913,8 @@ export function handleGauntletRewardDistributed(event: GauntletRewardDistributed
 // Low Bracket (Levels 1-4) Handlers
 export function handlePlayerQueuedLow(event: PlayerQueuedEvent): void { handlePlayerQueued(event); }
 export function handlePlayerWithdrewLow(event: PlayerWithdrewEvent): void { handlePlayerWithdrew(event); }
-export function handleGauntletStartedLow(event: GauntletStartedEvent): void { handleGauntletStarted(event); }
-export function handleGauntletCompletedLow(event: GauntletCompletedEvent): void { handleGauntletCompleted(event); }
+export function handleGauntletStartedLow(event: GauntletStartedEvent): void { handleGauntletStarted(event, 4); }
+export function handleGauntletCompletedLow(event: GauntletCompletedEvent): void { handleGauntletCompleted(event, 4); }
 export function handleGauntletRecoveredLow(event: GauntletRecoveredEvent): void { handleGauntletRecovered(event); }
 export function handleGauntletCombatResultLow(event: CombatResultEvent): void { handleGauntletCombatResult(event); }
 export function handleGauntletSizeSetLow(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event); }
@@ -927,8 +932,8 @@ export function handleDailyGauntletLimitUpdatedLow(event: DailyGauntletLimitUpda
 // Mid Bracket (Levels 5-9) Handlers
 export function handlePlayerQueuedMid(event: PlayerQueuedEvent): void { handlePlayerQueued(event); }
 export function handlePlayerWithdrewMid(event: PlayerWithdrewEvent): void { handlePlayerWithdrew(event); }
-export function handleGauntletStartedMid(event: GauntletStartedEvent): void { handleGauntletStarted(event); }
-export function handleGauntletCompletedMid(event: GauntletCompletedEvent): void { handleGauntletCompleted(event); }
+export function handleGauntletStartedMid(event: GauntletStartedEvent): void { handleGauntletStarted(event, 9); }
+export function handleGauntletCompletedMid(event: GauntletCompletedEvent): void { handleGauntletCompleted(event, 9); }
 export function handleGauntletRecoveredMid(event: GauntletRecoveredEvent): void { handleGauntletRecovered(event); }
 export function handleGauntletCombatResultMid(event: CombatResultEvent): void { handleGauntletCombatResult(event); }
 export function handleGauntletSizeSetMid(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event); }
@@ -946,8 +951,8 @@ export function handleDailyGauntletLimitUpdatedMid(event: DailyGauntletLimitUpda
 // High Bracket (Level 10) Handlers
 export function handlePlayerQueuedHigh(event: PlayerQueuedEvent): void { handlePlayerQueued(event); }
 export function handlePlayerWithdrewHigh(event: PlayerWithdrewEvent): void { handlePlayerWithdrew(event); }
-export function handleGauntletStartedHigh(event: GauntletStartedEvent): void { handleGauntletStarted(event); }
-export function handleGauntletCompletedHigh(event: GauntletCompletedEvent): void { handleGauntletCompleted(event); }
+export function handleGauntletStartedHigh(event: GauntletStartedEvent): void { handleGauntletStarted(event, 10); }
+export function handleGauntletCompletedHigh(event: GauntletCompletedEvent): void { handleGauntletCompleted(event, 10); }
 export function handleGauntletRecoveredHigh(event: GauntletRecoveredEvent): void { handleGauntletRecovered(event); }
 export function handleGauntletCombatResultHigh(event: CombatResultEvent): void { handleGauntletCombatResult(event); }
 export function handleGauntletSizeSetHigh(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event); }

@@ -1,5 +1,5 @@
 import { BigInt, Address, Bytes, BigDecimal } from "@graphprotocol/graph-ts"
-import { Stats, Owner, Player, PlayerVsRecord, DefaultPlayer, SkinCombatStat, PlayerSkinCombatStat, Skin } from "../../generated/schema"
+import { Stats, Owner, Player, PlayerVsRecord, DefaultPlayer, SkinCombatStat, PlayerSkinCombatStat, Skin, PlayerSeasonalStats } from "../../generated/schema"
 import { log } from "@graphprotocol/graph-ts"
 
 // Little-endian helper functions
@@ -70,6 +70,36 @@ export function getOrCreateStats(): Stats {
   return stats as Stats
 }
 
+// Helper function to get or create PlayerSeasonalStats
+export function getOrCreatePlayerSeasonalStats(
+  playerId: string, 
+  seasonId: string,
+  timestamp: BigInt
+): PlayerSeasonalStats {
+  const statsId = seasonId + "-" + playerId;
+  let stats = PlayerSeasonalStats.load(statsId);
+  
+  if (!stats) {
+    stats = new PlayerSeasonalStats(statsId);
+    stats.season = seasonId;
+    stats.player = playerId;
+    stats.seasonId = BigInt.fromString(seasonId);
+    stats.playerId = BigInt.fromString(playerId);
+    stats.wins = 0;
+    stats.losses = 0;
+    stats.kills = 0;
+    stats.tournamentRating = 0;
+    stats.tournamentsPlayed = 0;
+    stats.tournamentWins = 0;
+    stats.gauntletsPlayed = 0;
+    stats.gauntletWins = 0;
+    stats.createdAt = timestamp;
+    stats.lastUpdatedAt = timestamp;
+  }
+  
+  return stats;
+}
+
 // Player-related update methods
 export function updateStatsForPlayerCreation(timestamp: BigInt, ownerAddress: Address): void {
   let stats = getOrCreateStats()
@@ -118,7 +148,7 @@ export function updateStatsForKills(timestamp: BigInt, killsDelta: i32): void {
 
 // New function to update gauntlet wins
 export function updateStatsForGauntletWin(winnerId: string, timestamp: BigInt): void {
-  // Update the winner's gauntlet wins counter
+  // Update the winner's gauntlet wins counter - only Players can win gauntlets
   let player = Player.load(winnerId)
   if (player) {
     player.gauntletWins += 1
@@ -127,56 +157,9 @@ export function updateStatsForGauntletWin(winnerId: string, timestamp: BigInt): 
     return
   }
   
-  let defaultPlayer = DefaultPlayer.load(winnerId)
-  if (defaultPlayer) {
-    defaultPlayer.gauntletWins += 1
-    defaultPlayer.lastUpdatedAt = timestamp
-    defaultPlayer.save()
-    return
-  }
-  
-  // Could also check for Monster if they can win gauntlets
-  // let monster = Monster.load(winnerId)
-  // if (monster) {
-  //   monster.gauntletWins += 1
-  //   monster.lastUpdatedAt = timestamp
-  //   monster.save()
-  //   return
-  // }
-  
-  log.warning("Fighter with ID {} not found when updating gauntlet wins", [winnerId])
+  log.warning("Player with ID {} not found when updating gauntlet wins", [winnerId])
 }
 
-// New function to update duel wins
-export function updateStatsForDuelWin(winnerId: string, timestamp: BigInt): void {
-  // Update the winner's duel wins counter
-  let player = Player.load(winnerId)
-  if (player) {
-    player.duelWins += 1
-    player.lastUpdatedAt = timestamp
-    player.save()
-    return
-  }
-  
-  let defaultPlayer = DefaultPlayer.load(winnerId)
-  if (defaultPlayer) {
-    defaultPlayer.duelWins += 1
-    defaultPlayer.lastUpdatedAt = timestamp
-    defaultPlayer.save()
-    return
-  }
-  
-  // Could also check for Monster if they can win duels
-  // let monster = Monster.load(winnerId)
-  // if (monster) {
-  //   monster.duelWins += 1
-  //   monster.lastUpdatedAt = timestamp
-  //   monster.save()
-  //   return
-  // }
-  
-  log.warning("Fighter with ID {} not found when updating duel wins", [winnerId])
-}
 
 // Monster-related update methods
 export function updateStatsForMonsterCreation(timestamp: BigInt): void {
@@ -1365,6 +1348,23 @@ class CombatStats {
     this.player2AttacksParried = 0;
     this.player2AttacksRiposted = 0;
   }
+}
+
+/**
+ * Updates global statistics for a tournament win
+ */
+export function updateStatsForTournamentWin(winnerId: string): void {
+  let stats = getOrCreateStats();
+  
+  // Increment tournament wins counter
+  stats.totalTournamentWins = stats.totalTournamentWins.plus(BigInt.fromI32(1));
+  
+  log.info("[updateStatsForTournamentWin] Incremented tournament wins to {} for winner {}", [
+    stats.totalTournamentWins.toString(),
+    winnerId
+  ]);
+  
+  stats.save();
 }
 
 

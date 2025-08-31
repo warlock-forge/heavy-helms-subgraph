@@ -35,7 +35,6 @@ import {
   updateStatsForChallengeCancellation,
   updateStatsForChallengeForfeit,
   updatePlayerPostCombatStats,
-  updateStatsForDuelWin,
   processCombatResultsWithPlayerData,
   decodePlayerData,
   updateSkinCombatAnalytics,
@@ -280,9 +279,6 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
     
     // Call the unified utility function to update player stats
     updatePlayerPostCombatStats(winnerId_str, loserId_str, event.block.timestamp);
-    
-    // Update the winner's duel wins counter
-    updateStatsForDuelWin(winnerId_str, event.block.timestamp);
     
     challenge.save();
     

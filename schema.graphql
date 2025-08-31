@@ -100,93 +100,132 @@ type Player implements Fighter @entity {
   battleRating: Int!
   gauntletStatus: PlayerGauntletStatus! # Default to NONE
   currentGauntlet: Gauntlet # Link to Gauntlet if IN_GAUNTLET
+  tournamentStatus: PlayerTournamentStatus! # Default to NONE
+  currentTournament: Tournament # Link to Tournament if IN_TOURNAMENT
 }
 
 
-# New type for default players
-type DefaultPlayer implements Fighter @entity {
-  id: ID!
+# Identity container for default players (not a Fighter itself)
+type DefaultPlayer @entity {
+  id: ID!                 # playerId from contract
   fighterId: BigInt!      # The playerId from the contract
-  fighterType: String!    # Will always be "DefaultPlayer"
-  isRetired: Boolean!     # Should always be false
   
-  # Common attributes from Fighter
-  strength: Int!
-  constitution: Int!
-  size: Int!
-  agility: Int!
-  stamina: Int!
-  luck: Int!
-  
-  # Name fields
+  # Identity data shared across all levels
   firstNameIndex: Int!
   surnameIndex: Int!
   firstName: String
   surname: String
   fullName: String
+  currentSkin: Skin       # Shared skin across all levels
+  stance: Int!            # Shared stance across all levels
   
-  # Skin information
-  currentSkin: Skin
-  
-  # Record fields (always 0)
-  wins: Int!
-  losses: Int!
-  kills: Int!
-  gauntletWins: Int!       # Number of gauntlets won
-  duelWins: Int!           # Number of duels won
-  
-  # Stance field (new)
-  stance: Int!            # uint8 stance value, set on creation
-  
-  # v1.0.0 Progression fields
-  level: Int!             # uint8 level (1-10)
-  currentXP: Int!         # uint16 current experience points
-  weaponSpecialization: Int! # uint8 weapon class specialization (255 = none)
-  armorSpecialization: Int!  # uint8 armor specialization (255 = none)
+  # Progression levels (1-10)
+  progressionLevels: [DefaultPlayerProgression!]! @derivedFrom(field: "player")
   
   createdAt: BigInt!
   lastUpdatedAt: BigInt!
 }
 
-# New type for monsters
-type Monster implements Fighter @entity {
-  id: ID!
-  fighterId: BigInt!      # The monsterId from the contract
-  fighterType: String!    # Will always be "Monster"
+# Actual Fighter implementation for DefaultPlayer levels
+type DefaultPlayerProgression implements Fighter @entity {
+  id: ID!                    # "{playerId}-{level}"
+  fighterId: BigInt!         # playerId * 100 + level (e.g., 12305 for player 123 level 5)
+  fighterType: String!       # "DefaultPlayer"
+  player: DefaultPlayer!     # Reference to identity container
+  level: Int!               # Level (1-10)
+  isRetired: Boolean!       # Always false
   
-  # Common attributes from Fighter
+  # Combat attributes that vary by level
   strength: Int!
   constitution: Int!
   size: Int!
   agility: Int!
   stamina: Int!
   luck: Int!
-  
-  # Name fields
-  firstNameIndex: Int!    # Might not be used for monsters
-  surnameIndex: Int!      # Might not be used for monsters
-  firstName: String       # Could be monster type name
-  surname: String         # Could be empty
-  fullName: String        # Could be monster type name
-  
-  # Skin information
-  currentSkin: Skin
-  
-  # Record fields
-  wins: Int!
-  losses: Int!
-  kills: Int!
-  gauntletWins: Int!       # Number of gauntlets won
-  duelWins: Int!           # Number of duels won
-  
-  # Stance field (new)
-  stance: Int!            # uint8 stance value, set on creation
-  
-  # v1.0.0 Progression fields
-  level: Int!             # uint8 level (1-10)
-  currentXP: Int!         # uint16 current experience points
   weaponSpecialization: Int! # uint8 weapon class specialization (255 = none)
   armorSpecialization: Int!  # uint8 armor specialization (255 = none)
+  
+  # Fighter interface requirements (delegated from parent)
+  firstNameIndex: Int!       # Copy from DefaultPlayer
+  surnameIndex: Int!         # Copy from DefaultPlayer
+  firstName: String          # Copy from DefaultPlayer
+  surname: String            # Copy from DefaultPlayer
+  fullName: String           # Copy from DefaultPlayer
+  currentSkin: Skin         # Copy from DefaultPlayer
+  stance: Int!              # Copy from DefaultPlayer
+  
+  # Progression fields
+  currentXP: Int!           # Always 0 for DefaultPlayers
+  
+  # Record fields (always 0 for DefaultPlayers)
+  wins: Int!                # Always 0
+  losses: Int!              # Always 0
+  kills: Int!               # Always 0
+  gauntletWins: Int!        # Always 0
+  duelWins: Int!            # Always 0
+  
+  createdAt: BigInt!
+  lastUpdatedAt: BigInt!
+}
+
+# Identity container for monsters (not a Fighter itself)
+type Monster @entity {
+  id: ID!                 # monsterId from contract
+  fighterId: BigInt!      # The monsterId from the contract
+  
+  # Identity data shared across all levels
+  firstNameIndex: Int!    # Monster type name index
+  surnameIndex: Int!      # Usually not used for monsters
+  firstName: String       # Monster type name
+  surname: String         # Usually empty
+  fullName: String        # Monster type name
+  currentSkin: Skin       # Shared skin across all levels
+  stance: Int!            # Shared stance across all levels
+  
+  # Progression levels (1-10)
+  progressionLevels: [MonsterProgression!]! @derivedFrom(field: "monster")
+  
+  createdAt: BigInt!
+  lastUpdatedAt: BigInt!
+}
+
+# Actual Fighter implementation for Monster levels
+type MonsterProgression implements Fighter @entity {
+  id: ID!                    # "{monsterId}-{level}"
+  fighterId: BigInt!         # monsterId * 100 + level (e.g., 45607 for monster 456 level 7)
+  fighterType: String!       # "Monster"
+  monster: Monster!          # Reference to identity container
+  level: Int!               # Level (1-10)
+  isRetired: Boolean!       # Always false
+  
+  # Combat attributes that vary by level
+  strength: Int!
+  constitution: Int!
+  size: Int!
+  agility: Int!
+  stamina: Int!
+  luck: Int!
+  weaponSpecialization: Int! # uint8 weapon class specialization (255 = none)
+  armorSpecialization: Int!  # uint8 armor specialization (255 = none)
+  
+  # Fighter interface requirements (delegated from parent)
+  firstNameIndex: Int!       # Copy from Monster
+  surnameIndex: Int!         # Copy from Monster
+  firstName: String          # Copy from Monster
+  surname: String            # Copy from Monster
+  fullName: String           # Copy from Monster
+  currentSkin: Skin         # Copy from Monster
+  stance: Int!              # Copy from Monster
+  
+  # Progression fields
+  currentXP: Int!           # Always 0 for Monsters
+  
+  # Record fields (always 0 for Monsters)
+  wins: Int!                # Always 0
+  losses: Int!              # Always 0
+  kills: Int!               # Always 0
+  gauntletWins: Int!        # Always 0
+  duelWins: Int!            # Always 0
   
   createdAt: BigInt!
   lastUpdatedAt: BigInt!
@@ -665,9 +704,10 @@ type OwnershipTransferred @entity(immutable: true) {
 # Lean snapshot entity for historical display data
 # Deduplicates based on name+skin+stance+level combination
 type FighterSnapshot @entity(immutable: true) {
-  id: ID!                    # "fullName-skinId-stance-level"
+  id: ID!                    # "playerId-fullName-skinId-stance-level"
   
   # Fighter identification
+  playerId: BigInt!          # The actual player/defaultPlayer/monster ID
   fighterType: String!       # "Player", "DefaultPlayer", or "Monster"
   
   # Display data
@@ -933,6 +973,11 @@ type Stats @entity {
   currentGauntletQueueSize: Int!
   currentGauntletSize: Int!
   currentMinTimeBetweenGauntlets: BigInt!
+  
+  # Tournament statistics
+  totalTournamentsStarted: BigInt!
+  totalTournamentsCompleted: BigInt!
+  totalTournamentWins: BigInt!
 }
 
 # Helper entity for mapping addresses to collection IDs
@@ -1088,6 +1133,12 @@ enum PlayerGauntletStatus {
   IN_GAUNTLET
 }
 
+enum PlayerTournamentStatus {
+  NONE
+  QUEUED
+  IN_TOURNAMENT
+}
+
 # Represents a single Gauntlet run
 type Gauntlet @entity {
   id: ID!                  # Gauntlet ID (uint256 from contract)
@@ -1099,7 +1150,7 @@ type Gauntlet @entity {
   completionTimestamp: BigInt # Timestamp of completion or recovery
   participants: [GauntletParticipant!]! @derivedFrom(field: "gauntlet") # List of participants (INITIAL REGISTRANTS)
   roundWinners: [String!]  # List of Fighter IDs for each round winner (size - 1)
-  champion: Fighter        # Link to the final winner (Player or DefaultPlayer)
+  championSnapshot: FighterSnapshot # Historical snapshot of champion when they won
   startedAt: BigInt!       # Timestamp GauntletStarted event occurred
   startedTx: Bytes!        # Transaction hash of GauntletStarted
   completedAt: BigInt      # Timestamp GauntletCompleted event occurred
@@ -1113,9 +1164,39 @@ type Gauntlet @entity {
 type GauntletParticipant @entity {
   id: ID!                  # Composite ID: "{gauntletId}-{playerId}"
   gauntlet: Gauntlet!      # Link back to the Gauntlet
-  player: Fighter!         # Link to the participating Fighter (Player or DefaultPlayer)
-  skin: Skin               
-  stance: Int!             # Stance used by the player in this gauntlet
+  fighterSnapshot: FighterSnapshot! # Historical snapshot of the participant
+}
+
+# ==========================================================
+#                   TOURNAMENT GAME ENTITIES                  
+# ==========================================================
+type Tournament @entity {
+  id: ID!                  # Tournament ID (uint256 from contract)
+  size: Int!               # 16, 32, or 64
+  state: TournamentState!  # PENDING or COMPLETED
+  startTimestamp: BigInt!  # When tournament started
+  completionTimestamp: BigInt # When tournament completed
+  participants: [TournamentParticipant!]! @derivedFrom(field: "tournament") # List of participants
+  roundWinners: [String!]  # List of Fighter IDs for each round winner (size - 1)
+  championSnapshot: FighterSnapshot # Historical snapshot of champion when they won
+  runnerUpSnapshot: FighterSnapshot # Historical snapshot of runner-up
+  startedAt: BigInt!       # Timestamp TournamentStarted event occurred
+  startedTx: Bytes!        # Transaction hash of TournamentStarted
+  completedAt: BigInt      # Timestamp TournamentCompleted event occurred
+  completedTx: Bytes       # Transaction hash of TournamentCompleted
+  finalParticipantIds: [String!] # List of final participant IDs (INCLUDING SUBSTITUTIONS)
+}
+
+enum TournamentState {
+  PENDING
+  COMPLETED
+}
+
+# Represents a player's participation in a specific Tournament
+type TournamentParticipant @entity {
+  id: ID!                  # Composite ID: "{tournamentId}-{playerId}"
+  tournament: Tournament!  # Link back to the Tournament
+  fighterSnapshot: FighterSnapshot! # Historical snapshot of the participant
 }
 
 # ==========================================================
@@ -1456,22 +1537,6 @@ type NameChangeNFTMinted @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
-type Tournament @entity {
-  id: ID!                  # Tournament ID as string
-  tournamentId: BigInt!    # uint256 tournament ID
-  participants: [TournamentParticipant!]! @derivedFrom(field: "tournament")
-  rewards: [RewardDistributed!]! @derivedFrom(field: "tournament")
-  createdAt: BigInt!
-  createdTx: Bytes!
-}
-
-type TournamentParticipant @entity {
-  id: ID!                  # tournamentId + playerId
-  tournament: Tournament!  # Link to Tournament
-  player: Player!          # Link to Player
-  joinedAt: BigInt!
-  joinedTx: Bytes!
-}
 
 type RewardDistributed @entity(immutable: true) {
   id: Bytes!               # Transaction hash + log index
@@ -1500,5 +1565,202 @@ type RewardConfigUpdated @entity(immutable: true) {
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
+}
+
+# ==========================================================
+#                  TOURNAMENT GAME EVENTS                   
+# ==========================================================
+
+type TournamentPlayerQueued @entity(immutable: true) {
+  id: Bytes!
+  playerId: BigInt!
+  queueSize: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TournamentPlayerWithdrew @entity(immutable: true) {
+  id: Bytes!
+  playerId: BigInt!
+  queueSize: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type QueueCommitted @entity(immutable: true) {
+  id: Bytes!
+  selectionBlock: BigInt!
+  queueSize: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type ParticipantsSelected @entity(immutable: true) {
+  id: Bytes!
+  tournamentId: BigInt!
+  tournamentBlock: BigInt!
+  selectedIds: [BigInt!]!
+  tournament: Tournament!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TournamentStarted @entity(immutable: true) {
+  id: Bytes!
+  tournamentId: BigInt!
+  size: Int!
+  participants: [String!]! # Store as JSON string array since GraphQL doesn't support complex nested arrays
+  tournament: Tournament!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TournamentCompleted @entity(immutable: true) {
+  id: Bytes!
+  tournamentId: BigInt!
+  size: Int!
+  championId: BigInt!
+  runnerUpId: BigInt!
+  seasonId: BigInt!
+  participantIds: [BigInt!]!
+  roundWinners: [BigInt!]!
+  tournament: Tournament!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TournamentRatingsAwarded @entity(immutable: true) {
+  id: Bytes!
+  tournamentId: BigInt!
+  seasonId: BigInt!
+  playerIds: [BigInt!]!
+  ratings: [Int!]!
+  tournament: Tournament!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerRetiredInTournament @entity(immutable: true) {
+  id: Bytes!
+  tournamentId: BigInt!
+  playerId: BigInt!
+  tournament: Tournament!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PlayerReplaced @entity(immutable: true) {
+  id: Bytes!
+  tournamentId: BigInt!
+  originalPlayerId: BigInt!
+  replacementPlayerId: BigInt!
+  reason: Int! # ReplacementReason enum as int
+  tournament: Tournament!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TournamentAutoRecovered @entity(immutable: true) {
+  id: Bytes!
+  commitBlock: BigInt!
+  currentBlock: BigInt!
+  phase: Int! # TournamentPhase enum as int
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TournamentSizeSet @entity(immutable: true) {
+  id: Bytes!
+  oldSize: Int!
+  newSize: Int!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type LethalityFactorSet @entity(immutable: true) {
+  id: Bytes!
+  oldFactor: Int!
+  newFactor: Int!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TournamentRewardConfigUpdated @entity(immutable: true) {
+  id: Bytes!
+  placement: String!
+  nonePercent: Int!
+  attributeSwapPercent: Int!
+  createPlayerPercent: Int!
+  playerSlotPercent: Int!
+  weaponSpecPercent: Int!
+  armorSpecPercent: Int!
+  duelTicketPercent: Int!
+  nameChangePercent: Int!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TournamentGameEnabledChanged @entity(immutable: true) {
+  id: Bytes!
+  oldEnabled: Boolean!
+  newEnabled: Boolean!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+# ==========================================================
+#                   SEASONAL TRACKING ENTITIES                       
+# ==========================================================
+
+type Season @entity {
+  id: ID!                     # Season ID as string
+  seasonId: BigInt!           # uint256 season ID from contract
+  startTimestamp: BigInt!     # When season started
+  startBlock: BigInt!         # Block when season started
+  endTimestamp: BigInt        # When season ended (null if current)
+  endBlock: BigInt           # Block when season ended (null if current)
+  isActive: Boolean!          # Whether this is the current season
+  playerStats: [PlayerSeasonalStats!]! @derivedFrom(field: "season")
+  createdAt: BigInt!
+  lastUpdatedAt: BigInt!
+}
+
+type PlayerSeasonalStats @entity {
+  id: ID!                     # "{seasonId}-{playerId}"
+  season: Season!             # Reference to Season
+  player: Player!             # Reference to Player
+  seasonId: BigInt!           # uint256 season ID for easy filtering
+  playerId: BigInt!           # uint32 player ID for easy filtering
+  
+  # Seasonal combat records
+  wins: Int!                  # Wins this season
+  losses: Int!                # Losses this season
+  kills: Int!                 # Kills this season
+  
+  # Tournament-specific seasonal data
+  tournamentRating: Int!      # Tournament rating for this season (0 if not rated)
+  tournamentsPlayed: Int!     # Number of tournaments participated in this season
+  tournamentWins: Int!        # Number of tournaments won this season
+  
+  # Gauntlet-specific seasonal data
+  gauntletsPlayed: Int!       # Number of gauntlets participated in this season
+  gauntletWins: Int!          # Number of gauntlets won this season
+  
+  createdAt: BigInt!
+  lastUpdatedAt: BigInt!
 }
 

@@ -11,12 +11,10 @@ import {
   PlayerCreationComplete as PlayerCreationCompleteEvent,
   PlayerCreationRequested as PlayerCreationRequestedEvent,
   PlayerImmortalityChanged as PlayerImmortalityChangedEvent,
-  PlayerKillUpdated as PlayerKillUpdatedEvent,
   PlayerNameUpdated as PlayerNameUpdatedEvent,
   PlayerRetired as PlayerRetiredEvent,
   PlayerSkinEquipped as PlayerSkinEquippedEvent,
   PlayerSlotsPurchased as PlayerSlotsPurchasedEvent,
-  PlayerWinLossUpdated as PlayerWinLossUpdatedEvent,
   SlotBatchCostUpdated as SlotBatchCostUpdatedEvent,
   StanceUpdated as StanceUpdatedEvent,
   VrfRequestTimeoutUpdated as VrfRequestTimeoutUpdatedEvent,
@@ -30,7 +28,10 @@ import {
   SeasonStarted as SeasonStartedEvent,
   SeasonLengthUpdated as SeasonLengthUpdatedEvent,
   VRFConfigUpdated as VRFConfigUpdatedEvent,
-  SubscriptionIdUpdated as SubscriptionIdUpdatedEvent
+  SubscriptionIdUpdated as SubscriptionIdUpdatedEvent,
+  PlayerWinRecorded as PlayerWinRecordedEvent,
+  PlayerLossRecorded as PlayerLossRecordedEvent,
+  PlayerKillRecorded as PlayerKillRecordedEvent
 } from "../generated/Player/Player";
 
 import {
@@ -45,12 +46,10 @@ import {
   PlayerCreationComplete,
   PlayerCreationRequested,
   PlayerImmortalityChanged,
-  PlayerKillUpdated,
   PlayerNameUpdated,
   PlayerRetired,
   PlayerSkinEquipped,
   PlayerSlotsPurchased,
-  PlayerWinLossUpdated,
   SlotBatchCostUpdated,
   Player,
   Owner,
@@ -68,14 +67,17 @@ import {
   SeasonStarted,
   SeasonLengthUpdated,
   VRFConfigUpdated,
-  SubscriptionIdUpdated
+  SubscriptionIdUpdated,
+  Season,
+  PlayerSeasonalStats
 } from "../generated/schema";
 import { loadFirstName, loadSurname, createFullName } from "./utils/fighter-utils";
 import { 
   updateStatsForPlayerCreation, 
   updateStatsForPlayerRetirement, 
   updateStatsForWinLoss, 
-  updateStatsForKills 
+  updateStatsForKills,
+  getOrCreatePlayerSeasonalStats
 } from "./utils/stats-utils";
 
 export function handleAttributeSwapAwarded(
@@ -403,30 +405,6 @@ export function handlePlayerImmortalityChanged(
   }
 }
 
-export function handlePlayerKillUpdated(
-  event: PlayerKillUpdatedEvent
-): void {
-  let entity = new PlayerKillUpdated(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  );
-  entity.playerId = event.params.playerId;
-  entity.kills = event.params.kills;
-
-  entity.blockNumber = event.block.number;
-  entity.blockTimestamp = event.block.timestamp;
-  entity.transactionHash = event.transaction.hash;
-
-  entity.save();
-
-  // Update player entity
-  let player = Player.load(event.params.playerId.toString());
-  if (player) {
-    let previousKills = player.kills;
-    player.kills = event.params.kills;
-    player.lastUpdatedAt = event.block.timestamp;
-    player.save();
-  }
-}
 
 export function handlePlayerNameUpdated(
   event: PlayerNameUpdatedEvent
@@ -549,33 +527,6 @@ export function handlePlayerSlotsPurchased(
   owner.save();
 }
 
-export function handlePlayerWinLossUpdated(
-  event: PlayerWinLossUpdatedEvent
-): void {
-  let entity = new PlayerWinLossUpdated(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  );
-  entity.playerId = event.params.playerId;
-  entity.wins = event.params.wins;
-  entity.losses = event.params.losses;
-
-  entity.blockNumber = event.block.number;
-  entity.blockTimestamp = event.block.timestamp;
-  entity.transactionHash = event.transaction.hash;
-
-  entity.save();
-
-  // Update player entity
-  let player = Player.load(event.params.playerId.toString());
-  if (player) {
-    let previousWins = player.wins;
-    let previousLosses = player.losses;
-    player.wins = event.params.wins;
-    player.losses = event.params.losses;
-    player.lastUpdatedAt = event.block.timestamp;
-    player.save();
-  }
-}
 
 
 export function handleSlotBatchCostUpdated(
@@ -808,16 +759,47 @@ export function handlePlayerArmorSpecializationChanged(event: PlayerArmorSpecial
 
 export function handleSeasonStarted(event: SeasonStartedEvent): void {
   // Create the event entity
-  let entity = new SeasonStarted(
+  let eventEntity = new SeasonStarted(
     event.transaction.hash.concatI32(event.logIndex.toI32())
   );
-  entity.seasonId = event.params.seasonId;
-  entity.startTimestamp = event.params.startTimestamp;
-  entity.startBlock = event.params.startBlock;
-  entity.blockNumber = event.block.number;
-  entity.blockTimestamp = event.block.timestamp;
-  entity.transactionHash = event.transaction.hash;
-  entity.save();
+  eventEntity.seasonId = event.params.seasonId;
+  eventEntity.startTimestamp = event.params.startTimestamp;
+  eventEntity.startBlock = event.params.startBlock;
+  eventEntity.blockNumber = event.block.number;
+  eventEntity.blockTimestamp = event.block.timestamp;
+  eventEntity.transactionHash = event.transaction.hash;
+  eventEntity.save();
+  
+  // Mark previous season as inactive if it exists
+  if (event.params.seasonId.gt(BigInt.fromI32(1))) {
+    let previousSeasonId = event.params.seasonId.minus(BigInt.fromI32(1)).toString();
+    let previousSeason = Season.load(previousSeasonId);
+    if (previousSeason) {
+      previousSeason.isActive = false;
+      previousSeason.endTimestamp = event.params.startTimestamp;
+      previousSeason.endBlock = event.params.startBlock;
+      previousSeason.lastUpdatedAt = event.block.timestamp;
+      previousSeason.save();
+    }
+  }
+  
+  // Create new Season entity
+  let season = new Season(event.params.seasonId.toString());
+  season.seasonId = event.params.seasonId;
+  season.startTimestamp = event.params.startTimestamp;
+  season.startBlock = event.params.startBlock;
+  season.endTimestamp = null;
+  season.endBlock = null;
+  season.isActive = true;
+  season.createdAt = event.block.timestamp;
+  season.lastUpdatedAt = event.block.timestamp;
+  season.save();
+  
+  log.info("Season {} started at timestamp {} (block {})", [
+    event.params.seasonId.toString(),
+    event.params.startTimestamp.toString(),
+    event.params.startBlock.toString()
+  ]);
 }
 
 export function handleSeasonLengthUpdated(event: SeasonLengthUpdatedEvent): void {
@@ -858,4 +840,76 @@ export function handleSubscriptionIdUpdated(event: SubscriptionIdUpdatedEvent): 
   entity.blockTimestamp = event.block.timestamp;
   entity.transactionHash = event.transaction.hash;
   entity.save();
+}
+
+export function handlePlayerWinRecorded(event: PlayerWinRecordedEvent): void {
+  // Update Player lifetime stats
+  let player = Player.load(event.params.playerId.toString());
+  if (player) {
+    player.wins += 1;
+    player.lastUpdatedAt = event.block.timestamp;
+    player.save();
+  }
+  
+  // Update PlayerSeasonalStats
+  let seasonalStats = getOrCreatePlayerSeasonalStats(
+    event.params.playerId.toString(),
+    event.params.seasonId.toString(),
+    event.block.timestamp
+  );
+  
+  seasonalStats.wins += 1;
+  seasonalStats.lastUpdatedAt = event.block.timestamp;
+  seasonalStats.save();
+  
+  // Update global stats
+  updateStatsForWinLoss(event.block.timestamp, 1, 0);
+}
+
+export function handlePlayerLossRecorded(event: PlayerLossRecordedEvent): void {
+  // Update Player lifetime stats
+  let player = Player.load(event.params.playerId.toString());
+  if (player) {
+    player.losses += 1;
+    player.lastUpdatedAt = event.block.timestamp;
+    player.save();
+  }
+  
+  // Update PlayerSeasonalStats
+  let seasonalStats = getOrCreatePlayerSeasonalStats(
+    event.params.playerId.toString(),
+    event.params.seasonId.toString(),
+    event.block.timestamp
+  );
+  
+  seasonalStats.losses += 1;
+  seasonalStats.lastUpdatedAt = event.block.timestamp;
+  seasonalStats.save();
+  
+  // Update global stats
+  updateStatsForWinLoss(event.block.timestamp, 0, 1);
+}
+
+export function handlePlayerKillRecorded(event: PlayerKillRecordedEvent): void {
+  // Update Player lifetime stats
+  let player = Player.load(event.params.playerId.toString());
+  if (player) {
+    player.kills += 1;
+    player.lastUpdatedAt = event.block.timestamp;
+    player.save();
+  }
+  
+  // Update PlayerSeasonalStats
+  let seasonalStats = getOrCreatePlayerSeasonalStats(
+    event.params.playerId.toString(),
+    event.params.seasonId.toString(),
+    event.block.timestamp
+  );
+  
+  seasonalStats.kills += 1;
+  seasonalStats.lastUpdatedAt = event.block.timestamp;
+  seasonalStats.save();
+  
+  // Update global stats
+  updateStatsForKills(event.block.timestamp, 1);
 }

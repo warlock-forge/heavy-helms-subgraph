@@ -40,7 +40,8 @@ armorSpecialization: Int!  # uint8 armor specialization (255 = none)
 ### New FighterSnapshot Entity:
 ```graphql
 type FighterSnapshot @entity(immutable: true) {
-  id: ID!                    # Deduplication key: "fullName-skinId-stance-level"
+  id: ID!                    # Deduplication key: "playerId-fullName-skinId-stance-level"
+  playerId: BigInt!          # The actual player/defaultPlayer/monster ID
   fighterType: String!       # "Player", "DefaultPlayer", or "Monster"
   fullName: String!          # Display name at snapshot time
   currentSkin: Skin          # Link to skin entity
@@ -110,10 +111,19 @@ duelCompletes {
 - ✅ **NameChangeNFTMinted** - ADDED event entity for name change tickets
 
 ### TournamentGame Contract Entities  
-- ✅ **Tournament** - ADDED entity for tournament events
-- ✅ **TournamentParticipant** - ADDED entity for tournament participants
+- ✅ **Tournament** - ADDED entity for tournament events (uses FighterSnapshot for winners)
+- ✅ **TournamentParticipant** - ADDED entity for tournament participants (uses FighterSnapshot)
+- ✅ **TournamentPlayerQueued** - ADDED event entity
+- ✅ **TournamentPlayerWithdrew** - ADDED event entity  
+- ✅ **TournamentStarted** - ADDED event entity
+- ✅ **TournamentCompleted** - ADDED event entity
+- ✅ **TournamentRatingsAwarded** - ADDED event entity
+- ✅ **PlayerRetiredInTournament** - ADDED event entity
 - ✅ **RewardDistributed** - ADDED event entity
-- ✅ **RewardConfigUpdated** - ADDED event entity
+- ✅ **TournamentAutoRecovered** - ADDED event entity
+- ✅ **TournamentSizeSet** - ADDED event entity
+- ✅ **TournamentRewardConfigUpdated** - ADDED event entity
+- ✅ **TournamentGameEnabledChanged** - ADDED event entity
 
 ### Progression Event Entities
 - ✅ **ExperienceGained** - ADDED event entity
@@ -144,10 +154,114 @@ duelCompletes {
 - ✅ **DailyResetCostUpdated** - ADDED (All brackets)
 - ✅ **DailyGauntletLimitUpdated** - ADDED (All brackets)
 
+### Gauntlet FighterSnapshot Integration
+**BREAKING**: Gauntlets now use FighterSnapshot for all historical data storage.
+
+#### Key Changes:
+- ❌ **Gauntlet.champion field REMOVED** (was Fighter reference)
+- ✅ **Gauntlet.championSnapshot field ADDED** (FighterSnapshot reference)
+- ❌ **GauntletParticipant.player field REMOVED** (was Fighter reference)
+- ❌ **GauntletParticipant.skin field REMOVED** (now in FighterSnapshot)
+- ❌ **GauntletParticipant.stance field REMOVED** (now in FighterSnapshot)
+- ✅ **GauntletParticipant.fighterSnapshot field ADDED** (FighterSnapshot reference)
+
+#### Frontend Query Changes:
+**BEFORE** (old queries):
+```graphql
+gauntlets {
+  champion {
+    id
+    fullName
+    currentSkin { ... }
+    # All fighter fields
+  }
+  participants {
+    player {
+      id
+      fullName
+      # All fighter fields
+    }
+    skin { ... }
+    stance
+  }
+}
+```
+
+**AFTER** (new queries):
+```graphql
+gauntlets {
+  championSnapshot {
+    playerId         # NEW: actual fighter ID for linking
+    fighterType
+    fullName
+    currentSkin { ... }
+    stance
+    level
+  }
+  participants {
+    fighterSnapshot {
+      playerId       # NEW: actual fighter ID for linking
+      fighterType
+      fullName
+      currentSkin { ... }
+      stance
+      level
+    }
+  }
+}
+```
+
+#### Benefits:
+- ✅ **Consistent with duel system** - same FighterSnapshot pattern
+- ✅ **Historical accuracy** - participant data frozen at gauntlet start
+- ✅ **Efficient storage** - automatic deduplication of fighter states
+- ✅ **Simplified queries** - all display data in one place
+
 ---
 
 ## 5. Contract Address Changes
 All contract addresses have changed for v1.0.0 deployment - may affect hardcoded addresses in frontend.
+
+---
+
+## 5. TournamentGame Changes
+
+### Tournament FighterSnapshot Integration
+**BREAKING**: Tournaments use FighterSnapshot for all historical data storage, following the same pattern as duels and gauntlets.
+
+#### Key Features:
+- ✅ **Tournament.winnerSnapshot field** - FighterSnapshot reference for champions
+- ✅ **TournamentParticipant.fighterSnapshot field** - FighterSnapshot reference for all participants
+- ✅ **Daily elimination tournaments** with level-based priority and ratings
+- ✅ **Death mechanics** - players can be permanently retired if killed
+- ✅ **Bracket system** - 16, 32, or 64 player tournaments
+- ✅ **Reward distribution** - different tiers for champion, runner-up, and 3rd-4th place
+
+#### Frontend Query Pattern:
+```graphql
+tournaments {
+  winnerSnapshot {
+    playerId       # Actual fighter ID for linking
+    fighterType
+    fullName
+    currentSkin { ... }
+    stance
+    level
+  }
+  participants {
+    fighterSnapshot {
+      playerId     # Actual fighter ID for linking
+      fighterType
+      fullName
+      currentSkin { ... }
+      stance
+      level
+    }
+    finalPosition
+    killed       # If player was killed in tournament
+  }
+}
+```
 
 ---
 
@@ -167,19 +281,29 @@ All contract addresses have changed for v1.0.0 deployment - may affect hardcoded
 - [ ] GET_ALL_DUELS query (update snapshot field usage)
 - [ ] GET_PLAYER_DUELS query (update snapshot field usage)  
 - [ ] GET_USER_CHALLENGES query (if using snapshots)
-- [ ] All queries fetching Player entities (progression fields)
+- [ ] **PRIORITY**: All gauntlet-related queries (FighterSnapshot refactor)
+- [ ] GET_ALL_GAUNTLETS query (update championSnapshot and participant.fighterSnapshot usage)
+- [ ] GET_PLAYER_GAUNTLETS query (update snapshot field usage)
+- [ ] **NEW**: All tournament-related queries (FighterSnapshot usage)
+- [ ] GET_ALL_TOURNAMENTS query (winnerSnapshot and participant.fighterSnapshot usage)
+- [ ] GET_PLAYER_TOURNAMENTS query (update snapshot field usage)
+- [ ] All queries fetching Player entities (progression fields + tournament status)
 - [ ] All queries fetching DefaultPlayer entities (progression fields)
 - [ ] All queries fetching Monster entities (progression fields)
-- [ ] Gauntlet-related queries (now bracket-specific)
 - [ ] Any queries using Fighter interface
 
 ### Components to Update:
 - [ ] **PRIORITY**: Duel list components (FighterSnapshot fields)
 - [ ] **PRIORITY**: Challenge list components (FighterSnapshot fields)
 - [ ] **PRIORITY**: Fighter snapshot processing logic (useRecentDuels hook)
-- [ ] Player stat displays (add level, XP, specializations)
+- [ ] **PRIORITY**: Gauntlet list components (FighterSnapshot fields)
+- [ ] **PRIORITY**: Gauntlet participant display components (use fighterSnapshot instead of player+skin+stance)
+- [ ] **PRIORITY**: Gauntlet champion display components (use championSnapshot instead of champion)
+- [ ] **NEW**: Tournament list components (FighterSnapshot fields)
+- [ ] **NEW**: Tournament participant display components (use fighterSnapshot)
+- [ ] **NEW**: Tournament winner display components (use winnerSnapshot)
+- [ ] Player stat displays (add level, XP, specializations, tournament status)
 - [ ] Fighter comparison components
-- [ ] Any gauntlet-related components
 
 ### New Features to Add:
 - [ ] Level/XP display components
@@ -193,8 +317,15 @@ All contract addresses have changed for v1.0.0 deployment - may affect hardcoded
 - [ ] **CRITICAL**: Duel list display with new FighterSnapshot data
 - [ ] **CRITICAL**: Open challenges list display
 - [ ] **CRITICAL**: Duel detail views with CombatResult integration
+- [ ] **CRITICAL**: Gauntlet list display with new FighterSnapshot data
+- [ ] **CRITICAL**: Gauntlet participant and champion displays (no more direct Fighter references)
+- [ ] **CRITICAL**: Gauntlet detail views with bracket-specific data
+- [ ] **NEW**: Tournament list display with FighterSnapshot data
+- [ ] **NEW**: Tournament participant and winner displays (FighterSnapshot usage)
+- [ ] **NEW**: Tournament detail views with progression and death mechanics
 - [ ] Fighter snapshot deduplication behavior
-- [ ] Historical accuracy of names/skins in past duels
+- [ ] Historical accuracy of names/skins in past duels, gauntlets, and tournaments
+- [ ] Linking from FighterSnapshot.playerId back to current Fighter entity
 
 ---
 

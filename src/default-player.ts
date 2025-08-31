@@ -5,6 +5,7 @@ import {
 } from "../generated/DefaultPlayer/DefaultPlayer";
 import {
   DefaultPlayer,
+  DefaultPlayerProgression,
   DefaultPlayerCreated,
   DefaultPlayerStatsUpdated,
   Skin
@@ -21,96 +22,160 @@ import { updateStatsForDefaultPlayerCreation } from "./utils/stats-utils";
 
 /**
  * Handle DefaultPlayerCreated events
+ * Creates DefaultPlayer identity container and all 10 progression levels
  */
 export function handleDefaultPlayerCreated(event: DefaultPlayerCreatedEvent): void {
-  // Create the event entity with proper Bytes ID
+  if (event.params.allLevelStats.length != 10) {
+    log.error("DefaultPlayerCreated: Expected 10 levels, got {}", [event.params.allLevelStats.length.toString()]);
+    return;
+  }
+  
+  // Validate all levels have same identity data (name, skin, stance)
+  const firstStats = event.params.allLevelStats[0];
+  for (let i = 1; i < event.params.allLevelStats.length; i++) {
+    const stats = event.params.allLevelStats[i];
+    if (stats.name.firstNameIndex != firstStats.name.firstNameIndex ||
+        stats.name.surnameIndex != firstStats.name.surnameIndex ||
+        stats.skin.skinIndex != firstStats.skin.skinIndex ||
+        stats.skin.skinTokenId != firstStats.skin.skinTokenId ||
+        stats.stance != firstStats.stance) {
+      log.error("DefaultPlayerCreated: Inconsistent identity data across levels for player {}", [event.params.playerId.toString()]);
+      return;
+    }
+  }
+  
+  // Create the event entity with proper Bytes ID (using first stats for event data)
   const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
   const createdEvent = new DefaultPlayerCreated(eventId);
   
   createdEvent.playerId = event.params.playerId;
-  createdEvent.strength = event.params.stats.attributes.strength;
-  createdEvent.constitution = event.params.stats.attributes.constitution;
-  createdEvent.size = event.params.stats.attributes.size;
-  createdEvent.agility = event.params.stats.attributes.agility;
-  createdEvent.stamina = event.params.stats.attributes.stamina;
-  createdEvent.luck = event.params.stats.attributes.luck;
-  createdEvent.skinIndex = event.params.stats.skin.skinIndex;
-  createdEvent.skinTokenId = event.params.stats.skin.skinTokenId;
-  createdEvent.firstNameIndex = event.params.stats.name.firstNameIndex;
-  createdEvent.surnameIndex = event.params.stats.name.surnameIndex;
+  createdEvent.strength = firstStats.attributes.strength;
+  createdEvent.constitution = firstStats.attributes.constitution;
+  createdEvent.size = firstStats.attributes.size;
+  createdEvent.agility = firstStats.attributes.agility;
+  createdEvent.stamina = firstStats.attributes.stamina;
+  createdEvent.luck = firstStats.attributes.luck;
+  createdEvent.skinIndex = firstStats.skin.skinIndex;
+  createdEvent.skinTokenId = firstStats.skin.skinTokenId;
+  createdEvent.firstNameIndex = firstStats.name.firstNameIndex;
+  createdEvent.surnameIndex = firstStats.name.surnameIndex;
   createdEvent.wins = 0;
   createdEvent.losses = 0;
   createdEvent.kills = 0;
-  createdEvent.stance = event.params.stats.stance;
+  createdEvent.stance = firstStats.stance;
   createdEvent.blockNumber = event.block.number;
   createdEvent.blockTimestamp = event.block.timestamp;
   createdEvent.transactionHash = event.transaction.hash;
   createdEvent.save();
 
-  // Create the DefaultPlayer entity
+  // Create the DefaultPlayer identity container
   const defaultPlayerId = event.params.playerId.toString();
   const defaultPlayer = new DefaultPlayer(defaultPlayerId);
   defaultPlayer.fighterId = event.params.playerId;
-  defaultPlayer.fighterType = "DefaultPlayer";
-  defaultPlayer.isRetired = false;
   
-  // Set attributes
-  defaultPlayer.strength = event.params.stats.attributes.strength;
-  defaultPlayer.constitution = event.params.stats.attributes.constitution;
-  defaultPlayer.size = event.params.stats.attributes.size;
-  defaultPlayer.agility = event.params.stats.attributes.agility;
-  defaultPlayer.stamina = event.params.stats.attributes.stamina;
-  defaultPlayer.luck = event.params.stats.attributes.luck;
-  
-  // Set name indices
-  defaultPlayer.firstNameIndex = event.params.stats.name.firstNameIndex;
-  defaultPlayer.surnameIndex = event.params.stats.name.surnameIndex;
+  // Set identity data (shared across all levels) - validated to be consistent above
+  defaultPlayer.firstNameIndex = firstStats.name.firstNameIndex;
+  defaultPlayer.surnameIndex = firstStats.name.surnameIndex;
+  defaultPlayer.stance = firstStats.stance;
   
   // Load and set names using the utility functions
-  const firstName = loadFirstName(event.params.stats.name.firstNameIndex);
-  const surname = loadSurname(event.params.stats.name.surnameIndex);
+  const firstName = loadFirstName(firstStats.name.firstNameIndex);
+  const surname = loadSurname(firstStats.name.surnameIndex);
   
   defaultPlayer.firstName = firstName;
   defaultPlayer.surname = surname;
   defaultPlayer.fullName = createFullName(firstName, surname);
   
-  // Set record fields (always 0 for default players)
-  defaultPlayer.wins = 0;
-  defaultPlayer.losses = 0;
-  defaultPlayer.kills = 0;
-  defaultPlayer.gauntletWins = 0; // Initialize gauntlet wins counter
-  defaultPlayer.duelWins = 0; // Initialize duel wins counter
-  
-  // Set stance
-  defaultPlayer.stance = event.params.stats.stance;
-  
-  // Set v1.0.0 progression fields (from level 1 stats by default)
-  defaultPlayer.level = event.params.stats.level;
-  defaultPlayer.currentXP = event.params.stats.currentXP;
-  defaultPlayer.weaponSpecialization = event.params.stats.weaponSpecialization;
-  defaultPlayer.armorSpecialization = event.params.stats.armorSpecialization;
+  // Construct the consistent skin ID (validated to be same across all levels)
+  const skinIndex = firstStats.skin.skinIndex;
+  const skinTokenId = firstStats.skin.skinTokenId;
+  const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
+  defaultPlayer.currentSkin = skinId; 
   
   // Set timestamps
   defaultPlayer.createdAt = event.block.timestamp;
   defaultPlayer.lastUpdatedAt = event.block.timestamp;
   
-  // Construct the consistent skin ID
-  const skinIndex = event.params.stats.skin.skinIndex;
-  const skinTokenId = event.params.stats.skin.skinTokenId;
-  const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
-  
-  // Directly assign the skin ID. The link will resolve if the Skin entity exists or is created later.
-  defaultPlayer.currentSkin = skinId; 
-  log.info("handleDefaultPlayerCreated: Assigning currentSkin ID '{}' to DefaultPlayer '{}'", [skinId, defaultPlayer.id]);
-  
   defaultPlayer.save();
+  log.info("Created DefaultPlayer identity container: {}", [defaultPlayerId]);
+  
+  // Create ALL 10 progression levels - no defaults, no shortcuts
+  for (let i = 0; i < event.params.allLevelStats.length; i++) {
+    const levelStats = event.params.allLevelStats[i];
+    const level = levelStats.level;
+    
+    // Validate level matches array index + 1
+    if (level != i + 1) {
+      log.error("DefaultPlayerCreated: Level mismatch at index {}. Expected {}, got {}", [i.toString(), (i + 1).toString(), level.toString()]);
+      continue;
+    }
+    
+    // Create DefaultPlayerProgression entity
+    const progressionId = defaultPlayerId + "-" + level.toString();
+    const progression = new DefaultPlayerProgression(progressionId);
+    
+    // Set Fighter interface fields
+    progression.fighterId = event.params.playerId.times(BigInt.fromI32(100)).plus(BigInt.fromI32(level));
+    progression.fighterType = "DefaultPlayer";
+    progression.player = defaultPlayerId;
+    progression.level = level;
+    progression.isRetired = false;
+    
+    // Set level-specific combat attributes
+    progression.strength = levelStats.attributes.strength;
+    progression.constitution = levelStats.attributes.constitution;
+    progression.size = levelStats.attributes.size;
+    progression.agility = levelStats.attributes.agility;
+    progression.stamina = levelStats.attributes.stamina;
+    progression.luck = levelStats.attributes.luck;
+    progression.weaponSpecialization = levelStats.weaponSpecialization;
+    progression.armorSpecialization = levelStats.armorSpecialization;
+    
+    // Copy shared identity data from parent (already validated to be consistent)
+    progression.firstNameIndex = defaultPlayer.firstNameIndex;
+    progression.surnameIndex = defaultPlayer.surnameIndex;
+    progression.firstName = defaultPlayer.firstName;
+    progression.surname = defaultPlayer.surname;
+    progression.fullName = defaultPlayer.fullName;
+    progression.currentSkin = defaultPlayer.currentSkin;
+    progression.stance = defaultPlayer.stance;
+    
+    // Set progression fields (always 0 for DefaultPlayers)
+    progression.currentXP = 0;
+    
+    // Set record fields (always 0 for DefaultPlayers)
+    progression.wins = 0;
+    progression.losses = 0;
+    progression.kills = 0;
+    progression.gauntletWins = 0;
+    progression.duelWins = 0;
+    
+    // Set timestamps
+    progression.createdAt = event.block.timestamp;
+    progression.lastUpdatedAt = event.block.timestamp;
+    
+    progression.save();
+    
+    log.info("Created DefaultPlayerProgression: {} (level {} with {} STR, {} CON, {} SIZ, {} AGI, {} STA, {} LUK)", [
+      progressionId, 
+      level.toString(),
+      levelStats.attributes.strength.toString(),
+      levelStats.attributes.constitution.toString(),
+      levelStats.attributes.size.toString(),
+      levelStats.attributes.agility.toString(),
+      levelStats.attributes.stamina.toString(),
+      levelStats.attributes.luck.toString()
+    ]);
+  }
 
   // Update stats
   updateStatsForDefaultPlayerCreation(event.block.timestamp);
+  log.info("Successfully created DefaultPlayer {} with 10 progression levels", [defaultPlayerId]);
 }
 
 /**
  * Handle DefaultPlayerStatsUpdated events
+ * Updates the specific level that was changed (single stats object, not array)
  */
 export function handleDefaultPlayerStatsUpdated(event: DefaultPlayerStatsUpdatedEvent): void {
   // Create the event entity with proper Bytes ID
@@ -137,61 +202,84 @@ export function handleDefaultPlayerStatsUpdated(event: DefaultPlayerStatsUpdated
   updatedEvent.transactionHash = event.transaction.hash;
   updatedEvent.save();
 
-  // Update the DefaultPlayer entity
+  // Update the DefaultPlayer identity container if needed
   const defaultPlayerId = event.params.playerId.toString();
   let defaultPlayer = DefaultPlayer.load(defaultPlayerId);
   
   if (defaultPlayer == null) {
-    // ... handle case where player doesn't exist (log error or create minimal) ...
      log.error("handleDefaultPlayerStatsUpdated: DefaultPlayer {} not found!", [defaultPlayerId]);
-     return; // Or handle appropriately
+     return;
   }
   
-  // Update attributes
-  defaultPlayer.strength = event.params.stats.attributes.strength;
-  defaultPlayer.constitution = event.params.stats.attributes.constitution;
-  defaultPlayer.size = event.params.stats.attributes.size;
-  defaultPlayer.agility = event.params.stats.attributes.agility;
-  defaultPlayer.stamina = event.params.stats.attributes.stamina;
-  defaultPlayer.luck = event.params.stats.attributes.luck;
+  // Check if shared identity data changed (name, skin, stance)
+  let identityChanged = false;
   
-  // Update name indices
-  defaultPlayer.firstNameIndex = event.params.stats.name.firstNameIndex;
-  defaultPlayer.surnameIndex = event.params.stats.name.surnameIndex;
+  if (defaultPlayer.firstNameIndex != event.params.stats.name.firstNameIndex ||
+      defaultPlayer.surnameIndex != event.params.stats.name.surnameIndex ||
+      defaultPlayer.stance != event.params.stats.stance) {
+    
+    // Update identity data
+    defaultPlayer.firstNameIndex = event.params.stats.name.firstNameIndex;
+    defaultPlayer.surnameIndex = event.params.stats.name.surnameIndex;
+    defaultPlayer.stance = event.params.stats.stance;
+    
+    // Load and set names
+    const firstName = loadFirstName(event.params.stats.name.firstNameIndex);
+    const surname = loadSurname(event.params.stats.name.surnameIndex);
+    
+    defaultPlayer.firstName = firstName;
+    defaultPlayer.surname = surname;
+    defaultPlayer.fullName = createFullName(firstName, surname);
+    
+    // Check skin change
+    const skinIndex = event.params.stats.skin.skinIndex;
+    const skinTokenId = event.params.stats.skin.skinTokenId;
+    const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
+    
+    if (defaultPlayer.currentSkin != skinId) {
+      defaultPlayer.currentSkin = skinId;
+      log.info("handleDefaultPlayerStatsUpdated: Updated skin ID '{}' for DefaultPlayer '{}'", [skinId, defaultPlayer.id]);
+    }
+    
+    defaultPlayer.lastUpdatedAt = event.block.timestamp;
+    defaultPlayer.save();
+    
+    identityChanged = true;
+  }
   
-  // Load and set names using the utility functions
-  const firstName = loadFirstName(event.params.stats.name.firstNameIndex);
-  const surname = loadSurname(event.params.stats.name.surnameIndex);
+  // Update the specific DefaultPlayerProgression level
+  const level = event.params.stats.level;
+  const progressionId = defaultPlayerId + "-" + level.toString();
+  let progression = DefaultPlayerProgression.load(progressionId);
   
-  defaultPlayer.firstName = firstName;
-  defaultPlayer.surname = surname;
-  defaultPlayer.fullName = createFullName(firstName, surname);
+  if (progression == null) {
+    log.error("handleDefaultPlayerStatsUpdated: DefaultPlayerProgression {} not found!", [progressionId]);
+    return;
+  }
   
-  // Update record fields
-  defaultPlayer.wins = 0;
-  defaultPlayer.losses = 0;
-  defaultPlayer.kills = 0;
+  // Update level-specific combat attributes
+  progression.strength = event.params.stats.attributes.strength;
+  progression.constitution = event.params.stats.attributes.constitution;
+  progression.size = event.params.stats.attributes.size;
+  progression.agility = event.params.stats.attributes.agility;
+  progression.stamina = event.params.stats.attributes.stamina;
+  progression.luck = event.params.stats.attributes.luck;
+  progression.weaponSpecialization = event.params.stats.weaponSpecialization;
+  progression.armorSpecialization = event.params.stats.armorSpecialization;
   
-  // Update stance
-  defaultPlayer.stance = event.params.stats.stance;
+  // Update shared identity data if it changed
+  if (identityChanged) {
+    progression.firstNameIndex = defaultPlayer.firstNameIndex;
+    progression.surnameIndex = defaultPlayer.surnameIndex;
+    progression.firstName = defaultPlayer.firstName;
+    progression.surname = defaultPlayer.surname;
+    progression.fullName = defaultPlayer.fullName;
+    progression.currentSkin = defaultPlayer.currentSkin;
+    progression.stance = defaultPlayer.stance;
+  }
   
-  // Update v1.0.0 progression fields
-  defaultPlayer.level = event.params.stats.level;
-  defaultPlayer.currentXP = event.params.stats.currentXP;
-  defaultPlayer.weaponSpecialization = event.params.stats.weaponSpecialization;
-  defaultPlayer.armorSpecialization = event.params.stats.armorSpecialization;
+  progression.lastUpdatedAt = event.block.timestamp;
+  progression.save();
   
-  // Update timestamp
-  defaultPlayer.lastUpdatedAt = event.block.timestamp;
-  
-  // Construct the consistent skin ID
-  const skinIndex = event.params.stats.skin.skinIndex;
-  const skinTokenId = event.params.stats.skin.skinTokenId;
-  const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
-  
-  // Directly assign the skin ID. The link will resolve if the Skin entity exists or is created later.
-  defaultPlayer.currentSkin = skinId; 
-  log.info("handleDefaultPlayerStatsUpdated: Assigning currentSkin ID '{}' to DefaultPlayer '{}'", [skinId, defaultPlayer.id]);
-
-  defaultPlayer.save();
+  log.info("Updated DefaultPlayerProgression: {} (level {})", [progressionId, level.toString()]);
 }
