@@ -1,5 +1,5 @@
 import { BigInt, Address, Bytes, BigDecimal } from "@graphprotocol/graph-ts"
-import { Stats, Owner, Player, PlayerVsRecord, DefaultPlayer, SkinCombatStat, PlayerSkinCombatStat, Skin, PlayerSeasonalStats } from "../../generated/schema"
+import { Stats, Owner, Player, DefaultPlayer, SkinCombatStat, PlayerSkinCombatStat, Skin, PlayerSeasonalStats } from "../../generated/schema"
 import { log } from "@graphprotocol/graph-ts"
 
 // Little-endian helper functions
@@ -247,107 +247,54 @@ export function updateStatsForSkinCreation(timestamp: BigInt): void {
   stats.save()
 }
 
-export function updatePlayerPostCombatStats(winnerId_str: string, loserId_str: string, timestamp: BigInt): void {
-  log.info("updatePlayerPostCombatStats: Winner ID: {}, Loser ID: {}, Timestamp: {}", [winnerId_str, loserId_str, timestamp.toString()]);
-
+export function updatePlayerWinPercentages(winnerId_str: string, loserId_str: string, timestamp: BigInt): void {
   let winner = Player.load(winnerId_str);
   let loser = Player.load(loserId_str);
 
   if (winner && loser) {
-    // Sort player IDs for consistent PlayerVsRecord ID
-    // Ensure comparison is on strings if IDs can have varying lengths, though BigInt converted to string should be fine.
-    let player1Id_for_record: string;
-    let player2Id_for_record: string;
-
-    if (winnerId_str < loserId_str) {
-      player1Id_for_record = winnerId_str;
-      player2Id_for_record = loserId_str;
+    // Calculate win percentages
+    winner.totalFights = winner.wins + winner.losses;
+    loser.totalFights = loser.wins + loser.losses;
+    
+    if (winner.totalFights > 0) {
+      winner.winPercentage = BigDecimal.fromString(winner.wins.toString())
+        .times(BigDecimal.fromString("100"))
+        .div(BigDecimal.fromString(winner.totalFights.toString()));
     } else {
-      player1Id_for_record = loserId_str;
-      player2Id_for_record = winnerId_str;
+      winner.winPercentage = BigDecimal.fromString("0");
     }
     
-    let winnerIsPlayer1_for_record = (winnerId_str == player1Id_for_record);
-
-    const recordId = player1Id_for_record + "-" + player2Id_for_record;
-    let vsRecord = PlayerVsRecord.load(recordId);
-
-    if (!vsRecord) {
-      vsRecord = new PlayerVsRecord(recordId);
-      vsRecord.player1 = player1Id_for_record;
-      vsRecord.player2 = player2Id_for_record;
-      vsRecord.player1WinsAgainst2 = winnerIsPlayer1_for_record;
-      vsRecord.player2WinsAgainst1 = !winnerIsPlayer1_for_record;
-      vsRecord.firstPlayer1Win = winnerIsPlayer1_for_record ? timestamp : null;
-      vsRecord.firstPlayer2Win = !winnerIsPlayer1_for_record ? timestamp : null;
-      
-      // NEW: Initialize counters
-      vsRecord.player1TotalWinsAgainst2 = 0;
-      vsRecord.player2TotalWinsAgainst1 = 0;
-      vsRecord.totalMatchups = 0;
-      vsRecord.lastMatchup = BigInt.fromI32(0);
-
-      winner.uniqueWins += 1;
-      loser.uniqueLosses += 1;
-      log.info("updatePlayerPostCombatStats: First encounter. Winner {} uniqueWins: {}, Loser {} uniqueLosses: {}", [winnerId_str, winner.uniqueWins.toString(), loserId_str, loser.uniqueLosses.toString()]);
-
+    if (loser.totalFights > 0) {
+      loser.winPercentage = BigDecimal.fromString(loser.wins.toString())
+        .times(BigDecimal.fromString("100"))
+        .div(BigDecimal.fromString(loser.totalFights.toString()));
     } else {
-      let uniqueWinForThisMatch = false;
-      if (winnerIsPlayer1_for_record && !vsRecord.player1WinsAgainst2) {
-        vsRecord.player1WinsAgainst2 = true;
-        vsRecord.firstPlayer1Win = timestamp;
-        uniqueWinForThisMatch = true;
-      } else if (!winnerIsPlayer1_for_record && !vsRecord.player2WinsAgainst1) {
-        vsRecord.player2WinsAgainst1 = true;
-        vsRecord.firstPlayer2Win = timestamp;
-        uniqueWinForThisMatch = true;
-      }
-
-      if (uniqueWinForThisMatch) {
-        winner.uniqueWins += 1;
-        loser.uniqueLosses += 1;
-        log.info("updatePlayerPostCombatStats: Unique win in existing matchup. Winner {} uniqueWins: {}, Loser {} uniqueLosses: {}", [winnerId_str, winner.uniqueWins.toString(), loserId_str, loser.uniqueLosses.toString()]);
-      } else {
-        log.info("updatePlayerPostCombatStats: Non-unique win in existing matchup. Winner: {}, Loser: {}", [winnerId_str, loserId_str]);
-      }
+      loser.winPercentage = BigDecimal.fromString("0");
     }
-
-    // NEW: Always increment total matchups and update timestamp
-    vsRecord.totalMatchups += 1;
-    vsRecord.lastMatchup = timestamp;
-    
-    // NEW: Increment win counters
-    if (winnerIsPlayer1_for_record) {
-      vsRecord.player1TotalWinsAgainst2 += 1;
-    } else {
-      vsRecord.player2TotalWinsAgainst1 += 1;
-    }
-
-    winner.battleRating = winner.uniqueWins - winner.uniqueLosses;
-    loser.battleRating = loser.uniqueWins - loser.uniqueLosses;
     
     winner.lastUpdatedAt = timestamp;
     loser.lastUpdatedAt = timestamp;
 
-    vsRecord.save();
     winner.save();
     loser.save();
     
-    log.info("updatePlayerPostCombatStats: Updated H2H - {} vs {}: {}-{} (Total: {})", [
-      player1Id_for_record,
-      player2Id_for_record,
-      vsRecord.player1TotalWinsAgainst2.toString(),
-      vsRecord.player2TotalWinsAgainst1.toString(),
-      vsRecord.totalMatchups.toString()
+    log.info("Updated win percentages. Winner {}: {}% ({}/{}), Loser {}: {}% ({}/{})", [
+      winnerId_str, 
+      winner.winPercentage.toString(),
+      winner.wins.toString(),
+      winner.totalFights.toString(),
+      loserId_str, 
+      loser.winPercentage.toString(),
+      loser.wins.toString(),
+      loser.totalFights.toString()
     ]);
-    log.info("updatePlayerPostCombatStats: Updated battle ratings. Winner {}: {}, Loser {}: {}", [winnerId_str, winner.battleRating.toString(), loserId_str, loser.battleRating.toString()]);
 
   } else {
     if (!winner) {
-      log.warning("updatePlayerPostCombatStats: Winner Player entity not found for ID: {}. Skipping battle rating update for this combat.", [winnerId_str]);
+      log.warning("Winner Player entity not found for ID: {}. Skipping win percentage update.", [winnerId_str]);
     }
     if (!loser) {
-      log.warning("updatePlayerPostCombatStats: Loser Player entity not found for ID: {}. Skipping battle rating update for this combat.", [loserId_str]);
+      log.warning("Loser Player entity not found for ID: {}. Skipping win percentage update.", [loserId_str]);
     }
   }
 }

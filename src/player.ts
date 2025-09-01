@@ -1,4 +1,4 @@
-import { BigInt, Bytes, log } from "@graphprotocol/graph-ts";
+import { BigInt, Bytes, log, BigDecimal } from "@graphprotocol/graph-ts";
 import {
   AttributeSwapAwarded as AttributeSwapAwardedEvent,
   CreatePlayerFeeUpdated as CreatePlayerFeeUpdatedEvent,
@@ -329,6 +329,8 @@ export function handlePlayerCreationComplete(
   
   player.gauntletWins = 0; // Initialize gauntlet wins counter
   player.duelWins = 0; // Initialize duel wins counter
+  player.totalFights = 0; // Initialize total fights counter
+  player.winPercentage = BigDecimal.fromString("0"); // Initialize win percentage
   
   // Set gauntlet status to NONE by default
   player.gauntletStatus = "NONE";

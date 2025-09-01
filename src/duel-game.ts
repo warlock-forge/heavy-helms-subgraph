@@ -34,7 +34,7 @@ import {
   updateStatsForChallengeCreation,
   updateStatsForChallengeCancellation,
   updateStatsForChallengeForfeit,
-  updatePlayerPostCombatStats,
+  updatePlayerWinPercentages,
   processCombatResultsWithPlayerData,
   decodePlayerData,
   updateSkinCombatAnalytics,
@@ -43,7 +43,6 @@ import {
 import { getOrCreateFighterSnapshotById } from "./utils/fighter-utils";
 import { DuelGame } from "../generated/DuelGame/DuelGame";
 import { Skin } from "../generated/schema";
-import { PlayerVsRecord } from "../generated/schema";
 
 /**
  * Handle ChallengeCreated events
@@ -278,7 +277,7 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
     }
     
     // Call the unified utility function to update player stats
-    updatePlayerPostCombatStats(winnerId_str, loserId_str, event.block.timestamp);
+    updatePlayerWinPercentages(winnerId_str, loserId_str, event.block.timestamp);
     
     challenge.save();
     

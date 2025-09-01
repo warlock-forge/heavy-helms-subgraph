@@ -128,7 +128,7 @@ CombatResult entity includes historical loadout tracking:
 
 ### Performance Analytics
 - `SkinCombatStat` - Aggregated performance by skin+stance combination
-- `PlayerVsRecord` - Head-to-head records between players
+- `PlayerSkinCombatStat` - Player-specific performance by skin+stance
 - `Stats` - Global game statistics
 
 ## Development Notes

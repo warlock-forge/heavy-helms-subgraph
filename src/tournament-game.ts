@@ -46,7 +46,7 @@ import {
 } from "../generated/schema";
 
 import { getOrCreateStats, getOrCreatePlayerSeasonalStats } from "./utils/stats-utils";
-import { updatePlayerPostCombatStats, processCombatResultsWithPlayerData, decodePlayerData, updateSkinCombatAnalytics, updatePlayerSkinCombatAnalytics, u32BE, updateStatsForTournamentWin } from "./utils/stats-utils";
+import { updatePlayerWinPercentages, processCombatResultsWithPlayerData, decodePlayerData, updateSkinCombatAnalytics, updatePlayerSkinCombatAnalytics, u32BE, updateStatsForTournamentWin } from "./utils/stats-utils";
 import { getOrCreateFighterSnapshotById } from "./utils/fighter-utils";
 
 // Define ZERO_BI directly

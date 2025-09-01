@@ -49,7 +49,7 @@ import {
 } from "../generated/schema";
 
 import { getOrCreateStats } from "./utils/stats-utils";
-import { updatePlayerPostCombatStats, updateStatsForGauntletWin, processCombatResultsWithPlayerData, decodePlayerData, updateSkinCombatAnalytics, updatePlayerSkinCombatAnalytics, u32BE } from "./utils/stats-utils";
+import { updatePlayerWinPercentages, updateStatsForGauntletWin, processCombatResultsWithPlayerData, decodePlayerData, updateSkinCombatAnalytics, updatePlayerSkinCombatAnalytics, u32BE } from "./utils/stats-utils";
 import { getOrCreateFighterSnapshotById } from "./utils/fighter-utils";
 
 // Define ZERO_BI directly
@@ -578,12 +578,12 @@ export function handleGauntletCombatResult(event: CombatResultEvent): void {
 
   if (winnerIdFromEvent_str && determinedLoserId_str) {
     // Optional: Could add a log.info here if you want to confirm successful calls in production without too much noise
-    // log.info("[GauntletCombatResult] Calling updatePlayerPostCombatStats for Winner: {}, Loser: {}", [winnerIdFromEvent_str, determinedLoserId_str]);
-    updatePlayerPostCombatStats(winnerIdFromEvent_str, determinedLoserId_str as string, event.block.timestamp);
+    // log.info("[GauntletCombatResult] Calling updatePlayerWinPercentages for Winner: {}, Loser: {}", [winnerIdFromEvent_str, determinedLoserId_str]);
+    updatePlayerWinPercentages(winnerIdFromEvent_str, determinedLoserId_str as string, event.block.timestamp);
   } else {
     // This warning is important to keep if the stats update is skipped
     log.warning(
-      "[GauntletCombatResult] Skipping call to updatePlayerPostCombatStats due to missing winner or loser. Event Winner: {}, Determined Loser: {}, P1 Derived: {}, P2 Derived: {}, Event ID: {}",
+      "[GauntletCombatResult] Skipping call to updatePlayerWinPercentages due to missing winner or loser. Event Winner: {}, Determined Loser: {}, P1 Derived: {}, P2 Derived: {}, Event ID: {}",
       [
         winnerIdFromEvent_str, 
         determinedLoserId_str ? determinedLoserId_str : "null",
