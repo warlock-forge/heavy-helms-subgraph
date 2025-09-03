@@ -619,6 +619,7 @@ export function handleRewardConfigUpdated(event: RewardConfigUpdatedEvent): void
   eventEntity.weaponSpecPercent = event.params.config.weaponSpecPercent;
   eventEntity.armorSpecPercent = event.params.config.armorSpecPercent;
   eventEntity.duelTicketPercent = event.params.config.duelTicketPercent;
+  eventEntity.dailyResetPercent = event.params.config.dailyResetPercent;
   eventEntity.nameChangePercent = event.params.config.nameChangePercent;
   eventEntity.blockNumber = event.block.number;
   eventEntity.blockTimestamp = event.block.timestamp;

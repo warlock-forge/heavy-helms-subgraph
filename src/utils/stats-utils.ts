@@ -1,5 +1,5 @@
 import { BigInt, Address, Bytes, BigDecimal } from "@graphprotocol/graph-ts"
-import { Stats, Owner, Player, DefaultPlayer, SkinCombatStat, PlayerSkinCombatStat, Skin, PlayerSeasonalStats } from "../../generated/schema"
+import { Stats, Owner, Player, DefaultPlayer, SkinCombatStat, PlayerSkinCombatStat, Skin, PlayerSeasonalStats, Accounting } from "../../generated/schema"
 import { log } from "@graphprotocol/graph-ts"
 
 // Little-endian helper functions
@@ -68,6 +68,32 @@ export function getOrCreateStats(): Stats {
   }
   
   return stats as Stats
+}
+
+export function getOrCreateAccounting(timestamp: BigInt): Accounting {
+  let accounting = Accounting.load("all");
+  if (!accounting) {
+    accounting = new Accounting("all");
+    accounting.currentCreatePlayerFee = BigInt.fromI32(0);
+    accounting.currentSlotBatchCost = BigInt.fromI32(0);
+    accounting.currentDailyResetCost = BigInt.fromI32(0);
+    accounting.totalPlayersCreatedWithETH = 0;
+    accounting.totalPlayersCreatedWithTicket = 0;
+    accounting.totalETHFromPlayerCreation = BigInt.fromI32(0);
+    accounting.totalSlotsAddedWithETH = 0;
+    accounting.totalSlotsAddedWithTicket = 0;
+    accounting.totalETHFromSlotPurchases = BigInt.fromI32(0);
+    accounting.totalDailyResetsWithETH = 0;
+    accounting.totalDailyResetsWithTicket = 0;
+    accounting.totalETHFromDailyResets = BigInt.fromI32(0);
+    accounting.totalETHCollected = BigInt.fromI32(0);
+    accounting.totalTicketsUsed = 0;
+    accounting.totalRequestsRecovered = 0;
+    accounting.totalETHRecovered = BigInt.fromI32(0);
+    accounting.createdAt = timestamp;
+    accounting.lastUpdated = timestamp;
+  }
+  return accounting;
 }
 
 // Helper function to get or create PlayerSeasonalStats

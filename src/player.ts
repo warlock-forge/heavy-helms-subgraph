@@ -69,7 +69,8 @@ import {
   VRFConfigUpdated,
   SubscriptionIdUpdated,
   Season,
-  PlayerSeasonalStats
+  PlayerSeasonalStats,
+  Accounting
 } from "../generated/schema";
 import { loadFirstName, loadSurname, createFullName } from "./utils/fighter-utils";
 import { 
@@ -77,7 +78,8 @@ import {
   updateStatsForPlayerRetirement, 
   updateStatsForWinLoss, 
   updateStatsForKills,
-  getOrCreatePlayerSeasonalStats
+  getOrCreatePlayerSeasonalStats,
+  getOrCreateAccounting
 } from "./utils/stats-utils";
 
 export function handleAttributeSwapAwarded(
@@ -115,6 +117,12 @@ export function handleCreatePlayerFeeUpdated(
   entity.transactionHash = event.transaction.hash;
 
   entity.save();
+
+  // Update accounting entity with current fee
+  let accounting = getOrCreateAccounting(event.block.timestamp);
+  accounting.currentCreatePlayerFee = event.params.newFee;
+  accounting.lastUpdated = event.block.timestamp;
+  accounting.save();
 }
 
 export function handleEquipmentRequirementsUpdated(
@@ -272,6 +280,7 @@ export function handlePlayerCreationComplete(
   entity.agility = event.params.agility;
   entity.stamina = event.params.stamina;
   entity.luck = event.params.luck;
+  entity.paidWithTicket = event.params.paidWithTicket;
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
   entity.transactionHash = event.transaction.hash;
@@ -358,6 +367,20 @@ export function handlePlayerCreationComplete(
     event.block.timestamp,
     event.params.owner
   );
+
+  // Update accounting based on payment method
+  let accounting = getOrCreateAccounting(event.block.timestamp);
+  if (event.params.paidWithTicket) {
+    accounting.totalPlayersCreatedWithTicket = accounting.totalPlayersCreatedWithTicket + 1;
+    accounting.totalTicketsUsed = accounting.totalTicketsUsed + 1;
+  } else {
+    accounting.totalPlayersCreatedWithETH = accounting.totalPlayersCreatedWithETH + 1;
+    // Add the current fee to total ETH collected
+    accounting.totalETHFromPlayerCreation = accounting.totalETHFromPlayerCreation.plus(accounting.currentCreatePlayerFee);
+    accounting.totalETHCollected = accounting.totalETHCollected.plus(accounting.currentCreatePlayerFee);
+  }
+  accounting.lastUpdated = event.block.timestamp;
+  accounting.save();
 }
 
 export function handlePlayerCreationRequested(
@@ -368,6 +391,7 @@ export function handlePlayerCreationRequested(
   );
   entity.requestId = event.params.requestId;
   entity.owner = event.params.requester;
+  entity.paidWithTicket = event.params.paidWithTicket;
 
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
@@ -513,9 +537,8 @@ export function handlePlayerSlotsPurchased(
     event.transaction.hash.concatI32(event.logIndex.toI32())
   );
   entity.user = event.params.user;
-  entity.slotsAdded = event.params.slotsAdded;
   entity.totalSlots = event.params.totalSlots;
-  entity.amountPaid = event.params.amountPaid;
+  entity.paidWithTicket = event.params.paidWithTicket;
 
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
@@ -527,6 +550,20 @@ export function handlePlayerSlotsPurchased(
   let owner = getOrCreateOwner(event.params.user);
   owner.playerSlots = event.params.totalSlots; // totalSlots from event becomes playerSlots in entity
   owner.save();
+
+  // Update accounting based on payment method
+  let accounting = getOrCreateAccounting(event.block.timestamp);
+  if (event.params.paidWithTicket) {
+    accounting.totalSlotsAddedWithTicket = accounting.totalSlotsAddedWithTicket + 1;
+    accounting.totalTicketsUsed = accounting.totalTicketsUsed + 1;
+  } else {
+    accounting.totalSlotsAddedWithETH = accounting.totalSlotsAddedWithETH + 1;
+    // Add the current slot cost to total ETH collected
+    accounting.totalETHFromSlotPurchases = accounting.totalETHFromSlotPurchases.plus(accounting.currentSlotBatchCost);
+    accounting.totalETHCollected = accounting.totalETHCollected.plus(accounting.currentSlotBatchCost);
+  }
+  accounting.lastUpdated = event.block.timestamp;
+  accounting.save();
 }
 
 
@@ -545,6 +582,12 @@ export function handleSlotBatchCostUpdated(
   entity.transactionHash = event.transaction.hash;
 
   entity.save();
+
+  // Update accounting entity with current slot cost
+  let accounting = getOrCreateAccounting(event.block.timestamp);
+  accounting.currentSlotBatchCost = event.params.newCost;
+  accounting.lastUpdated = event.block.timestamp;
+  accounting.save();
 }
 
 export function handleVrfRequestTimeoutUpdated(
@@ -603,6 +646,7 @@ function getOrCreateOwner(ownerAddress: Bytes): Owner {
 }
 
 
+
 export function handleRequestRecovered(event: RequestRecoveredEvent): void {
   let entity = new RequestRecovered(
     event.transaction.hash.concatI32(event.logIndex.toI32())
@@ -618,6 +662,16 @@ export function handleRequestRecovered(event: RequestRecoveredEvent): void {
   entity.transactionHash = event.transaction.hash;
 
   entity.save();
+
+  // Update accounting for recovered requests
+  let accounting = getOrCreateAccounting(event.block.timestamp);
+  accounting.totalRequestsRecovered = accounting.totalRequestsRecovered + 1;
+  accounting.totalETHRecovered = accounting.totalETHRecovered.plus(event.params.amount);
+  // Subtract recovered amount from total ETH collected
+  accounting.totalETHFromPlayerCreation = accounting.totalETHFromPlayerCreation.minus(event.params.amount);
+  accounting.totalETHCollected = accounting.totalETHCollected.minus(event.params.amount);
+  accounting.lastUpdated = event.block.timestamp;
+  accounting.save();
 }
 
 export function handleExperienceGained(event: ExperienceGainedEvent): void {

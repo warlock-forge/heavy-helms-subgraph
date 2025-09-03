@@ -17,7 +17,8 @@ import {
   DailyLimitReset as DailyLimitResetEvent,
   DailyResetCostUpdated as DailyResetCostUpdatedEvent,
   DailyGauntletLimitUpdated as DailyGauntletLimitUpdatedEvent,
-  GauntletRewardDistributed as GauntletRewardDistributedEvent
+  GauntletRewardDistributed as GauntletRewardDistributedEvent,
+  RewardConfigUpdated as RewardConfigUpdatedEvent
 } from "../generated/GauntletGameLow/GauntletGame";
 
 import { 
@@ -45,10 +46,12 @@ import {
   GauntletRewardDistributed,
   MinTimeBetweenGauntletsSet,
   GameEnabledUpdated,
-  GauntletSizeSet
+  GauntletSizeSet,
+  RewardConfigUpdated,
+  Accounting
 } from "../generated/schema";
 
-import { getOrCreateStats } from "./utils/stats-utils";
+import { getOrCreateStats, getOrCreateAccounting } from "./utils/stats-utils";
 import { updatePlayerWinPercentages, updateStatsForGauntletWin, processCombatResultsWithPlayerData, decodePlayerData, updateSkinCombatAnalytics, updatePlayerSkinCombatAnalytics, u32BE } from "./utils/stats-utils";
 import { getOrCreateFighterSnapshotById } from "./utils/fighter-utils";
 
@@ -831,14 +834,27 @@ export function handleDailyLimitReset(event: DailyLimitResetEvent): void {
   const dailyReset = new DailyLimitReset(eventId);
   
   dailyReset.playerId = event.params.playerId;
-  dailyReset.payer = event.params.payer;
   dailyReset.dayNumber = event.params.dayNumber;
-  dailyReset.amountPaid = event.params.amountPaid;
+  dailyReset.paidWithTicket = event.params.paidWithTicket;
   dailyReset.blockNumber = event.block.number;
   dailyReset.blockTimestamp = event.block.timestamp;
   dailyReset.transactionHash = event.transaction.hash;
   
   dailyReset.save();
+
+  // Update accounting based on payment method
+  let accounting = getOrCreateAccounting(event.block.timestamp);
+  if (event.params.paidWithTicket) {
+    accounting.totalDailyResetsWithTicket = accounting.totalDailyResetsWithTicket + 1;
+    accounting.totalTicketsUsed = accounting.totalTicketsUsed + 1;
+  } else {
+    accounting.totalDailyResetsWithETH = accounting.totalDailyResetsWithETH + 1;
+    // Add the current daily reset cost to total ETH collected
+    accounting.totalETHFromDailyResets = accounting.totalETHFromDailyResets.plus(accounting.currentDailyResetCost);
+    accounting.totalETHCollected = accounting.totalETHCollected.plus(accounting.currentDailyResetCost);
+  }
+  accounting.lastUpdated = event.block.timestamp;
+  accounting.save();
 }
 
 // Handle DailyResetCostUpdated event
@@ -853,6 +869,12 @@ export function handleDailyResetCostUpdated(event: DailyResetCostUpdatedEvent): 
   costUpdated.transactionHash = event.transaction.hash;
   
   costUpdated.save();
+
+  // Update accounting entity with current daily reset cost
+  let accounting = getOrCreateAccounting(event.block.timestamp);
+  accounting.currentDailyResetCost = event.params.newCost;
+  accounting.lastUpdated = event.block.timestamp;
+  accounting.save();
 }
 
 // Handle DailyGauntletLimitUpdated event
@@ -903,6 +925,32 @@ export function handleGauntletRewardDistributed(event: GauntletRewardDistributed
     event.params.rewardType.toString(),
     event.params.ticketId.toString(),
     event.params.gauntletId.toString()
+  ]);
+}
+
+// Handle RewardConfigUpdated event (Level 10 only)
+export function handleRewardConfigUpdated(event: RewardConfigUpdatedEvent): void {
+  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
+  const rewardConfigUpdated = new RewardConfigUpdated(eventId);
+  
+  rewardConfigUpdated.configName = event.params.placement;
+  rewardConfigUpdated.nonePercent = event.params.config.nonePercent;
+  rewardConfigUpdated.attributeSwapPercent = event.params.config.attributeSwapPercent;
+  rewardConfigUpdated.createPlayerPercent = event.params.config.createPlayerPercent;
+  rewardConfigUpdated.playerSlotPercent = event.params.config.playerSlotPercent;
+  rewardConfigUpdated.weaponSpecPercent = event.params.config.weaponSpecPercent;
+  rewardConfigUpdated.armorSpecPercent = event.params.config.armorSpecPercent;
+  rewardConfigUpdated.duelTicketPercent = event.params.config.duelTicketPercent;
+  rewardConfigUpdated.dailyResetPercent = event.params.config.dailyResetPercent;
+  rewardConfigUpdated.nameChangePercent = event.params.config.nameChangePercent;
+  rewardConfigUpdated.blockNumber = event.block.number;
+  rewardConfigUpdated.blockTimestamp = event.block.timestamp;
+  rewardConfigUpdated.transactionHash = event.transaction.hash;
+  
+  rewardConfigUpdated.save();
+  
+  log.info("GauntletGame RewardConfigUpdated: {} config updated", [
+    event.params.placement
   ]);
 }
 
@@ -965,4 +1013,5 @@ export function handleDefaultPlayerContractSetHigh(event: DefaultPlayerContractS
 export function handleGauntletRewardDistributedHigh(event: GauntletRewardDistributedEvent): void { handleGauntletRewardDistributed(event); }
 export function handleDailyLimitResetHigh(event: DailyLimitResetEvent): void { handleDailyLimitReset(event); }
 export function handleDailyResetCostUpdatedHigh(event: DailyResetCostUpdatedEvent): void { handleDailyResetCostUpdated(event); }
-export function handleDailyGauntletLimitUpdatedHigh(event: DailyGauntletLimitUpdatedEvent): void { handleDailyGauntletLimitUpdated(event); } 
+export function handleDailyGauntletLimitUpdatedHigh(event: DailyGauntletLimitUpdatedEvent): void { handleDailyGauntletLimitUpdated(event); }
+export function handleRewardConfigUpdatedHigh(event: RewardConfigUpdatedEvent): void { handleRewardConfigUpdated(event); } 

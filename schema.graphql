@@ -308,6 +308,7 @@ type PlayerCreationRequested @entity(immutable: true) {
   id: Bytes!
   requestId: BigInt! # uint256
   owner: Bytes! # address
+  paidWithTicket: Boolean! # bool - true if paid with ticket, false if paid with ETH
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -327,6 +328,7 @@ type PlayerCreationComplete @entity(immutable: true) {
   agility: Int! # uint8
   stamina: Int! # uint8
   luck: Int! # uint8
+  paidWithTicket: Boolean! # bool - true if paid with ticket, false if paid with ETH
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -421,9 +423,8 @@ type PlayerSkinEquipped @entity(immutable: true) {
 type PlayerSlotsPurchased @entity(immutable: true) {
   id: Bytes!
   user: Bytes! # address
-  slotsAdded: Int! # uint8
   totalSlots: Int! # uint8
-  amountPaid: BigInt! # uint256
+  paidWithTicket: Boolean! # bool - true if paid with ticket, false if paid with ETH
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -979,6 +980,45 @@ type Stats @entity {
   totalTournamentWins: BigInt!
 }
 
+# ==========================================================
+#                   ACCOUNTING ENTITY                        
+# ==========================================================
+type Accounting @entity {
+  id: ID!  # Use "all" as the ID for a singleton
+  
+  # Current fee amounts (tracked from fee update events)
+  currentCreatePlayerFee: BigInt!     # Current ETH fee to create a player
+  currentSlotBatchCost: BigInt!       # Current ETH fee per slot
+  currentDailyResetCost: BigInt!      # Current ETH fee to reset daily gauntlet limit
+  
+  # Player creation accounting
+  totalPlayersCreatedWithETH: Int!    # Number of players created with ETH payment
+  totalPlayersCreatedWithTicket: Int! # Number of players created with tickets
+  totalETHFromPlayerCreation: BigInt! # Total ETH collected from player creation
+  
+  # Slot purchase accounting  
+  totalSlotsAddedWithETH: Int!        # Number of slots purchased with ETH
+  totalSlotsAddedWithTicket: Int!     # Number of slots purchased with tickets
+  totalETHFromSlotPurchases: BigInt!  # Total ETH collected from slot purchases
+  
+  # Gauntlet daily reset accounting
+  totalDailyResetsWithETH: Int!       # Number of daily resets purchased with ETH
+  totalDailyResetsWithTicket: Int!    # Number of daily resets purchased with tickets
+  totalETHFromDailyResets: BigInt!    # Total ETH collected from daily resets
+  
+  # Aggregate totals
+  totalETHCollected: BigInt!          # Total ETH from all sources
+  totalTicketsUsed: Int!              # Total tickets used for all purposes
+  
+  # Request recovery tracking
+  totalRequestsRecovered: Int!        # Number of player creation requests recovered
+  totalETHRecovered: BigInt!          # Total ETH recovered from failed requests
+  
+  # Timestamps
+  createdAt: BigInt!
+  lastUpdated: BigInt!
+}
+
 # Helper entity for mapping addresses to collection IDs
 type SkinAddressMapping @entity {
   id: ID!
@@ -1452,10 +1492,8 @@ type GauntletRewardDistributed @entity(immutable: true) {
 type DailyLimitReset @entity(immutable: true) {
   id: Bytes!               # Transaction hash + log index
   playerId: BigInt!        # uint32 indexed playerId
-  payer: Bytes!            # address indexed payer
   dayNumber: BigInt!       # uint256 dayNumber
-  amountPaid: BigInt!      # uint256 amountPaid
-  player: Player!          # Link to Player entity
+  paidWithTicket: Boolean! # bool - true if paid with ticket, false if paid with ETH
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -1545,6 +1583,7 @@ type RewardConfigUpdated @entity(immutable: true) {
   weaponSpecPercent: Int!  # uint16 weaponSpecPercent
   armorSpecPercent: Int!   # uint16 armorSpecPercent
   duelTicketPercent: Int!  # uint16 duelTicketPercent
+  dailyResetPercent: Int!  # uint16 dailyResetPercent
   nameChangePercent: Int!  # uint16 nameChangePercent
   blockNumber: BigInt!
   blockTimestamp: BigInt!
@@ -1691,6 +1730,7 @@ type TournamentRewardConfigUpdated @entity(immutable: true) {
   weaponSpecPercent: Int!
   armorSpecPercent: Int!
   duelTicketPercent: Int!
+  dailyResetPercent: Int!
   nameChangePercent: Int!
   blockNumber: BigInt!
   blockTimestamp: BigInt!

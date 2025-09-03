@@ -58,7 +58,7 @@ dataSources:
           handler: handlePausedStateChanged
         - event: PlayerAttributesSwapped(indexed uint32,uint8,uint8,uint8,uint8)
           handler: handlePlayerAttributesSwapped
-        - event: PlayerCreationRequested(indexed uint256,indexed address)
+        - event: PlayerCreationRequested(indexed uint256,indexed address,bool)
           handler: handlePlayerCreationRequested
         - event: PlayerImmortalityChanged(indexed uint32,indexed address,bool)
           handler: handlePlayerImmortalityChanged
@@ -68,11 +68,11 @@ dataSources:
           handler: handlePlayerRetired
         - event: PlayerSkinEquipped(indexed uint32,indexed uint32,uint16,uint8)
           handler: handlePlayerSkinEquipped
-        - event: PlayerSlotsPurchased(indexed address,uint8,uint8,uint256)
+        - event: PlayerSlotsPurchased(indexed address,uint8,bool)
           handler: handlePlayerSlotsPurchased
         - event: SlotBatchCostUpdated(uint256,uint256)
           handler: handleSlotBatchCostUpdated
-        - event: PlayerCreationComplete(indexed uint256,indexed uint32,indexed address,uint256,uint16,uint16,uint8,uint8,uint8,uint8,uint8,uint8)
+        - event: PlayerCreationComplete(indexed uint256,indexed uint32,indexed address,uint256,uint16,uint16,uint8,uint8,uint8,uint8,uint8,uint8,bool)
           handler: handlePlayerCreationComplete
         - event: StanceUpdated(indexed uint32,uint8)
           handler: handleStanceUpdated
@@ -382,7 +382,7 @@ dataSources:
         # v1.0.0 New Events - Low Bracket (XP only, no rewards)
         - event: GauntletXPAwarded(indexed uint256,uint8,uint32[],uint16[])
           handler: handleGauntletXPAwardedLow
-        - event: DailyLimitReset(indexed uint32,indexed address,uint256,uint256)
+        - event: DailyLimitReset(indexed uint32,uint256,bool)
           handler: handleDailyLimitResetLow
         - event: DailyResetCostUpdated(uint256,uint256)
           handler: handleDailyResetCostUpdatedLow
@@ -468,7 +468,7 @@ dataSources:
         # v1.0.0 New Events - Mid Bracket (XP only, no rewards)
         - event: GauntletXPAwarded(indexed uint256,uint8,uint32[],uint16[])
           handler: handleGauntletXPAwardedMid
-        - event: DailyLimitReset(indexed uint32,indexed address,uint256,uint256)
+        - event: DailyLimitReset(indexed uint32,uint256,bool)
           handler: handleDailyLimitResetMid
         - event: DailyResetCostUpdated(uint256,uint256)
           handler: handleDailyResetCostUpdatedMid
@@ -554,12 +554,14 @@ dataSources:
         # v1.0.0 New Events - High Bracket (Rewards only, no XP)
         - event: GauntletRewardDistributed(indexed uint256,indexed uint32,uint8,uint256)
           handler: handleGauntletRewardDistributedHigh
-        - event: DailyLimitReset(indexed uint32,indexed address,uint256,uint256)
+        - event: DailyLimitReset(indexed uint32,uint256,bool)
           handler: handleDailyLimitResetHigh
         - event: DailyResetCostUpdated(uint256,uint256)
           handler: handleDailyResetCostUpdatedHigh
         - event: DailyGauntletLimitUpdated(uint8,uint8)
           handler: handleDailyGauntletLimitUpdatedHigh
+        - event: RewardConfigUpdated(string,(uint16,uint16,uint16,uint16,uint16,uint16,uint16,uint16,uint16))
+          handler: handleRewardConfigUpdatedHigh
       file: ./src/gauntlet-game.ts
 
   # Add PracticeGame data source
@@ -675,7 +677,7 @@ dataSources:
           handler: handleTournamentSizeSet
         - event: LethalityFactorSet(uint16,uint16)
           handler: handleLethalityFactorSet
-        - event: RewardConfigUpdated(string,(uint16,uint16,uint16,uint16,uint16,uint16,uint16,uint16))
+        - event: RewardConfigUpdated(string,(uint16,uint16,uint16,uint16,uint16,uint16,uint16,uint16,uint16))
           handler: handleRewardConfigUpdated
         - event: GameEnabledChanged(bool,bool)
           handler: handleGameEnabledChanged
