@@ -1,10 +1,8 @@
 import { BigInt, Bytes, log, BigDecimal } from "@graphprotocol/graph-ts";
 import {
-  AttributeSwapAwarded as AttributeSwapAwardedEvent,
   CreatePlayerFeeUpdated as CreatePlayerFeeUpdatedEvent,
   EquipmentRequirementsUpdated as EquipmentRequirementsUpdatedEvent,
   GameContractPermissionsUpdated as GameContractPermissionsUpdatedEvent,
-  NameChangeAwarded as NameChangeAwardedEvent,
   OwnershipTransferred as OwnershipTransferredEvent,
   PausedStateChanged as PausedStateChangedEvent,
   PlayerAttributesSwapped as PlayerAttributesSwappedEvent,
@@ -82,26 +80,6 @@ import {
   getOrCreateAccounting
 } from "./utils/stats-utils";
 
-export function handleAttributeSwapAwarded(
-  event: AttributeSwapAwardedEvent
-): void {
-  let entity = new AttributeSwapAwarded(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  );
-  entity.to = event.params.to;
-  entity.totalCharges = event.params.totalCharges;
-
-  entity.blockNumber = event.block.number;
-  entity.blockTimestamp = event.block.timestamp;
-  entity.transactionHash = event.transaction.hash;
-
-  entity.save();
-
-  // Update owner's attribute swap charges
-  let owner = getOrCreateOwner(event.params.to);
-  owner.attributeSwapCharges = event.params.totalCharges;
-  owner.save();
-}
 
 export function handleCreatePlayerFeeUpdated(
   event: CreatePlayerFeeUpdatedEvent
@@ -164,26 +142,6 @@ export function handleGameContractPermissionsUpdated(
   entity.save();
 }
 
-export function handleNameChangeAwarded(
-  event: NameChangeAwardedEvent
-): void {
-  let entity = new NameChangeAwarded(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  );
-  entity.to = event.params.to;
-  entity.totalCharges = event.params.totalCharges;
-
-  entity.blockNumber = event.block.number;
-  entity.blockTimestamp = event.block.timestamp;
-  entity.transactionHash = event.transaction.hash;
-
-  entity.save();
-
-  // Update owner's name change charges
-  let owner = getOrCreateOwner(event.params.to);
-  owner.nameChangeCharges = event.params.totalCharges;
-  owner.save();
-}
 
 export function handleOwnershipTransferred(
   event: OwnershipTransferredEvent
@@ -703,7 +661,6 @@ export function handlePlayerLevelUp(event: PlayerLevelUpEvent): void {
   );
   entity.playerId = event.params.playerId;
   entity.newLevel = event.params.newLevel;
-  entity.attributePointsAwarded = event.params.attributePointsAwarded;
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
   entity.transactionHash = event.transaction.hash;
@@ -713,8 +670,6 @@ export function handlePlayerLevelUp(event: PlayerLevelUpEvent): void {
   let player = Player.load(event.params.playerId.toString());
   if (player) {
     player.level = event.params.newLevel;
-    // Award attribute points to this specific player
-    player.attributePoints = player.attributePoints.plus(BigInt.fromI32(event.params.attributePointsAwarded));
     player.lastUpdatedAt = event.block.timestamp;
     player.save();
   }
@@ -725,15 +680,19 @@ export function handleAttributePointAwarded(event: AttributePointAwardedEvent): 
   let entity = new AttributePointAwarded(
     event.transaction.hash.concatI32(event.logIndex.toI32())
   );
-  entity.to = event.params.to;
-  entity.totalCharges = event.params.totalCharges;
+  entity.playerId = event.params.playerId;
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
   entity.transactionHash = event.transaction.hash;
   entity.save();
 
-  // Note: AttributePoints are tracked per player, not per owner
-  // The PlayerLevelUp handler will update the individual player's attributePoints
+  // Award 1 attribute point to this specific player
+  let player = Player.load(event.params.playerId.toString());
+  if (player) {
+    player.attributePoints = player.attributePoints.plus(BigInt.fromI32(1));
+    player.lastUpdatedAt = event.block.timestamp;
+    player.save();
+  }
 }
 
 export function handlePlayerAttributePointUsed(event: PlayerAttributePointUsedEvent): void {

@@ -9,7 +9,7 @@ dataSources:
     name: Player
     network: base-sepolia
     source:
-      address: "0x2d248A737e3eCB013e2a62fD8959a0A3D7eCf9F3"
+      address: "0x5C716544Ad465cEABc0Be10c204E76BC761f9D56"
       abi: Player
       startBlock: 30203920
     mapping:
@@ -44,16 +44,12 @@ dataSources:
         - name: PlayerSkinNFT
           file: ./abis/PlayerSkinNFT.json
       eventHandlers:
-        - event: AttributeSwapAwarded(indexed address,uint256)
-          handler: handleAttributeSwapAwarded
         - event: CreatePlayerFeeUpdated(uint256,uint256)
           handler: handleCreatePlayerFeeUpdated
         - event: EquipmentRequirementsUpdated(indexed address,indexed address)
           handler: handleEquipmentRequirementsUpdated
-        - event: GameContractPermissionsUpdated(indexed address,(bool,bool,bool,bool,bool))
+        - event: GameContractPermissionsUpdated(indexed address,(bool,bool,bool,bool))
           handler: handleGameContractPermissionsUpdated
-        - event: NameChangeAwarded(indexed address,uint256)
-          handler: handleNameChangeAwarded
         - event: PausedStateChanged(bool)
           handler: handlePausedStateChanged
         - event: PlayerAttributesSwapped(indexed uint32,uint8,uint8,uint8,uint8)
@@ -83,9 +79,9 @@ dataSources:
         # v1.0.0 Player Progression Events
         - event: ExperienceGained(indexed uint32,uint16,uint16)
           handler: handleExperienceGained
-        - event: PlayerLevelUp(indexed uint32,uint8,uint8)
+        - event: PlayerLevelUp(indexed uint32,uint8)
           handler: handlePlayerLevelUp
-        - event: AttributePointAwarded(indexed address,uint256)
+        - event: AttributePointAwarded(indexed uint32)
           handler: handleAttributePointAwarded
         - event: PlayerAttributePointUsed(indexed uint32,uint8,uint8,uint256)
           handler: handlePlayerAttributePointUsed
@@ -114,7 +110,7 @@ dataSources:
     name: PlayerNameRegistry
     network: base-sepolia
     source:
-      address: "0x7224Ff906a60E96725D019E84f3B23540442A898"
+      address: "0x0b7529Fb5BE5485e8799F13F079d1eB2b65FeCf7"
       abi: PlayerNameRegistry
       startBlock: 30203920
     mapping:
@@ -136,7 +132,7 @@ dataSources:
     name: PlayerSkinRegistry
     network: base-sepolia
     source:
-      address: "0xaA8c214bA0efFd88CdE442946B518b91a437b4e3"
+      address: "0x9D371Aac24d54b397e9CBCdf048681BF17F12716"
       abi: PlayerSkinRegistry
       startBlock: 30203920
     mapping:
@@ -176,7 +172,7 @@ dataSources:
     name: DefaultPlayer
     network: base-sepolia
     source:
-      address: "0xcE8129957D8B64813D9E936921819741a54649Fc"
+      address: "0x3554BFC5d5A95A9ae1139d9dBa7160EFDeA781F9"
       abi: DefaultPlayer
       startBlock: 30203920
     mapping:
@@ -204,7 +200,7 @@ dataSources:
     name: Monster
     network: base-sepolia
     source:
-      address: "0x3feae9A9788c3d48C06F15d9115fA47b536EA66F"
+      address: "0xCfb1580C3E0624e960FedaE72Fb342602FBc2e5f"
       abi: Monster
       startBlock: 30203920
     mapping:
@@ -232,7 +228,7 @@ dataSources:
     name: MonsterNameRegistry
     network: base-sepolia
     source:
-      address: "0xacD57159a8A02b59E923FCE01Ca8A21f16C2042A"
+      address: "0x09CdBd3763d9Eec6d7AC35EC312859D0Ee40158F"
       abi: MonsterNameRegistry
       startBlock: 30203920
     mapping:
@@ -255,7 +251,7 @@ dataSources:
     name: DuelGame
     network: base-sepolia
     source:
-      address: "0x86f776A0d39F5640a276696A868814f99a58b4D2"
+      address: "0x5DaCCD177e362c136103c7A3B169589Bc7b25567"
       abi: DuelGame
       startBlock: 30203920
     mapping:
@@ -273,8 +269,6 @@ dataSources:
         - TimeUntilExpireUpdated
         - VrfRequestTimeoutUpdated
         - ChallengeRecovered
-        - PlayerContractUpdated
-        - RequestRecovered
       abis:
         - name: DuelGame
           file: ./abis/DuelGame.json
@@ -293,8 +287,6 @@ dataSources:
           handler: handleGameEnabledUpdated
         - event: GameEngineUpdated(indexed address,indexed address)
           handler: handleGameEngineUpdated
-        - event: PlayerContractUpdated(indexed address,indexed address)
-          handler: handlePlayerContractUpdated
         - event: TimeUntilExpireUpdated(uint256,uint256)
           handler: handleTimeUntilExpireUpdated
         - event: ChallengeRecovered(indexed uint256)
@@ -309,7 +301,7 @@ dataSources:
     name: GauntletGameLow
     network: base-sepolia
     source:
-      address: "0xDF4Dca458939d95C64B5d610B6867d794C3FeC3f" # Levels 1-4
+      address: "0x71AD5e337EfA81FDe0eB737aB17342F25FE4C93b" # Levels 1-4
       abi: GauntletGame
       startBlock: 30203920
     mapping:
@@ -336,7 +328,6 @@ dataSources:
         - QueuePartiallyCleared
         - DefaultPlayerContractSet
         - GameEngineUpdated
-        - PlayerContractUpdated
       abis:
         - name: GauntletGame
           file: ./abis/GauntletGame.json
@@ -355,12 +346,20 @@ dataSources:
         - event: PlayerWithdrew(indexed uint32,uint256)
           handler: handlePlayerWithdrewLow
         # Gauntlet Lifecycle
+        - event: QueueCommitted(uint256,uint256)
+          handler: handleQueueCommittedLow
+        - event: ParticipantsSelected(indexed uint256,uint256,uint32[])
+          handler: handleParticipantsSelectedLow
         - event: GauntletStarted(indexed uint256,uint8,uint8,(uint32,(uint32,(uint32,uint16),uint8))[])
           handler: handleGauntletStartedLow
         - event: GauntletCompleted(indexed uint256,uint8,uint8,indexed uint32,uint256,uint32[],uint32[])
           handler: handleGauntletCompletedLow
         - event: GauntletRecovered(indexed uint256,uint256)
           handler: handleGauntletRecoveredLow
+        - event: GauntletAutoRecovered(uint256,uint256,uint8)
+          handler: handleGauntletAutoRecoveredLow
+        - event: PlayerReplaced(indexed uint256,indexed uint32,indexed uint32,uint8)
+          handler: handlePlayerReplacedLow
         # BaseGame Event (emitted by GauntletGame during fulfillment)
         - event: CombatResult(indexed bytes32,indexed bytes32,indexed uint32,bytes)
           handler: handleGauntletCombatResultLow
@@ -371,14 +370,18 @@ dataSources:
           handler: handleGameEnabledUpdatedLow
         - event: GameEngineUpdated(indexed address,indexed address)
           handler: handleGameEngineUpdatedLow
-        - event: PlayerContractUpdated(indexed address,indexed address)
-          handler: handlePlayerContractUpdatedLow
         - event: QueuePartiallyCleared(uint256,uint256)
           handler: handleQueuePartiallyClearedLow
         - event: MinTimeBetweenGauntletsSet(uint256)
           handler: handleMinTimeBetweenGauntletsSetLow
         - event: DefaultPlayerContractSet(indexed address)
           handler: handleDefaultPlayerContractSetLow
+        - event: FutureBlocksForSelectionSet(uint256)
+          handler: handleFutureBlocksForSelectionSetLow
+        - event: FutureBlocksForTournamentSet(uint256)
+          handler: handleFutureBlocksForTournamentSetLow
+        - event: EmergencyQueueCleared(uint256,uint256)
+          handler: handleEmergencyQueueClearedLow
         # v1.0.0 New Events - Low Bracket (XP only, no rewards)
         - event: GauntletXPAwarded(indexed uint256,uint8,uint32[],uint16[])
           handler: handleGauntletXPAwardedLow
@@ -395,7 +398,7 @@ dataSources:
     name: GauntletGameMid
     network: base-sepolia
     source:
-      address: "0x7AC1E825dB7501b7F886704f85d9E62B3E19DD41" # Levels 5-9
+      address: "0xf1639B58aF4cf0097b253c13Ec229082826224ca" # Levels 5-9
       abi: GauntletGame
       startBlock: 30203920
     mapping:
@@ -422,7 +425,6 @@ dataSources:
         - QueuePartiallyCleared
         - DefaultPlayerContractSet
         - GameEngineUpdated
-        - PlayerContractUpdated
       abis:
         - name: GauntletGame
           file: ./abis/GauntletGame.json
@@ -441,12 +443,20 @@ dataSources:
         - event: PlayerWithdrew(indexed uint32,uint256)
           handler: handlePlayerWithdrewMid
         # Gauntlet Lifecycle
+        - event: QueueCommitted(uint256,uint256)
+          handler: handleQueueCommittedMid
+        - event: ParticipantsSelected(indexed uint256,uint256,uint32[])
+          handler: handleParticipantsSelectedMid
         - event: GauntletStarted(indexed uint256,uint8,uint8,(uint32,(uint32,(uint32,uint16),uint8))[])
           handler: handleGauntletStartedMid
         - event: GauntletCompleted(indexed uint256,uint8,uint8,indexed uint32,uint256,uint32[],uint32[])
           handler: handleGauntletCompletedMid
         - event: GauntletRecovered(indexed uint256,uint256)
           handler: handleGauntletRecoveredMid
+        - event: GauntletAutoRecovered(uint256,uint256,uint8)
+          handler: handleGauntletAutoRecoveredMid
+        - event: PlayerReplaced(indexed uint256,indexed uint32,indexed uint32,uint8)
+          handler: handlePlayerReplacedMid
         # BaseGame Event (emitted by GauntletGame during fulfillment)
         - event: CombatResult(indexed bytes32,indexed bytes32,indexed uint32,bytes)
           handler: handleGauntletCombatResultMid
@@ -457,14 +467,18 @@ dataSources:
           handler: handleGameEnabledUpdatedMid
         - event: GameEngineUpdated(indexed address,indexed address)
           handler: handleGameEngineUpdatedMid
-        - event: PlayerContractUpdated(indexed address,indexed address)
-          handler: handlePlayerContractUpdatedMid
         - event: QueuePartiallyCleared(uint256,uint256)
           handler: handleQueuePartiallyClearedMid
         - event: MinTimeBetweenGauntletsSet(uint256)
           handler: handleMinTimeBetweenGauntletsSetMid
         - event: DefaultPlayerContractSet(indexed address)
           handler: handleDefaultPlayerContractSetMid
+        - event: FutureBlocksForSelectionSet(uint256)
+          handler: handleFutureBlocksForSelectionSetMid
+        - event: FutureBlocksForTournamentSet(uint256)
+          handler: handleFutureBlocksForTournamentSetMid
+        - event: EmergencyQueueCleared(uint256,uint256)
+          handler: handleEmergencyQueueClearedMid
         # v1.0.0 New Events - Mid Bracket (XP only, no rewards)
         - event: GauntletXPAwarded(indexed uint256,uint8,uint32[],uint16[])
           handler: handleGauntletXPAwardedMid
@@ -481,7 +495,7 @@ dataSources:
     name: GauntletGameHigh
     network: base-sepolia
     source:
-      address: "0x6E8266C2264c84e7552DA3f4eE9DC4634a90fA7c" # Level 10
+      address: "0x757BCCee1AAf9fb7C44ac1CE8bEdd434f71a2C0e" # Level 10
       abi: GauntletGame
       startBlock: 30203920
     mapping:
@@ -508,7 +522,6 @@ dataSources:
         - QueuePartiallyCleared
         - DefaultPlayerContractSet
         - GameEngineUpdated
-        - PlayerContractUpdated
       abis:
         - name: GauntletGame
           file: ./abis/GauntletGame.json
@@ -527,12 +540,20 @@ dataSources:
         - event: PlayerWithdrew(indexed uint32,uint256)
           handler: handlePlayerWithdrewHigh
         # Gauntlet Lifecycle
+        - event: QueueCommitted(uint256,uint256)
+          handler: handleQueueCommittedHigh
+        - event: ParticipantsSelected(indexed uint256,uint256,uint32[])
+          handler: handleParticipantsSelectedHigh
         - event: GauntletStarted(indexed uint256,uint8,uint8,(uint32,(uint32,(uint32,uint16),uint8))[])
           handler: handleGauntletStartedHigh
         - event: GauntletCompleted(indexed uint256,uint8,uint8,indexed uint32,uint256,uint32[],uint32[])
           handler: handleGauntletCompletedHigh
         - event: GauntletRecovered(indexed uint256,uint256)
           handler: handleGauntletRecoveredHigh
+        - event: GauntletAutoRecovered(uint256,uint256,uint8)
+          handler: handleGauntletAutoRecoveredHigh
+        - event: PlayerReplaced(indexed uint256,indexed uint32,indexed uint32,uint8)
+          handler: handlePlayerReplacedHigh
         # BaseGame Event (emitted by GauntletGame during fulfillment)
         - event: CombatResult(indexed bytes32,indexed bytes32,indexed uint32,bytes)
           handler: handleGauntletCombatResultHigh
@@ -543,14 +564,18 @@ dataSources:
           handler: handleGameEnabledUpdatedHigh
         - event: GameEngineUpdated(indexed address,indexed address)
           handler: handleGameEngineUpdatedHigh
-        - event: PlayerContractUpdated(indexed address,indexed address)
-          handler: handlePlayerContractUpdatedHigh
         - event: QueuePartiallyCleared(uint256,uint256)
           handler: handleQueuePartiallyClearedHigh
         - event: MinTimeBetweenGauntletsSet(uint256)
           handler: handleMinTimeBetweenGauntletsSetHigh
         - event: DefaultPlayerContractSet(indexed address)
           handler: handleDefaultPlayerContractSetHigh
+        - event: FutureBlocksForSelectionSet(uint256)
+          handler: handleFutureBlocksForSelectionSetHigh
+        - event: FutureBlocksForTournamentSet(uint256)
+          handler: handleFutureBlocksForTournamentSetHigh
+        - event: EmergencyQueueCleared(uint256,uint256)
+          handler: handleEmergencyQueueClearedHigh
         # v1.0.0 New Events - High Bracket (Rewards only, no XP)
         - event: GauntletRewardDistributed(indexed uint256,indexed uint32,uint8,uint256)
           handler: handleGauntletRewardDistributedHigh
@@ -560,7 +585,7 @@ dataSources:
           handler: handleDailyResetCostUpdatedHigh
         - event: DailyGauntletLimitUpdated(uint8,uint8)
           handler: handleDailyGauntletLimitUpdatedHigh
-        - event: RewardConfigUpdated(string,(uint16,uint16,uint16,uint16,uint16,uint16,uint16,uint16,uint16))
+        - event: RewardConfigUpdated(uint8,(uint16,uint16,uint16,uint16,uint16,uint16,uint16,uint16,uint16))
           handler: handleRewardConfigUpdatedHigh
       file: ./src/gauntlet-game.ts
 
@@ -569,7 +594,7 @@ dataSources:
     name: PracticeGame
     network: base-sepolia
     source:
-      address: "0xa1Ff9Cf87Ec73F30d6AD5A5a963809D0806C9852"
+      address: "0x5365DdbdD130B070928B8713BC79A5fe67564cA4"
       abi: PracticeGame
       startBlock: 30203920
     mapping:
@@ -580,7 +605,6 @@ dataSources:
         - DefaultPlayerContractUpdated
         - MonsterContractUpdated
         - GameEngineUpdated
-        - PlayerContractUpdated
       abis:
         - name: PracticeGame
           file: ./abis/PracticeGame.json
@@ -591,8 +615,6 @@ dataSources:
           handler: handleMonsterContractUpdated
         - event: GameEngineUpdated(indexed address,indexed address)
           handler: handleGameEngineUpdated
-        - event: PlayerContractUpdated(indexed address,indexed address)
-          handler: handlePlayerContractUpdated
       file: ./src/practice-game.ts
 
   # TournamentGame contract data source
@@ -600,7 +622,7 @@ dataSources:
     name: TournamentGame
     network: base-sepolia
     source:
-      address: "0x742af1F015920cF7eAd4ca68697c77e631489336"
+      address: "0x0Fda98b3167e35A6c01d2D38DEa4945CaEc908da"
       abi: TournamentGame
       startBlock: 30203920
     mapping:
@@ -677,7 +699,7 @@ dataSources:
           handler: handleTournamentSizeSet
         - event: LethalityFactorSet(uint16,uint16)
           handler: handleLethalityFactorSet
-        - event: RewardConfigUpdated(string,(uint16,uint16,uint16,uint16,uint16,uint16,uint16,uint16,uint16))
+        - event: RewardConfigUpdated(indexed uint8,(uint16,uint16,uint16,uint16,uint16,uint16,uint16,uint16,uint16))
           handler: handleRewardConfigUpdated
         - event: GameEnabledChanged(bool,bool)
           handler: handleGameEnabledChanged
@@ -688,7 +710,7 @@ dataSources:
   #   name: PlayerTickets
   #   network: base-sepolia
   #   source:
-  #     address: "0xc0e8973f7AF2e7Ab5F5749419934A04e1A90c6cB"
+  #     address: "0x73c6149A5AEA3569516dB6FCD87D4dc4AA143054"
   #     abi: PlayerTickets
   #     startBlock: 30203920
   #   mapping:
@@ -704,7 +726,7 @@ dataSources:
   #       - name: PlayerTickets
   #         file: ./abis/PlayerTickets.json
   #     eventHandlers:
-  #       - event: GameContractPermissionsUpdated(indexed address,(bool,bool,bool,bool,bool,bool))
+  #       - event: GameContractPermissionsUpdated(indexed address,(bool,bool,bool,bool,bool,bool,bool,bool))
   #         handler: handleGameContractPermissionsUpdated
   #       - event: NameChangeNFTMinted(indexed uint256,indexed address,uint16,uint16)
   #         handler: handleNameChangeNFTMinted

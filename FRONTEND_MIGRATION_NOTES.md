@@ -329,4 +329,76 @@ tournaments {
 
 ---
 
+## 6. v1.0.1 Contract Migration Updates
+
+### Contract Address Changes
+**NON-BREAKING**: All contract addresses updated to v1.0.1 versions. Frontend should use subgraph data rather than hardcoded addresses.
+
+### New GauntletGame Events (v1.0.1)
+**NON-BREAKING**: Added support for 7 new gauntlet management events across all brackets (Low/Mid/High):
+
+#### New Event Entities Added:
+```graphql
+# New gauntlet lifecycle events
+type GauntletAutoRecovered @entity(immutable: true) {
+  id: Bytes!
+  gauntletId: BigInt!
+  randomness: BigInt!
+  reason: Int!
+  # ... standard fields
+}
+
+type FutureBlocksForSelectionSet @entity(immutable: true) {
+  id: Bytes!
+  futureBlocks: BigInt!
+  # ... standard fields
+}
+
+type FutureBlocksForTournamentSet @entity(immutable: true) {
+  id: Bytes!
+  futureBlocks: BigInt!
+  # ... standard fields
+}
+
+type EmergencyQueueCleared @entity(immutable: true) {
+  id: Bytes!
+  gauntletId: BigInt!
+  queueSize: BigInt!
+  # ... standard fields
+}
+```
+
+#### Enhanced Event Tracking:
+- ✅ **QueueCommitted** - Now properly tracks `selectionBlock` instead of `gauntletId`
+- ✅ **ParticipantsSelected** - Enhanced with proper gauntlet-to-tournament field mapping
+- ✅ **PlayerReplaced** - Full gauntlet player replacement tracking
+- ✅ **GauntletAutoRecovered** - Automatic recovery due to block hash expiration
+- ✅ **Emergency Queue Management** - Queue clearing and admin operations
+
+### Schema Field Type Consistency
+**MINOR BREAKING**: RewardConfigUpdated placement fields standardized across game modes:
+
+```graphql
+# BEFORE (inconsistent):
+type RewardConfigUpdated { placement: Int! }           # Gauntlet 
+type TournamentRewardConfigUpdated { placement: String! }  # Tournament
+
+# AFTER (consistent):
+type RewardConfigUpdated { placement: Int! }           # Gauntlet
+type TournamentRewardConfigUpdated { placement: Int! }     # Tournament
+```
+
+- **Impact**: Any frontend code expecting `placement` as String in tournament rewards must be updated to handle Int
+- **Values**: `0=champion, 1=runnerUp, 2=thirdFourth`
+
+### Unified Tournament/Gauntlet Event Architecture
+**NON-BREAKING**: Confirmed that the shared event entity pattern works correctly:
+- ✅ **QueueCommitted** - Shared between tournaments and gauntlets  
+- ✅ **ParticipantsSelected** - Shared with field mapping (`gauntletId` → `tournamentId`)
+- ✅ **PlayerReplaced** - Shared across game modes
+
+This maintains frontend query compatibility while supporting both game types efficiently.
+
+---
+
 *This file will be updated as we make schema changes*

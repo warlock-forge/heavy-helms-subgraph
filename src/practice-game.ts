@@ -2,14 +2,12 @@ import { BigInt, Bytes, log } from "@graphprotocol/graph-ts";
 import {
   DefaultPlayerContractUpdated as DefaultPlayerContractUpdatedEvent,
   MonsterContractUpdated as MonsterContractUpdatedEvent,
-  GameEngineUpdated as GameEngineUpdatedEvent,
-  PlayerContractUpdated as PlayerContractUpdatedEvent
+  GameEngineUpdated as GameEngineUpdatedEvent
 } from "../generated/PracticeGame/PracticeGame";
 import {
   DefaultPlayerContractUpdated,
   MonsterContractUpdated,
-  GameEngineUpdated,
-  PlayerContractUpdated
+  GameEngineUpdated
 } from "../generated/schema";
 
 export function handleDefaultPlayerContractUpdated(event: DefaultPlayerContractUpdatedEvent): void {
@@ -54,20 +52,3 @@ export function handleGameEngineUpdated(event: GameEngineUpdatedEvent): void {
   ]);
 }
 
-export function handlePlayerContractUpdated(event: PlayerContractUpdatedEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const playerContractUpdated = new PlayerContractUpdated(eventId);
-  
-  playerContractUpdated.oldContract = event.params.oldContract;
-  playerContractUpdated.newContract = event.params.newContract;
-  playerContractUpdated.blockNumber = event.block.number;
-  playerContractUpdated.blockTimestamp = event.block.timestamp;
-  playerContractUpdated.transactionHash = event.transaction.hash;
-  
-  playerContractUpdated.save();
-  
-  log.info("PracticeGame: Player contract updated from {} to {}", [
-    event.params.oldContract.toHexString(),
-    event.params.newContract.toHexString()
-  ]);
-}

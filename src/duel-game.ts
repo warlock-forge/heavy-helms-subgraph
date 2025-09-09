@@ -9,7 +9,6 @@ import {
   TimeUntilExpireUpdated as TimeUntilExpireUpdatedEvent,
   ChallengeRecovered as ChallengeRecoveredEvent,
   GameEngineUpdated as GameEngineUpdatedEvent,
-  PlayerContractUpdated as PlayerContractUpdatedEvent,
   VrfRequestTimeoutUpdated as VrfRequestTimeoutUpdatedEvent,
 } from "../generated/DuelGame/DuelGame";
 
@@ -24,7 +23,6 @@ import {
   TimeUntilExpireUpdated,
   ChallengeRecovered,
   GameEngineUpdated,
-  PlayerContractUpdated,
   VrfRequestTimeoutUpdated
 } from "../generated/schema";
 
@@ -527,8 +525,8 @@ export function handleGameEngineUpdated(event: GameEngineUpdatedEvent): void {
   const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
   const gameEngineUpdated = new GameEngineUpdated(eventId);
   
-  gameEngineUpdated.oldEngine = event.params.oldGameEngine;
-  gameEngineUpdated.newEngine = event.params.newGameEngine;
+  gameEngineUpdated.oldEngine = event.params.oldEngine;
+  gameEngineUpdated.newEngine = event.params.newEngine;
   gameEngineUpdated.blockNumber = event.block.number;
   gameEngineUpdated.blockTimestamp = event.block.timestamp;
   gameEngineUpdated.transactionHash = event.transaction.hash;
@@ -536,31 +534,11 @@ export function handleGameEngineUpdated(event: GameEngineUpdatedEvent): void {
   gameEngineUpdated.save();
   
   log.info("Game engine updated from {} to {}", [
-    event.params.oldGameEngine.toHexString(),
-    event.params.newGameEngine.toHexString()
+    event.params.oldEngine.toHexString(),
+    event.params.newEngine.toHexString()
   ]);
 }
 
-/**
- * Handle PlayerContractUpdated events
- */
-export function handlePlayerContractUpdated(event: PlayerContractUpdatedEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const playerContractUpdated = new PlayerContractUpdated(eventId);
-  
-  playerContractUpdated.oldContract = event.params.oldPlayerContract;
-  playerContractUpdated.newContract = event.params.newPlayerContract;
-  playerContractUpdated.blockNumber = event.block.number;
-  playerContractUpdated.blockTimestamp = event.block.timestamp;
-  playerContractUpdated.transactionHash = event.transaction.hash;
-  
-  playerContractUpdated.save();
-  
-  log.info("Player contract updated from {} to {}", [
-    event.params.oldPlayerContract.toHexString(),
-    event.params.newPlayerContract.toHexString()
-  ]);
-}
 
 /**
  * Handle VrfRequestTimeoutUpdated events

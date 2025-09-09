@@ -1382,9 +1382,7 @@ type PlayerLevelUp @entity(immutable: true) {
 
 type AttributePointAwarded @entity(immutable: true) {
   id: Bytes!               # Transaction hash + log index
-  to: Bytes!               # address indexed to
-  totalCharges: BigInt!    # uint256 totalCharges
-  owner: Owner!            # Link to Owner entity
+  playerId: BigInt!        # uint32 indexed playerId
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -1575,7 +1573,7 @@ type RewardDistributed @entity(immutable: true) {
 
 type RewardConfigUpdated @entity(immutable: true) {
   id: Bytes!               # Transaction hash + log index
-  configName: String!      # string configName
+  configName: Int!         # uint8 placement (0=champion, 1=runnerUp, 2=thirdFourth)
   nonePercent: Int!        # uint16 nonePercent
   attributeSwapPercent: Int! # uint16 attributeSwapPercent
   createPlayerPercent: Int! # uint16 createPlayerPercent
@@ -1585,6 +1583,42 @@ type RewardConfigUpdated @entity(immutable: true) {
   duelTicketPercent: Int!  # uint16 duelTicketPercent
   dailyResetPercent: Int!  # uint16 dailyResetPercent
   nameChangePercent: Int!  # uint16 nameChangePercent
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+# v1.0.1 New Gauntlet Events
+type GauntletAutoRecovered @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  gauntletId: BigInt!      # uint256 gauntletId
+  randomness: BigInt!      # uint256 randomness
+  reason: Int!             # uint8 reason
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type FutureBlocksForSelectionSet @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  futureBlocks: BigInt!    # uint256 futureBlocks
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type FutureBlocksForTournamentSet @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  futureBlocks: BigInt!    # uint256 futureBlocks
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type EmergencyQueueCleared @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  gauntletId: BigInt!      # uint256 gauntletId
+  queueSize: BigInt!       # uint256 queueSize
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -1614,8 +1648,8 @@ type TournamentPlayerWithdrew @entity(immutable: true) {
 
 type QueueCommitted @entity(immutable: true) {
   id: Bytes!
-  selectionBlock: BigInt!
-  queueSize: BigInt!
+  selectionBlock: BigInt!  # uint256 selectionBlock
+  queueSize: BigInt!       # uint256 queueSize
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -1722,7 +1756,7 @@ type LethalityFactorSet @entity(immutable: true) {
 
 type TournamentRewardConfigUpdated @entity(immutable: true) {
   id: Bytes!
-  placement: String!
+  placement: Int!         # uint8 placement (0=champion, 1=runnerUp, 2=thirdFourth)
   nonePercent: Int!
   attributeSwapPercent: Int!
   createPlayerPercent: Int!

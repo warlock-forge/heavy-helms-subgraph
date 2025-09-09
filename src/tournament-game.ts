@@ -628,7 +628,7 @@ export function handleRewardConfigUpdated(event: RewardConfigUpdatedEvent): void
   eventEntity.save();
   
   log.info("[TournamentGame] RewardConfigUpdated: {} placement config updated", [
-    event.params.placement
+    event.params.placement.toString()
   ]);
 }
 
