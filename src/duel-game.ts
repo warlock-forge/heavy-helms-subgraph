@@ -36,7 +36,8 @@ import {
   processCombatResultsWithPlayerData,
   decodePlayerData,
   updateSkinCombatAnalytics,
-  updatePlayerSkinCombatAnalytics
+  updatePlayerSkinCombatAnalytics,
+  updateSeasonalDuelStats
 } from "./utils/stats-utils";
 import { getOrCreateFighterSnapshotById } from "./utils/fighter-utils";
 import { DuelGame } from "../generated/DuelGame/DuelGame";
@@ -276,6 +277,10 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
     
     // Call the unified utility function to update player stats
     updatePlayerWinPercentages(winnerId_str, loserId_str, event.block.timestamp);
+    
+    // Track seasonal duel stats (for fun, doesn't affect official records)
+    // Both players get duelsPlayed increment, winner gets duelWins increment
+    updateSeasonalDuelStats(winnerId_str, loserId_str, event.block.timestamp);
     
     challenge.save();
     

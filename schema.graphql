@@ -31,6 +31,7 @@ interface Fighter {
   kills: Int!
   gauntletWins: Int!       # Number of gauntlets won
   duelWins: Int!           # Number of duels won
+  tournamentWins: Int!     # Number of tournaments won
   
   # Stance field (new)
   stance: Int!            # uint8 stance value
@@ -81,6 +82,7 @@ type Player implements Fighter @entity {
   kills: Int!
   gauntletWins: Int!       # Number of gauntlets won
   duelWins: Int!           # Number of duels won
+  tournamentWins: Int!     # Number of tournaments won
   
   # Stance field (new)
   stance: Int!            # uint8 stance value, defaults to 1
@@ -104,33 +106,11 @@ type Player implements Fighter @entity {
 }
 
 
-# Identity container for default players (not a Fighter itself)
-type DefaultPlayer @entity {
-  id: ID!                 # playerId from contract
-  fighterId: BigInt!      # The playerId from the contract
-  
-  # Identity data shared across all levels
-  firstNameIndex: Int!
-  surnameIndex: Int!
-  firstName: String
-  surname: String
-  fullName: String
-  currentSkin: Skin       # Shared skin across all levels
-  stance: Int!            # Shared stance across all levels
-  
-  # Progression levels (1-10)
-  progressionLevels: [DefaultPlayerProgression!]! @derivedFrom(field: "player")
-  
-  createdAt: BigInt!
-  lastUpdatedAt: BigInt!
-}
-
-# Actual Fighter implementation for DefaultPlayer levels
-type DefaultPlayerProgression implements Fighter @entity {
+# DefaultPlayer entities implement Fighter directly - no more separate "Progression" entities
+type DefaultPlayer implements Fighter @entity {
   id: ID!                    # "{playerId}-{level}"
   fighterId: BigInt!         # playerId * 100 + level (e.g., 12305 for player 123 level 5)
   fighterType: String!       # "DefaultPlayer"
-  player: DefaultPlayer!     # Reference to identity container
   level: Int!               # Level (1-10)
   isRetired: Boolean!       # Always false
   
@@ -144,14 +124,14 @@ type DefaultPlayerProgression implements Fighter @entity {
   weaponSpecialization: Int! # uint8 weapon class specialization (255 = none)
   armorSpecialization: Int!  # uint8 armor specialization (255 = none)
   
-  # Fighter interface requirements (delegated from parent)
-  firstNameIndex: Int!       # Copy from DefaultPlayer
-  surnameIndex: Int!         # Copy from DefaultPlayer
-  firstName: String          # Copy from DefaultPlayer
-  surname: String            # Copy from DefaultPlayer
-  fullName: String           # Copy from DefaultPlayer
-  currentSkin: Skin         # Copy from DefaultPlayer
-  stance: Int!              # Copy from DefaultPlayer
+  # Fighter interface requirements
+  firstNameIndex: Int!
+  surnameIndex: Int!
+  firstName: String
+  surname: String
+  fullName: String
+  currentSkin: Skin
+  stance: Int!
   
   # Progression fields
   currentXP: Int!           # Always 0 for DefaultPlayers
@@ -162,38 +142,17 @@ type DefaultPlayerProgression implements Fighter @entity {
   kills: Int!               # Always 0
   gauntletWins: Int!        # Always 0
   duelWins: Int!            # Always 0
+  tournamentWins: Int!      # Always 0
   
   createdAt: BigInt!
   lastUpdatedAt: BigInt!
 }
 
-# Identity container for monsters (not a Fighter itself)
-type Monster @entity {
-  id: ID!                 # monsterId from contract
-  fighterId: BigInt!      # The monsterId from the contract
-  
-  # Identity data shared across all levels
-  firstNameIndex: Int!    # Monster type name index
-  surnameIndex: Int!      # Usually not used for monsters
-  firstName: String       # Monster type name
-  surname: String         # Usually empty
-  fullName: String        # Monster type name
-  currentSkin: Skin       # Shared skin across all levels
-  stance: Int!            # Shared stance across all levels
-  
-  # Progression levels (1-10)
-  progressionLevels: [MonsterProgression!]! @derivedFrom(field: "monster")
-  
-  createdAt: BigInt!
-  lastUpdatedAt: BigInt!
-}
-
-# Actual Fighter implementation for Monster levels
-type MonsterProgression implements Fighter @entity {
+# Monster entities implement Fighter directly - no more separate "Progression" entities
+type Monster implements Fighter @entity {
   id: ID!                    # "{monsterId}-{level}"
   fighterId: BigInt!         # monsterId * 100 + level (e.g., 45607 for monster 456 level 7)
   fighterType: String!       # "Monster"
-  monster: Monster!          # Reference to identity container
   level: Int!               # Level (1-10)
   isRetired: Boolean!       # Always false
   
@@ -207,14 +166,14 @@ type MonsterProgression implements Fighter @entity {
   weaponSpecialization: Int! # uint8 weapon class specialization (255 = none)
   armorSpecialization: Int!  # uint8 armor specialization (255 = none)
   
-  # Fighter interface requirements (delegated from parent)
-  firstNameIndex: Int!       # Copy from Monster
-  surnameIndex: Int!         # Copy from Monster
-  firstName: String          # Copy from Monster
-  surname: String            # Copy from Monster
-  fullName: String           # Copy from Monster
-  currentSkin: Skin         # Copy from Monster
-  stance: Int!              # Copy from Monster
+  # Fighter interface requirements
+  firstNameIndex: Int!
+  surnameIndex: Int!
+  firstName: String
+  surname: String
+  fullName: String
+  currentSkin: Skin
+  stance: Int!
   
   # Progression fields
   currentXP: Int!           # Always 0 for Monsters
@@ -225,6 +184,7 @@ type MonsterProgression implements Fighter @entity {
   kills: Int!               # Always 0
   gauntletWins: Int!        # Always 0
   duelWins: Int!            # Always 0
+  tournamentWins: Int!      # Always 0
   
   createdAt: BigInt!
   lastUpdatedAt: BigInt!
@@ -500,7 +460,6 @@ type GameContractPermissionsUpdated @entity(immutable: true) {
   gameContract: Bytes! # address
   permissions_record: Boolean! # bool
   permissions_retire: Boolean! # bool
-  permissions_attributes: Boolean! # bool
   permissions_immortal: Boolean! # bool
   permissions_experience: Boolean! # bool
   blockNumber: BigInt!
@@ -1800,7 +1759,6 @@ type Season @entity {
 type PlayerSeasonalStats @entity {
   id: ID!                     # "{seasonId}-{playerId}"
   season: Season!             # Reference to Season
-  player: Player!             # Reference to Player
   seasonId: BigInt!           # uint256 season ID for easy filtering
   playerId: BigInt!           # uint32 player ID for easy filtering
   
@@ -1817,6 +1775,10 @@ type PlayerSeasonalStats @entity {
   # Gauntlet-specific seasonal data
   gauntletsPlayed: Int!       # Number of gauntlets participated in this season
   gauntletWins: Int!          # Number of gauntlets won this season
+  
+  # Duel-specific seasonal data
+  duelsPlayed: Int!           # Number of duels participated in this season
+  duelWins: Int!              # Number of duels won this season
   
   createdAt: BigInt!
   lastUpdatedAt: BigInt!

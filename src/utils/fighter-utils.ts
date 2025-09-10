@@ -1,5 +1,5 @@
 import { log, BigInt } from "@graphprotocol/graph-ts";
-import { Name, Player, DefaultPlayer, DefaultPlayerProgression, Monster, MonsterProgression, FighterSnapshot } from "../../generated/schema";
+import { Name, Player, DefaultPlayer, Monster, FighterSnapshot } from "../../generated/schema";
 
 /**
  * Loads a fighter's first name based on index
@@ -69,17 +69,17 @@ export function getOrCreateFighterSnapshotById(fighterId: string, blockTimestamp
     return createPlayerSnapshot(player, blockTimestamp);
   }
   
-  // If level provided, try DefaultPlayerProgression
+  // If level provided, try DefaultPlayer
   if (level > 0 && level <= 10) {
-    let defaultPlayerProgression = DefaultPlayerProgression.load(fighterId + "-" + level.toString());
-    if (defaultPlayerProgression) {
-      return createDefaultPlayerProgressionSnapshot(defaultPlayerProgression, blockTimestamp);
+    let defaultPlayer = DefaultPlayer.load(fighterId + "-" + level.toString());
+    if (defaultPlayer) {
+      return createDefaultPlayerSnapshot(defaultPlayer, blockTimestamp);
     }
     
-    // Try MonsterProgression
-    let monsterProgression = MonsterProgression.load(fighterId + "-" + level.toString());
-    if (monsterProgression) {
-      return createMonsterProgressionSnapshot(monsterProgression, blockTimestamp);
+    // Try Monster
+    let monster = Monster.load(fighterId + "-" + level.toString());
+    if (monster) {
+      return createMonsterSnapshot(monster, blockTimestamp);
     }
   }
   
@@ -122,11 +122,11 @@ function createPlayerSnapshot(fighter: Player, blockTimestamp: BigInt): string |
 }
 
 /**
- * Create snapshot for DefaultPlayerProgression entity
+ * Create snapshot for DefaultPlayer entity
  */
-function createDefaultPlayerProgressionSnapshot(fighter: DefaultPlayerProgression, blockTimestamp: BigInt): string | null {
+function createDefaultPlayerSnapshot(fighter: DefaultPlayer, blockTimestamp: BigInt): string | null {
   if (!fighter.currentSkin) {
-    log.warning("createDefaultPlayerProgressionSnapshot: Fighter {} has no currentSkin", [fighter.id]);
+    log.warning("createDefaultPlayerSnapshot: Fighter {} has no currentSkin", [fighter.id]);
     return null;
   }
   
@@ -137,12 +137,14 @@ function createDefaultPlayerProgressionSnapshot(fighter: DefaultPlayerProgressio
   let snapshot = FighterSnapshot.load(snapshotId);
   
   if (snapshot) {
-    log.info("createDefaultPlayerProgressionSnapshot: Reusing existing snapshot {}", [snapshotId]);
+    log.info("createDefaultPlayerSnapshot: Reusing existing snapshot {}", [snapshotId]);
     return snapshotId;
   }
   
   snapshot = new FighterSnapshot(snapshotId);
-  snapshot.playerId = BigInt.fromString(fighter.player); // Use the parent DefaultPlayer ID
+  // Extract base ID from fighter.id (format: "baseId-level")
+  const idParts = fighter.id.split("-");
+  snapshot.playerId = BigInt.fromString(idParts[0]); // Use the base DefaultPlayer ID
   snapshot.fighterType = fighter.fighterType;
   snapshot.fullName = fighterNameStr;
   snapshot.currentSkin = fighter.currentSkin;
@@ -151,16 +153,16 @@ function createDefaultPlayerProgressionSnapshot(fighter: DefaultPlayerProgressio
   snapshot.createdAt = blockTimestamp;
   snapshot.save();
   
-  log.info("createDefaultPlayerProgressionSnapshot: Created snapshot {} for fighter {}", [snapshotId, fighter.id]);
+  log.info("createDefaultPlayerSnapshot: Created snapshot {} for fighter {}", [snapshotId, fighter.id]);
   return snapshotId;
 }
 
 /**
- * Create snapshot for MonsterProgression entity
+ * Create snapshot for Monster entity
  */
-function createMonsterProgressionSnapshot(fighter: MonsterProgression, blockTimestamp: BigInt): string | null {
+function createMonsterSnapshot(fighter: Monster, blockTimestamp: BigInt): string | null {
   if (!fighter.currentSkin) {
-    log.warning("createMonsterProgressionSnapshot: Fighter {} has no currentSkin", [fighter.id]);
+    log.warning("createMonsterSnapshot: Fighter {} has no currentSkin", [fighter.id]);
     return null;
   }
   
@@ -171,12 +173,14 @@ function createMonsterProgressionSnapshot(fighter: MonsterProgression, blockTime
   let snapshot = FighterSnapshot.load(snapshotId);
   
   if (snapshot) {
-    log.info("createMonsterProgressionSnapshot: Reusing existing snapshot {}", [snapshotId]);
+    log.info("createMonsterSnapshot: Reusing existing snapshot {}", [snapshotId]);
     return snapshotId;
   }
   
   snapshot = new FighterSnapshot(snapshotId);
-  snapshot.playerId = BigInt.fromString(fighter.monster); // Use the parent Monster ID
+  // Extract base ID from fighter.id (format: "baseId-level")
+  const idParts = fighter.id.split("-");
+  snapshot.playerId = BigInt.fromString(idParts[0]); // Use the base Monster ID
   snapshot.fighterType = fighter.fighterType;
   snapshot.fullName = fighterNameStr;
   snapshot.currentSkin = fighter.currentSkin;
@@ -185,6 +189,6 @@ function createMonsterProgressionSnapshot(fighter: MonsterProgression, blockTime
   snapshot.createdAt = blockTimestamp;
   snapshot.save();
   
-  log.info("createMonsterProgressionSnapshot: Created snapshot {} for fighter {}", [snapshotId, fighter.id]);
+  log.info("createMonsterSnapshot: Created snapshot {} for fighter {}", [snapshotId, fighter.id]);
   return snapshotId;
 }

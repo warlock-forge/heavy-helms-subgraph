@@ -65,6 +65,11 @@ export function getOrCreateStats(): Stats {
     stats.currentGauntletQueueSize = 0
     stats.currentGauntletSize = 0
     stats.currentMinTimeBetweenGauntlets = BigInt.fromI32(0)
+    
+    // Initialize Tournament-related fields
+    stats.totalTournamentsStarted = BigInt.fromI32(0)
+    stats.totalTournamentsCompleted = BigInt.fromI32(0)
+    stats.totalTournamentWins = BigInt.fromI32(0)
   }
   
   return stats as Stats
@@ -108,7 +113,6 @@ export function getOrCreatePlayerSeasonalStats(
   if (!stats) {
     stats = new PlayerSeasonalStats(statsId);
     stats.season = seasonId;
-    stats.player = playerId;
     stats.seasonId = BigInt.fromString(seasonId);
     stats.playerId = BigInt.fromString(playerId);
     stats.wins = 0;
@@ -119,6 +123,8 @@ export function getOrCreatePlayerSeasonalStats(
     stats.tournamentWins = 0;
     stats.gauntletsPlayed = 0;
     stats.gauntletWins = 0;
+    stats.duelsPlayed = 0;
+    stats.duelWins = 0;
     stats.createdAt = timestamp;
     stats.lastUpdatedAt = timestamp;
   }
@@ -1332,12 +1338,49 @@ export function updateStatsForTournamentWin(winnerId: string): void {
   // Increment tournament wins counter
   stats.totalTournamentWins = stats.totalTournamentWins.plus(BigInt.fromI32(1));
   
+  // Update player's lifetime tournament wins
+  let player = Player.load(winnerId);
+  if (player) {
+    player.tournamentWins += 1;
+    player.lastUpdatedAt = stats.lastUpdated;
+    player.save();
+  }
+  
   log.info("[updateStatsForTournamentWin] Incremented tournament wins to {} for winner {}", [
     stats.totalTournamentWins.toString(),
     winnerId
   ]);
   
   stats.save();
+}
+
+/**
+ * Updates seasonal duel statistics for both players
+ * Note: Duels are for fun and don't affect official Player win/loss records
+ */
+export function updateSeasonalDuelStats(winnerId: string, loserId: string, timestamp: BigInt): void {
+  // Get current season (assume season 0 for now, this could be dynamic)
+  const currentSeasonId = "0";
+  
+  // Update winner's seasonal stats
+  let winnerSeasonalStats = getOrCreatePlayerSeasonalStats(winnerId, currentSeasonId, timestamp);
+  winnerSeasonalStats.duelsPlayed += 1;
+  winnerSeasonalStats.duelWins += 1;
+  winnerSeasonalStats.lastUpdatedAt = timestamp;
+  winnerSeasonalStats.save();
+  
+  // Update loser's seasonal stats
+  let loserSeasonalStats = getOrCreatePlayerSeasonalStats(loserId, currentSeasonId, timestamp);
+  loserSeasonalStats.duelsPlayed += 1;
+  // duelWins stays the same for loser
+  loserSeasonalStats.lastUpdatedAt = timestamp;
+  loserSeasonalStats.save();
+  
+  log.info("[updateSeasonalDuelStats] Updated seasonal duel stats for winner {} and loser {} in season {}", [
+    winnerId,
+    loserId,
+    currentSeasonId
+  ]);
 }
 
 

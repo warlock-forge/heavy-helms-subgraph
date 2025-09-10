@@ -5,7 +5,6 @@ import {
 } from "../generated/Monster/Monster";
 import {
   Monster,
-  MonsterProgression,
   MonsterCreated,
   MonsterStatsUpdated,
   Skin
@@ -64,34 +63,13 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
   createdEvent.armorSpecialization = firstStats.armorSpecialization;
   createdEvent.save();
 
-  // Create the Monster identity container
   const monsterId = event.params.monsterId.toString();
-  const monster = new Monster(monsterId);
-  monster.fighterId = event.params.monsterId;
   
-  // Set identity data (shared across all levels) - validated to be consistent above
-  monster.firstNameIndex = firstStats.name.nameIndex;
-  monster.surnameIndex = 0; // Monsters don't have surnames
-  monster.stance = firstStats.stance;
-  
-  // Load and set name using utility function, with isMonster=true
+  // Load shared identity data once (validated to be consistent across all levels)
   const monsterName = loadFirstName(firstStats.name.nameIndex, true);
-  monster.firstName = monsterName;
-  monster.surname = null; // No surname for monsters
-  monster.fullName = monsterName; // Just use the monster name
-  
-  // Construct the consistent skin ID (validated to be same across all levels)
   const skinIndex = firstStats.skin.skinIndex;
   const skinTokenId = firstStats.skin.skinTokenId;
   const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
-  monster.currentSkin = skinId;
-  
-  // Set timestamps
-  monster.createdAt = event.block.timestamp;
-  monster.lastUpdatedAt = event.block.timestamp;
-  monster.save();
-  
-  log.info("Created Monster identity container: {} ({})", [monsterId, monsterName ? monsterName : "Unknown"]);
   
   // Create ALL 10 progression levels - no defaults, no shortcuts
   for (let i = 0; i < event.params.allLevelStats.length; i++) {
@@ -104,53 +82,53 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
       continue;
     }
     
-    // Create MonsterProgression entity
-    const progressionId = monsterId + "-" + level.toString();
-    const progression = new MonsterProgression(progressionId);
+    // Create Monster entity for this level
+    const monsterLevelId = monsterId + "-" + level.toString();
+    const monsterLevel = new Monster(monsterLevelId);
     
     // Set Fighter interface fields
-    progression.fighterId = event.params.monsterId.times(BigInt.fromI32(100)).plus(BigInt.fromI32(level));
-    progression.fighterType = "Monster";
-    progression.monster = monsterId;
-    progression.level = level;
-    progression.isRetired = false;
+    monsterLevel.fighterId = event.params.monsterId.times(BigInt.fromI32(100)).plus(BigInt.fromI32(level));
+    monsterLevel.fighterType = "Monster";
+    monsterLevel.level = level;
+    monsterLevel.isRetired = false;
     
     // Set level-specific combat attributes
-    progression.strength = levelStats.attributes.strength;
-    progression.constitution = levelStats.attributes.constitution;
-    progression.size = levelStats.attributes.size;
-    progression.agility = levelStats.attributes.agility;
-    progression.stamina = levelStats.attributes.stamina;
-    progression.luck = levelStats.attributes.luck;
-    progression.weaponSpecialization = levelStats.weaponSpecialization;
-    progression.armorSpecialization = levelStats.armorSpecialization;
+    monsterLevel.strength = levelStats.attributes.strength;
+    monsterLevel.constitution = levelStats.attributes.constitution;
+    monsterLevel.size = levelStats.attributes.size;
+    monsterLevel.agility = levelStats.attributes.agility;
+    monsterLevel.stamina = levelStats.attributes.stamina;
+    monsterLevel.luck = levelStats.attributes.luck;
+    monsterLevel.weaponSpecialization = levelStats.weaponSpecialization;
+    monsterLevel.armorSpecialization = levelStats.armorSpecialization;
     
-    // Copy shared identity data from parent (already validated to be consistent)
-    progression.firstNameIndex = monster.firstNameIndex;
-    progression.surnameIndex = monster.surnameIndex;
-    progression.firstName = monster.firstName;
-    progression.surname = monster.surname;
-    progression.fullName = monster.fullName;
-    progression.currentSkin = monster.currentSkin;
-    progression.stance = monster.stance;
+    // Set shared identity data (already validated to be consistent across all levels)
+    monsterLevel.firstNameIndex = firstStats.name.nameIndex;
+    monsterLevel.surnameIndex = 0; // Monsters don't have surnames
+    monsterLevel.firstName = monsterName;
+    monsterLevel.surname = null; // No surname for monsters
+    monsterLevel.fullName = monsterName; // Just use the monster name
+    monsterLevel.currentSkin = skinId;
+    monsterLevel.stance = firstStats.stance;
     
     // Set progression fields (always 0 for Monsters)
-    progression.currentXP = 0;
+    monsterLevel.currentXP = 0;
     
     // Set record fields (always 0 for Monsters)
-    progression.wins = 0;
-    progression.losses = 0;
-    progression.kills = 0;
-    progression.gauntletWins = 0;
-    progression.duelWins = 0;
+    monsterLevel.wins = 0;
+    monsterLevel.losses = 0;
+    monsterLevel.kills = 0;
+    monsterLevel.gauntletWins = 0;
+    monsterLevel.duelWins = 0;
+    monsterLevel.tournamentWins = 0;
     
     // Set timestamps
-    progression.createdAt = event.block.timestamp;
-    progression.lastUpdatedAt = event.block.timestamp;
-    progression.save();
+    monsterLevel.createdAt = event.block.timestamp;
+    monsterLevel.lastUpdatedAt = event.block.timestamp;
+    monsterLevel.save();
     
-    log.info("Created MonsterProgression: {} (level {} with {} STR, {} CON, {} SIZ, {} AGI, {} STA, {} LUK)", [
-      progressionId, 
+    log.info("Created Monster: {} (level {} with {} STR, {} CON, {} SIZ, {} AGI, {} STA, {} LUK)", [
+      monsterLevelId, 
       level.toString(),
       levelStats.attributes.strength.toString(),
       levelStats.attributes.constitution.toString(),
@@ -196,83 +174,49 @@ export function handleMonsterStatsUpdated(event: MonsterStatsUpdatedEvent): void
   updatedEvent.stance = event.params.stats.stance;
   updatedEvent.save();
 
-  // Update the Monster identity container if needed
+  // Update the specific Monster level
   const monsterId = event.params.monsterId.toString();
-  let monster = Monster.load(monsterId);
-  
-  if (monster == null) {
-    log.error("handleMonsterStatsUpdated: Monster {} not found!", [monsterId]);
-    return; 
-  }
-  
-  // Check if shared identity data changed (name, skin, stance)
-  let identityChanged = false;
-  
-  if (monster.firstNameIndex != event.params.stats.name.nameIndex ||
-      monster.stance != event.params.stats.stance) {
-    
-    // Update identity data
-    monster.firstNameIndex = event.params.stats.name.nameIndex;
-    monster.stance = event.params.stats.stance;
-    
-    // Load and set name
-    const monsterName = loadFirstName(event.params.stats.name.nameIndex, true);
-    monster.firstName = monsterName;
-    monster.surname = null; // No surname for monsters
-    monster.fullName = monsterName; // Just use the monster name
-    
-    // Check skin change
-    const skinIndex = event.params.stats.skin.skinIndex;
-    const skinTokenId = event.params.stats.skin.skinTokenId;
-    const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
-    
-    if (monster.currentSkin != skinId) {
-      monster.currentSkin = skinId;
-      log.info("handleMonsterStatsUpdated: Updated skin ID '{}' for Monster '{}'", [skinId, monster.id]);
-    }
-    
-    monster.lastUpdatedAt = event.block.timestamp;
-    monster.save();
-    
-    identityChanged = true;
-  }
-  
-  // Update the specific MonsterProgression level
   const level = event.params.stats.level;
-  const progressionId = monsterId + "-" + level.toString();
-  let progression = MonsterProgression.load(progressionId);
+  const monsterLevelId = monsterId + "-" + level.toString();
+  let monsterLevel = Monster.load(monsterLevelId);
   
-  if (progression == null) {
-    log.error("handleMonsterStatsUpdated: MonsterProgression {} not found!", [progressionId]);
+  if (monsterLevel == null) {
+    log.error("handleMonsterStatsUpdated: Monster {} not found!", [monsterLevelId]);
     return;
   }
   
   // Update level-specific combat attributes
-  progression.strength = event.params.stats.attributes.strength;
-  progression.constitution = event.params.stats.attributes.constitution;
-  progression.size = event.params.stats.attributes.size;
-  progression.agility = event.params.stats.attributes.agility;
-  progression.stamina = event.params.stats.attributes.stamina;
-  progression.luck = event.params.stats.attributes.luck;
-  progression.weaponSpecialization = event.params.stats.weaponSpecialization;
-  progression.armorSpecialization = event.params.stats.armorSpecialization;
+  monsterLevel.strength = event.params.stats.attributes.strength;
+  monsterLevel.constitution = event.params.stats.attributes.constitution;
+  monsterLevel.size = event.params.stats.attributes.size;
+  monsterLevel.agility = event.params.stats.attributes.agility;
+  monsterLevel.stamina = event.params.stats.attributes.stamina;
+  monsterLevel.luck = event.params.stats.attributes.luck;
+  monsterLevel.weaponSpecialization = event.params.stats.weaponSpecialization;
+  monsterLevel.armorSpecialization = event.params.stats.armorSpecialization;
   
-  // Update shared identity data if it changed
-  if (identityChanged) {
-    progression.firstNameIndex = monster.firstNameIndex;
-    progression.surnameIndex = monster.surnameIndex;
-    progression.firstName = monster.firstName;
-    progression.surname = monster.surname;
-    progression.fullName = monster.fullName;
-    progression.currentSkin = monster.currentSkin;
-    progression.stance = monster.stance;
-  }
+  // Update shared identity data directly (name, skin, stance)
+  monsterLevel.firstNameIndex = event.params.stats.name.nameIndex;
+  monsterLevel.surnameIndex = 0; // Monsters don't have surnames
+  monsterLevel.stance = event.params.stats.stance;
   
-  progression.lastUpdatedAt = event.block.timestamp;
-  progression.save();
+  // Update name if changed
+  const monsterName = loadFirstName(event.params.stats.name.nameIndex, true);
+  monsterLevel.firstName = monsterName;
+  monsterLevel.surname = null; // No surname for monsters
+  monsterLevel.fullName = monsterName;
   
-  log.info("Updated MonsterProgression: {} (level {} with {} STR, {} CON, {} SIZ, {} AGI, {} STA, {} LUK)", [
-    progressionId, 
+  // Update skin if changed
+  const skinIndex = event.params.stats.skin.skinIndex;
+  const skinTokenId = event.params.stats.skin.skinTokenId;
+  const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
+  monsterLevel.currentSkin = skinId;
+  
+  monsterLevel.lastUpdatedAt = event.block.timestamp;
+  monsterLevel.save();
+  
+  log.info("Updated Monster: {} (level {} with {} STR, {} CON, {} SIZ, {} AGI, {} STA, {} LUK)", [
+    monsterLevelId, 
     level.toString(),
     event.params.stats.attributes.strength.toString(),
     event.params.stats.attributes.constitution.toString(),

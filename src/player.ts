@@ -127,13 +127,12 @@ export function handleGameContractPermissionsUpdated(
   );
   entity.gameContract = event.params.gameContract;
   // Map permissions tuple to individual boolean fields
-  // Player contract has: record, retire, attributes, immortal, experience
+  // Player contract v1.0.1 has: record, retire, immortal, experience (4 fields)
   const permissions = event.params.permissions;
   entity.permissions_record = permissions[0].toBoolean();
   entity.permissions_retire = permissions[1].toBoolean();
-  entity.permissions_attributes = permissions[2].toBoolean();
-  entity.permissions_immortal = permissions[3].toBoolean();
-  entity.permissions_experience = permissions[4].toBoolean();
+  entity.permissions_immortal = permissions[2].toBoolean();
+  entity.permissions_experience = permissions[3].toBoolean();
 
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
@@ -296,11 +295,16 @@ export function handlePlayerCreationComplete(
   
   player.gauntletWins = 0; // Initialize gauntlet wins counter
   player.duelWins = 0; // Initialize duel wins counter
+  player.tournamentWins = 0; // Initialize tournament wins counter
   player.totalFights = 0; // Initialize total fights counter
   player.winPercentage = BigDecimal.fromString("0"); // Initialize win percentage
   
   // Set gauntlet status to NONE by default
   player.gauntletStatus = "NONE";
+  
+  // Set tournament status to NONE by default
+  player.tournamentStatus = "NONE";
+  player.currentTournament = null;
   
   // Initialize progression fields
   player.level = 1;

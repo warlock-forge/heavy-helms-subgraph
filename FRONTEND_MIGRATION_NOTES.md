@@ -401,4 +401,97 @@ This maintains frontend query compatibility while supporting both game types eff
 
 ---
 
+## 7. v1.0.1 Fighter Interface Updates
+
+### New Tournament Wins Tracking
+**NON-BREAKING**: Added `tournamentWins` field to Fighter interface for consistency:
+
+```graphql
+interface Fighter {
+  # Existing record fields
+  wins: Int!              # Official tournament/gauntlet wins only  
+  losses: Int!
+  kills: Int!
+  gauntletWins: Int!      # Number of gauntlets won
+  duelWins: Int!          # Number of duels won (for fun)
+  tournamentWins: Int!    # NEW: Number of tournaments won
+}
+```
+
+#### Key Points:
+- ✅ **All Fighter entities updated**: Player, DefaultPlayer, Monster all have `tournamentWins`
+- ✅ **Consistent tracking**: Separate counters for each game mode (duels, gauntlets, tournaments)
+- ✅ **Official vs Fun distinction**: `wins` field tracks only official competitive results (tournaments + gauntlets), while `duelWins` tracks "for fun" duels
+
+### Updated Player Query Example:
+```graphql
+{
+  players {
+    id
+    fighterId
+    fighterType
+    fullName
+    level
+    currentXP
+    weaponSpecialization
+    armorSpecialization
+    attributePoints
+    strength
+    constitution
+    size
+    agility
+    stamina
+    luck
+    wins              # Official record (tournaments + gauntlets)
+    losses
+    kills
+    gauntletWins      # Gauntlet-specific wins
+    duelWins          # Fun duel wins (not official)
+    tournamentWins    # Tournament-specific wins
+    currentSkin { id }
+    stance
+    isRetired
+    isImmortal
+    createdAt
+  }
+}
+```
+
+### Seasonal Duel Stats Enhanced
+**NEW**: Added seasonal tracking for "fun" duels:
+
+```graphql
+type PlayerSeasonalStats @entity {
+  id: ID!                     # "{seasonId}-{playerId}"
+  seasonId: BigInt!           # Direct season ID for filtering
+  playerId: BigInt!           # Direct player ID for filtering
+  
+  # Tournament stats (official)
+  tournamentsPlayed: Int!
+  tournamentWins: Int!
+  
+  # Gauntlet stats (official)  
+  gauntletsPlayed: Int!
+  gauntletWins: Int!
+  
+  # Duel stats (fun/casual) - NEW in v1.0.1
+  duelsPlayed: Int!           # NEW: Total duels this season
+  duelWins: Int!              # NEW: Duel wins this season
+}
+```
+
+#### Benefits:
+- ✅ **Seasonal leaderboards**: Track duel performance by season
+- ✅ **Efficient queries**: No player entity reference needed, use `playerId` directly  
+- ✅ **Fun vs Competitive separation**: Clear distinction between casual duels and official tournaments
+
+### Frontend Updates Required:
+- [ ] Add `tournamentWins` to all Fighter-related TypeScript interfaces
+- [ ] Add `tournamentWins` to all Fighter-related GraphQL queries
+- [ ] Update player stat displays to show tournament-specific wins
+- [ ] Add seasonal duel stats components (leaderboards, personal stats)
+- [ ] Update win percentage calculations to clarify official vs fun records
+
+---
+
 *This file will be updated as we make schema changes*
