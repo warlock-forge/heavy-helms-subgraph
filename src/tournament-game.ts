@@ -46,8 +46,8 @@ import {
 } from "../generated/schema";
 
 import { getOrCreateStats, getOrCreatePlayerSeasonalStats } from "./utils/stats-utils";
-import { updatePlayerWinPercentages, processCombatResultsWithPlayerData, decodePlayerData, updateSkinCombatAnalytics, updatePlayerSkinCombatAnalytics, u32BE, updateStatsForTournamentWin } from "./utils/stats-utils";
-import { getOrCreateFighterSnapshotById } from "./utils/fighter-utils";
+import { updateStatsForTournamentWin } from "./utils/stats-utils";
+import { getOrCreateFighterSnapshotById, createFighterSnapshotFromPlayerData, processCombatResultEvent } from "./utils/fighter-utils";
 
 // Define ZERO_BI directly
 const ZERO_BI = BigInt.fromI32(0);
@@ -190,22 +190,7 @@ export function handleTournamentStarted(event: TournamentStartedEvent): void {
     
     participant.tournament = tournamentId;
     
-    // Create fighter snapshot for this participant (tournaments are always level 10)
-    const fighterSnapshotId = getOrCreateFighterSnapshotById(participantIdString, event.block.timestamp, 10);
-    if (fighterSnapshotId) {
-      participant.fighterSnapshot = fighterSnapshotId;
-      log.info("[Tournament {}] Participant [{}]: Created/linked fighter snapshot {}", [
-        tournamentId, 
-        participantIdString, 
-        fighterSnapshotId
-      ]);
-    } else {
-      log.error("[Tournament {}] Participant [{}]: Failed to create fighter snapshot", [
-        tournamentId, 
-        participantIdString
-      ]);
-      continue; // Skip this participant if we can't create a snapshot
-    }
+    // Note: Individual FighterSnapshots will be created per combat in CombatResult events
     
     log.info("[Tournament {}] Participant [{}]: Attempting to save TournamentParticipant ID: {}", [
       tournamentId, 
@@ -658,35 +643,20 @@ export function handleGameEnabledChanged(event: GameEnabledChangedEvent): void {
  * Handle CombatResult events from Tournament matches
  */
 export function handleCombatResult(event: CombatResultEvent): void {
-  log.info("[TournamentGame CombatResult] Processing combat result in tx {}", [
-    event.transaction.hash.toHex()
-  ]);
+  log.info("[TOURNAMENT] Processing CombatResult event in tx {}", [event.transaction.hash.toHex()]);
   
-  // Create CombatResult entity
-  let entityId = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
-  let combatResult = new CombatResult(entityId);
+  // Use shared combat result processing logic (tournaments are official - include skin stats)
+  processCombatResultEvent(
+    event.transaction.hash,
+    event.logIndex,
+    event.params.player1Data,
+    event.params.player2Data,
+    event.params.winningPlayerId,
+    event.params.packedResults,
+    event.block.number,
+    event.block.timestamp,
+    true  // updateSkinStats: true for official tournament combats
+  );
   
-  combatResult.transactionHash = event.transaction.hash;
-  combatResult.logIndex = event.logIndex.toI32();
-  combatResult.player1Data = event.params.player1Data;
-  combatResult.player2Data = event.params.player2Data;
-  combatResult.winningPlayerId = event.params.winningPlayerId;
-  combatResult.packedResults = event.params.packedResults;
-  combatResult.blockNumber = event.block.number;
-  combatResult.blockTimestamp = event.block.timestamp;
-  
-  // Decode player data to set historical loadout fields
-  let p1Data = decodePlayerData(event.params.player1Data);
-  let p2Data = decodePlayerData(event.params.player2Data);
-  
-  combatResult.player1SkinCollectionId = BigInt.fromI32(p1Data.skinCollectionId);
-  combatResult.player1SkinTokenId = p1Data.skinTokenId;
-  combatResult.player1Stance = p1Data.stance;
-  combatResult.player2SkinCollectionId = BigInt.fromI32(p2Data.skinCollectionId);
-  combatResult.player2SkinTokenId = p2Data.skinTokenId;
-  combatResult.player2Stance = p2Data.stance;
-  
-  combatResult.save();
-  
-  log.info("[TournamentGame CombatResult] Saved combat result entity {}", [entityId]);
+  log.info("[TOURNAMENT] Completed CombatResult processing for tx {}", [event.transaction.hash.toHex()]);
 }

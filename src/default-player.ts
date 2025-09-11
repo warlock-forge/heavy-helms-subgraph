@@ -15,6 +15,7 @@ import {
   loadFirstName, 
   loadSurname, 
   createFullName,
+  loadSkinIdOrDefault
 } from "./utils/fighter-utils";
 
 import { updateStatsForDefaultPlayerCreation } from "./utils/stats-utils";
@@ -114,7 +115,8 @@ export function handleDefaultPlayerCreated(event: DefaultPlayerCreatedEvent): vo
     defaultPlayerLevel.firstName = firstName;
     defaultPlayerLevel.surname = surname;
     defaultPlayerLevel.fullName = fullName;
-    defaultPlayerLevel.currentSkin = skinId;
+    // Set skin with fallback to default
+    defaultPlayerLevel.currentSkin = loadSkinIdOrDefault(skinId);
     defaultPlayerLevel.stance = firstStats.stance;
     
     // Set progression fields (always 0 for DefaultPlayers)
@@ -217,7 +219,8 @@ export function handleDefaultPlayerStatsUpdated(event: DefaultPlayerStatsUpdated
   const skinIndex = event.params.stats.skin.skinIndex;
   const skinTokenId = event.params.stats.skin.skinTokenId;
   const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
-  defaultPlayerLevel.currentSkin = skinId;
+  // Set skin with fallback to default
+  defaultPlayerLevel.currentSkin = loadSkinIdOrDefault(skinId);
   
   defaultPlayerLevel.lastUpdatedAt = event.block.timestamp;
   defaultPlayerLevel.save();

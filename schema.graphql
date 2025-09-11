@@ -1,4 +1,13 @@
 # ==========================================================
+#                   SINGLETON ENTITIES                       
+# ==========================================================
+# Counter for generating sequential snapshot IDs
+type SnapshotCounter @entity {
+  id: ID!          # Always "counter"
+  nextId: BigInt!  # Next available ID number
+}
+
+# ==========================================================
 #                   INTERFACES                               
 # ==========================================================
 # Add a Fighter interface that represents common properties
@@ -23,7 +32,7 @@ interface Fighter {
   fullName: String
   
   # Skin information
-  currentSkin: Skin
+  currentSkin: Skin!
   
   # Record fields
   wins: Int!
@@ -74,7 +83,7 @@ type Player implements Fighter @entity {
   fullName: String
   
   # Skin information
-  currentSkin: Skin
+  currentSkin: Skin!
   
   # Record fields
   wins: Int!
@@ -130,7 +139,7 @@ type DefaultPlayer implements Fighter @entity {
   firstName: String
   surname: String
   fullName: String
-  currentSkin: Skin
+  currentSkin: Skin!
   stance: Int!
   
   # Progression fields
@@ -172,7 +181,7 @@ type Monster implements Fighter @entity {
   firstName: String
   surname: String
   fullName: String
-  currentSkin: Skin
+  currentSkin: Skin!
   stance: Int!
   
   # Progression fields
@@ -660,23 +669,70 @@ type OwnershipTransferred @entity(immutable: true) {
 # ==========================================================
 #                   FIGHTER SNAPSHOTS                       
 # ==========================================================
-# Lean snapshot entity for historical display data
-# Deduplicates based on name+skin+stance+level combination
+# Complete historical snapshot entity containing all fighter data at combat time
+# Created for each fighter in each combat for battle archives and historical analysis
 type FighterSnapshot @entity(immutable: true) {
-  id: ID!                    # "playerId-fullName-skinId-stance-level"
+  id: ID!                    # "combatResultId-1" or "combatResultId-2" (player1/player2)
   
-  # Fighter identification
+  # Fighter identification (bytes [0-3])
   playerId: BigInt!          # The actual player/defaultPlayer/monster ID
   fighterType: String!       # "Player", "DefaultPlayer", or "Monster"
   
-  # Display data
-  fullName: String!          # Computed name for UI display
-  currentSkin: Skin          # Link to skin entity
-  stance: Int!               # Stance at snapshot time
-  level: Int!                # Progression level at snapshot time
+  # Attributes (bytes [4-9])
+  strength: Int!             # byte 4
+  constitution: Int!         # byte 5
+  size: Int!                 # byte 6
+  agility: Int!              # byte 7
+  stamina: Int!              # byte 8
+  luck: Int!                 # byte 9
+  
+  # Skin info (bytes [10-15])
+  skinIndex: BigInt!         # bytes [10-13] - skin collection ID
+  skinTokenId: Int!          # bytes [14-15] - token ID within collection
+  currentSkin: Skin!         # Resolved skin entity (required, fallback to default)
+  
+  # Stance (byte [16])
+  stance: Int!               # byte 16 - 0=Defensive, 1=Balanced, 2=Offensive
+  
+  # Names (bytes [17-20])
+  firstNameIndex: Int!       # bytes [17-18]
+  surnameIndex: Int!         # bytes [19-20] 
+  fullName: String!          # Computed from name indices for display
+  
+  # Combat Record AT THAT TIME (bytes [21-26])
+  wins: Int!                 # bytes [21-22] - wins at time of combat
+  losses: Int!               # bytes [23-24] - losses at time of combat
+  kills: Int!                # bytes [25-26] - kills at time of combat
+  
+  # Progression AT THAT TIME (bytes [27-31])
+  level: Int!                # byte 27 - character level (1-10)
+  currentXP: Int!            # bytes [28-29] - experience points
+  weaponSpecialization: Int! # byte 30 - weapon class specialization (255 = none)
+  armorSpecialization: Int!  # byte 31 - armor specialization (255 = none)
   
   # Snapshot metadata
-  createdAt: BigInt!         # When this combination was first seen
+  createdAt: BigInt!         # Block timestamp when snapshot was created
+}
+
+# ==========================================================
+#                   FIGHTER PARTICIPANTS                     
+# ==========================================================
+# Represents a locked loadout commitment (skin + stance)
+# Reusable across duels, gauntlets, tournaments
+type FighterParticipant @entity {
+  id: ID!                    # Counter-based unique ID
+  
+  # Core fighter reference
+  playerId: BigInt!          # The fighter who committed this loadout
+  fighterType: String!       # "Player", "DefaultPlayer", or "Monster"
+  
+  # Locked loadout data
+  skinIndex: BigInt!         # Committed skin collection ID
+  skinTokenId: Int!          # Committed skin token ID within collection
+  stance: Int!               # Committed stance (0=Defensive, 1=Balanced, 2=Offensive)
+  
+  # Metadata
+  createdAt: BigInt!         # When this loadout commitment was made
 }
 
 # ==========================================================
@@ -691,9 +747,9 @@ type DuelChallenge @entity {
   challengerOwner: Owner
   defenderOwner: Owner
   
-  # Historical fighter snapshots (created when combat occurs)
-  challengerSnapshot: FighterSnapshot
-  defenderSnapshot: FighterSnapshot
+  # Locked loadout commitments
+  challengerParticipant: FighterParticipant!    # Created at challenge creation
+  defenderParticipant: FighterParticipant       # Created at challenge acceptance
   
   createdBlock: BigInt!
   createdAt: BigInt!
@@ -784,23 +840,22 @@ type CombatResult @entity(immutable: true) {
   id: ID!                  
   transactionHash: Bytes! @index
   logIndex: Int!           
-  player1Data: Bytes!
-  player2Data: Bytes!
+  
+  # Player IDs for efficient querying and role mapping
+  player1Id: BigInt!       # Extracted from player1Data bytes [0-3]
+  player2Id: BigInt!       # Extracted from player2Data bytes [0-3]
+  
+  # Raw blockchain data (kept for debugging/verification)
+  player1Data: Bytes!      # Raw encoded player 1 data
+  player2Data: Bytes!      # Raw encoded player 2 data
   winningPlayerId: BigInt!
   packedResults: Bytes!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   
-  # NEW: Historical loadout data (extracted from player1Data/player2Data)
-  player1SkinCollectionId: BigInt!    # Skin Index from bytes 10-13
-  player1SkinTokenId: Int!            # Skin Token ID from bytes 14-15
-  player1Skin: Skin                   # Reference to actual Skin entity (if exists)
-  player1Stance: Int!                 # Stance from byte 16 (0=Defensive, 1=Balanced, 2=Offensive)
-  
-  player2SkinCollectionId: BigInt!    # Skin Index from bytes 10-13  
-  player2SkinTokenId: Int!            # Skin Token ID from bytes 14-15
-  player2Skin: Skin                   # Reference to actual Skin entity (if exists)
-  player2Stance: Int!                 # Stance from byte 16 (0=Defensive, 1=Balanced, 2=Offensive)
+  # Historical fighter snapshots (decoded from player1Data/player2Data)
+  player1Snapshot: FighterSnapshot!   # Complete historical state of player 1
+  player2Snapshot: FighterSnapshot!   # Complete historical state of player 2
   
   # Decoded combat statistics (extracted from packedResults)
   player1Won: Boolean!      # True if player1 won, false if player2 won
@@ -1147,7 +1202,7 @@ type Gauntlet @entity {
 type GauntletParticipant @entity {
   id: ID!                  # Composite ID: "{gauntletId}-{playerId}"
   gauntlet: Gauntlet!      # Link back to the Gauntlet
-  fighterSnapshot: FighterSnapshot! # Historical snapshot of the participant
+  participant: FighterParticipant! # Locked loadout commitment when joining gauntlet
 }
 
 # ==========================================================
@@ -1179,7 +1234,7 @@ enum TournamentState {
 type TournamentParticipant @entity {
   id: ID!                  # Composite ID: "{tournamentId}-{playerId}"
   tournament: Tournament!  # Link back to the Tournament
-  fighterSnapshot: FighterSnapshot! # Historical snapshot of the participant
+  participant: FighterParticipant! # Locked loadout commitment when joining tournament
 }
 
 # ==========================================================

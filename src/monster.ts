@@ -11,6 +11,7 @@ import {
 } from "../generated/schema";
 import { 
   loadFirstName,
+  loadSkinIdOrDefault
 } from "./utils/fighter-utils";
 import { 
   updateStatsForMonsterCreation
@@ -108,7 +109,8 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
     monsterLevel.firstName = monsterName;
     monsterLevel.surname = null; // No surname for monsters
     monsterLevel.fullName = monsterName; // Just use the monster name
-    monsterLevel.currentSkin = skinId;
+    // Set skin with fallback to default
+    monsterLevel.currentSkin = loadSkinIdOrDefault(skinId);
     monsterLevel.stance = firstStats.stance;
     
     // Set progression fields (always 0 for Monsters)
@@ -210,7 +212,8 @@ export function handleMonsterStatsUpdated(event: MonsterStatsUpdatedEvent): void
   const skinIndex = event.params.stats.skin.skinIndex;
   const skinTokenId = event.params.stats.skin.skinTokenId;
   const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
-  monsterLevel.currentSkin = skinId;
+  // Set skin with fallback to default
+  monsterLevel.currentSkin = loadSkinIdOrDefault(skinId);
   
   monsterLevel.lastUpdatedAt = event.block.timestamp;
   monsterLevel.save();

@@ -70,7 +70,7 @@ import {
   PlayerSeasonalStats,
   Accounting
 } from "../generated/schema";
-import { loadFirstName, loadSurname, createFullName } from "./utils/fighter-utils";
+import { loadFirstName, loadSurname, createFullName, loadSkinIdOrDefault } from "./utils/fighter-utils";
 import { 
   updateStatsForPlayerCreation, 
   updateStatsForPlayerRetirement, 
@@ -278,20 +278,9 @@ export function handlePlayerCreationComplete(
   player.surname = surname;
   player.fullName = createFullName(firstName, surname);
   
-  // Set default skin using direct approach
-  const skinIndex = BigInt.fromI32(0);
-  const skinTokenId = 1;
-  const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
-  
-  // Check if the skin exists before assigning it
-  const skin = Skin.load(skinId);
-  if (skin !== null) {
-    player.currentSkin = skinId;
-    log.info("Set default skin for new player: {}", [player.id]);
-  } else {
-    log.warning("Default skin not found: {}", [skinId]);
-    player.currentSkin = null;
-  }
+  // New players always start with default skin 0-1 (schema requires non-null currentSkin)
+  player.currentSkin = "0-1";
+  log.info("Set default skin 0-1 for new player: {}", [player.id]);
   
   player.gauntletWins = 0; // Initialize gauntlet wins counter
   player.duelWins = 0; // Initialize duel wins counter
@@ -476,14 +465,9 @@ export function handlePlayerSkinEquipped(
     // Construct skin ID from collection index and token ID
     const skinId = event.params.skinIndex.toString() + "-" + event.params.tokenId.toString();
     
-    // Verify the skin exists before updating
-    const skin = Skin.load(skinId);
-    if (skin !== null) {
-      player.currentSkin = skinId;
-      log.info("Equipped skin {} on player {}", [skinId, player.id]);
-    } else {
-      log.warning("Attempted to equip non-existent skin: {}", [skinId]);
-    }
+    // Update skin (with fallback to default if needed)
+    player.currentSkin = loadSkinIdOrDefault(skinId);
+    log.info("Equipped skin {} on player {}", [skinId, player.id]);
     
     player.lastUpdatedAt = event.block.timestamp;
     player.save();
@@ -866,6 +850,15 @@ export function handlePlayerWinRecorded(event: PlayerWinRecordedEvent): void {
   let player = Player.load(event.params.playerId.toString());
   if (player) {
     player.wins += 1;
+    player.totalFights += 1;
+    
+    // Calculate new win percentage: (wins / totalFights) * 100
+    if (player.totalFights > 0) {
+      player.winPercentage = BigDecimal.fromString(player.wins.toString())
+        .div(BigDecimal.fromString(player.totalFights.toString()))
+        .times(BigDecimal.fromString("100"));
+    }
+    
     player.lastUpdatedAt = event.block.timestamp;
     player.save();
   }
@@ -890,6 +883,15 @@ export function handlePlayerLossRecorded(event: PlayerLossRecordedEvent): void {
   let player = Player.load(event.params.playerId.toString());
   if (player) {
     player.losses += 1;
+    player.totalFights += 1;
+    
+    // Calculate new win percentage: (wins / totalFights) * 100
+    if (player.totalFights > 0) {
+      player.winPercentage = BigDecimal.fromString(player.wins.toString())
+        .div(BigDecimal.fromString(player.totalFights.toString()))
+        .times(BigDecimal.fromString("100"));
+    }
+    
     player.lastUpdatedAt = event.block.timestamp;
     player.save();
   }

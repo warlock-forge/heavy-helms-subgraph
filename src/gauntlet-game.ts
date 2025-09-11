@@ -64,8 +64,8 @@ import {
 } from "../generated/schema";
 
 import { getOrCreateStats, getOrCreateAccounting } from "./utils/stats-utils";
-import { updatePlayerWinPercentages, updateStatsForGauntletWin, processCombatResultsWithPlayerData, decodePlayerData, updateSkinCombatAnalytics, updatePlayerSkinCombatAnalytics, u32BE } from "./utils/stats-utils";
-import { getOrCreateFighterSnapshotById } from "./utils/fighter-utils";
+import { updateStatsForGauntletWin } from "./utils/stats-utils";
+import { getOrCreateFighterSnapshotById, createFighterSnapshotFromPlayerData, processCombatResultEvent } from "./utils/fighter-utils";
 
 // Define ZERO_BI directly
 const ZERO_BI = BigInt.fromI32(0);
@@ -199,15 +199,7 @@ export function handleGauntletStarted(event: GauntletStartedEvent, defaultPlayer
       log.info("[Gauntlet {}] Participant [{}]: Found existing Skin ID: {}", [gauntletId, participantIdString, skinId]);
     }
     
-    // Create fighter snapshot for this participant
-    const fighterSnapshotId = getOrCreateFighterSnapshotById(participantIdString, event.block.timestamp, defaultPlayerLevel);
-    if (fighterSnapshotId) {
-      participant.fighterSnapshot = fighterSnapshotId;
-      log.info("[Gauntlet {}] Participant [{}]: Created/linked fighter snapshot {}", [gauntletId, participantIdString, fighterSnapshotId]);
-    } else {
-      log.error("[Gauntlet {}] Participant [{}]: Failed to create fighter snapshot", [gauntletId, participantIdString]);
-      continue; // Skip this participant if we can't create a snapshot
-    }
+    // Note: Individual FighterSnapshots will be created per combat in CombatResult events
 
     log.info("[Gauntlet {}] Participant [{}]: Attempting to save GauntletParticipant ID: {}", [gauntletId, participantIdString, gauntletParticipantId]);
     participant.save();
@@ -373,241 +365,22 @@ export function handleGauntletRecovered(event: GauntletRecoveredEvent): void {
 
 // Handle the GauntletCombatResult event
 export function handleGauntletCombatResult(event: CombatResultEvent): void {
-  const eventId = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
-  const combatResult = new CombatResult(eventId); 
-
-  combatResult.transactionHash = event.transaction.hash;
-  combatResult.logIndex = event.logIndex.toI32(); 
-  combatResult.player1Data = event.params.player1Data;
-  combatResult.player2Data = event.params.player2Data;
-  combatResult.winningPlayerId = event.params.winningPlayerId;
-  combatResult.packedResults = event.params.packedResults;
-  combatResult.blockNumber = event.block.number;
-  combatResult.blockTimestamp = event.block.timestamp;
-
-  // Decode combat statistics with player data processing
-  const decodedStats = processCombatResultsWithPlayerData(
-    event.params.packedResults,
+  log.info("[GAUNTLET] Processing CombatResult event in tx {}", [event.transaction.hash.toHex()]);
+  
+  // Use shared combat result processing logic (gauntlets are official - include skin stats)
+  processCombatResultEvent(
+    event.transaction.hash,
+    event.logIndex,
     event.params.player1Data,
-    event.params.player2Data
+    event.params.player2Data,
+    event.params.winningPlayerId,
+    event.params.packedResults,
+    event.block.number,
+    event.block.timestamp,
+    true  // updateSkinStats: true for official gauntlet combats
   );
   
-  // Basic combat info
-  combatResult.player1Won = decodedStats.player1Won;
-  combatResult.gameEngineVersion = decodedStats.gameEngineVersion;
-  combatResult.winCondition = decodedStats.winCondition;
-  combatResult.roundCount = decodedStats.roundCount;
-  
-  // Player 1 combat stats
-  combatResult.player1TotalDamage = decodedStats.player1TotalDamage;
-  combatResult.player1TotalStaminaLost = decodedStats.player1TotalStaminaLost;
-  combatResult.player1Attacks = decodedStats.player1Attacks;
-  combatResult.player1Hits = decodedStats.player1Hits;
-  combatResult.player1Misses = decodedStats.player1Misses;
-  combatResult.player1Crits = decodedStats.player1Crits;
-  combatResult.player1Blocks = decodedStats.player1Blocks;
-  combatResult.player1Counters = decodedStats.player1Counters;
-  combatResult.player1Dodges = decodedStats.player1Dodges;
-  combatResult.player1Parries = decodedStats.player1Parries;
-  combatResult.player1Ripostes = decodedStats.player1Ripostes;
-  combatResult.player1DefensiveActions = decodedStats.player1DefensiveActions;
-  combatResult.player1MaxDamage = decodedStats.player1MaxDamage;
-  
-  // Player 1 failed attack types
-  combatResult.player1AttacksBlocked = decodedStats.player1AttacksBlocked;
-  combatResult.player1AttacksCountered = decodedStats.player1AttacksCountered;
-  combatResult.player1AttacksDodged = decodedStats.player1AttacksDodged;
-  combatResult.player1AttacksParried = decodedStats.player1AttacksParried;
-  combatResult.player1AttacksRiposted = decodedStats.player1AttacksRiposted;
-  
-  // Player 1 calculated stats
-  combatResult.player1MaxHealth = decodedStats.player1MaxHealth;
-  combatResult.player1MaxStamina = decodedStats.player1MaxStamina;
-  combatResult.player1EndingHealth = decodedStats.player1EndingHealth;
-  combatResult.player1EndingStamina = decodedStats.player1EndingStamina;
-  
-  // Player 2 combat stats
-  combatResult.player2TotalDamage = decodedStats.player2TotalDamage;
-  combatResult.player2TotalStaminaLost = decodedStats.player2TotalStaminaLost;
-  combatResult.player2Attacks = decodedStats.player2Attacks;
-  combatResult.player2Hits = decodedStats.player2Hits;
-  combatResult.player2Misses = decodedStats.player2Misses;
-  combatResult.player2Crits = decodedStats.player2Crits;
-  combatResult.player2Blocks = decodedStats.player2Blocks;
-  combatResult.player2Counters = decodedStats.player2Counters;
-  combatResult.player2Dodges = decodedStats.player2Dodges;
-  combatResult.player2Parries = decodedStats.player2Parries;
-  combatResult.player2Ripostes = decodedStats.player2Ripostes;
-  combatResult.player2DefensiveActions = decodedStats.player2DefensiveActions;
-  combatResult.player2MaxDamage = decodedStats.player2MaxDamage;
-  
-  // Player 2 failed attack types
-  combatResult.player2AttacksBlocked = decodedStats.player2AttacksBlocked;
-  combatResult.player2AttacksCountered = decodedStats.player2AttacksCountered;
-  combatResult.player2AttacksDodged = decodedStats.player2AttacksDodged;
-  combatResult.player2AttacksParried = decodedStats.player2AttacksParried;
-  combatResult.player2AttacksRiposted = decodedStats.player2AttacksRiposted;
-  
-  // Player 2 calculated stats
-  combatResult.player2MaxHealth = decodedStats.player2MaxHealth;
-  combatResult.player2MaxStamina = decodedStats.player2MaxStamina;
-  combatResult.player2EndingHealth = decodedStats.player2EndingHealth;
-  combatResult.player2EndingStamina = decodedStats.player2EndingStamina;
-
-  // NEW: Extract skin information from decoded player data
-  let p1Data = decodePlayerData(event.params.player1Data);
-  let p2Data = decodePlayerData(event.params.player2Data);
-
-  // NEW: Set skin data in combat result
-  combatResult.player1SkinCollectionId = BigInt.fromI32(p1Data.skinCollectionId);
-  combatResult.player1SkinTokenId = p1Data.skinTokenId;
-  combatResult.player1Stance = p1Data.stance;
-
-  combatResult.player2SkinCollectionId = BigInt.fromI32(p2Data.skinCollectionId);
-  combatResult.player2SkinTokenId = p2Data.skinTokenId;
-  combatResult.player2Stance = p2Data.stance;
-
-  // NEW: Try to link to actual Skin entities (format: "collectionId-tokenId")
-  let p1SkinId = p1Data.skinCollectionId.toString() + "-" + p1Data.skinTokenId.toString();
-  let p2SkinId = p2Data.skinCollectionId.toString() + "-" + p2Data.skinTokenId.toString();
-
-  let p1Skin = Skin.load(p1SkinId);
-  let p2Skin = Skin.load(p2SkinId);
-
-  combatResult.player1Skin = p1Skin ? p1SkinId : null;
-  combatResult.player2Skin = p2Skin ? p2SkinId : null;
-
-  log.info("handleGauntletCombatResult: Skins - P1: {} ({}), P2: {} ({})", [
-    p1SkinId,
-    p1Skin ? "found" : "not found",
-    p2SkinId,
-    p2Skin ? "found" : "not found"
-  ]);
-
-  // NEW: Set damage mitigation metrics (cross-reference for defensive analytics)
-  combatResult.player1DamageTaken = decodedStats.player2TotalDamage;
-  combatResult.player1HealthLost = p1Data.maxHealth - decodedStats.player1EndingHealth;
-  combatResult.player2DamageTaken = decodedStats.player1TotalDamage;
-  combatResult.player2HealthLost = p2Data.maxHealth - decodedStats.player2EndingHealth;
-
-  combatResult.save();
-
-  // NEW: Update skin combat analytics for both players
-  updateSkinCombatAnalytics(
-    p1Data, 
-    decodedStats, 
-    true,  // isPlayer1
-    decodedStats.player1Won, 
-    event.block.timestamp
-  );
-  
-  updateSkinCombatAnalytics(
-    p2Data, 
-    decodedStats, 
-    false, // isPlayer1 (this is player2)
-    !decodedStats.player1Won, 
-    event.block.timestamp
-  );
-
-  // NEW: Update player-specific skin combat analytics
-  const player1Id = BigInt.fromI32(p1Data.playerId);
-  const player2Id = BigInt.fromI32(p2Data.playerId);
-  
-  log.info("[GAUNTLET] About to call updatePlayerSkinCombatAnalytics for player1Id={}", [player1Id.toString()]);
-  updatePlayerSkinCombatAnalytics(
-    player1Id,
-    p1Data, 
-    decodedStats, 
-    true,  // isPlayer1
-    decodedStats.player1Won, 
-    event.block.timestamp
-  );
-  
-  log.info("[GAUNTLET] About to call updatePlayerSkinCombatAnalytics for player2Id={}", [player2Id.toString()]);
-  updatePlayerSkinCombatAnalytics(
-    player2Id,
-    p2Data, 
-    decodedStats, 
-    false, // isPlayer1 (this is player2)
-    !decodedStats.player1Won, 
-    event.block.timestamp
-  );
-
-  const winnerIdFromEvent_str = event.params.winningPlayerId.toString();
-  let p1IdFromData_str: string | null = null;
-  let p2IdFromData_str: string | null = null;
-
-  let player1DataBytes = event.params.player1Data as Bytes;
-  let player2DataBytes = event.params.player2Data as Bytes;
-
-  if (player1DataBytes.length >= 4) {
-    p1IdFromData_str = u32BE(player1DataBytes, 0).toString(); 
-  } else {
-    log.warning("[GauntletCombatResult] player1Data is too short (length {}) to extract ID for event ID {}. P1 Data (hex): {}", [
-      player1DataBytes.length.toString(),
-      eventId,
-      player1DataBytes.toHex()
-    ]);
-  }
-
-  if (player2DataBytes.length >= 4) {
-    p2IdFromData_str = u32BE(player2DataBytes, 0).toString();
-  } else {
-    log.warning("[GauntletCombatResult] player2Data is too short (length {}) to extract ID for event ID {}. P2 Data (hex): {}", [
-      player2DataBytes.length.toString(),
-      eventId,
-      player2DataBytes.toHex()
-    ]);
-  }
-  
-  let determinedLoserId_str: string | null = null;
-
-  if (p1IdFromData_str && p2IdFromData_str) {
-    if (winnerIdFromEvent_str == p1IdFromData_str) {
-      determinedLoserId_str = p2IdFromData_str;
-    } else if (winnerIdFromEvent_str == p2IdFromData_str) {
-      determinedLoserId_str = p1IdFromData_str;
-    } else {
-      // This is an important error to keep if the data is malformed or unexpected
-      log.error(
-        "[GauntletCombatResult] Winning player ID {} from event does not match derived P1 ID ({}) or P2 ID ({}) from event data for event ID {}. Cannot determine loser.",
-        [
-          winnerIdFromEvent_str, 
-          p1IdFromData_str ? p1IdFromData_str : "null", 
-          p2IdFromData_str ? p2IdFromData_str : "null", 
-          eventId
-        ]
-      );
-    }
-  } else {
-    // This is also an important warning to keep
-    log.warning(
-        "[GauntletCombatResult] Could not derive one or both player IDs (P1: {}, P2: {}) from event data for event ID {}. Cannot determine loser.",
-        [
-          p1IdFromData_str ? p1IdFromData_str : "null", 
-          p2IdFromData_str ? p2IdFromData_str : "null", 
-          eventId
-        ]
-      );
-  }
-
-  if (winnerIdFromEvent_str && determinedLoserId_str) {
-    // Optional: Could add a log.info here if you want to confirm successful calls in production without too much noise
-    // log.info("[GauntletCombatResult] Calling updatePlayerWinPercentages for Winner: {}, Loser: {}", [winnerIdFromEvent_str, determinedLoserId_str]);
-    updatePlayerWinPercentages(winnerIdFromEvent_str, determinedLoserId_str as string, event.block.timestamp);
-  } else {
-    // This warning is important to keep if the stats update is skipped
-    log.warning(
-      "[GauntletCombatResult] Skipping call to updatePlayerWinPercentages due to missing winner or loser. Event Winner: {}, Determined Loser: {}, P1 Derived: {}, P2 Derived: {}, Event ID: {}",
-      [
-        winnerIdFromEvent_str, 
-        determinedLoserId_str ? determinedLoserId_str : "null",
-        p1IdFromData_str ? p1IdFromData_str : "null",
-        p2IdFromData_str ? p2IdFromData_str : "null",
-        eventId
-      ]
-    );
-  }
+  log.info("[GAUNTLET] Completed CombatResult processing for tx {}", [event.transaction.hash.toHex()]);
 }
 
 // Admin event handlers

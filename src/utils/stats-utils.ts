@@ -279,58 +279,6 @@ export function updateStatsForSkinCreation(timestamp: BigInt): void {
   stats.save()
 }
 
-export function updatePlayerWinPercentages(winnerId_str: string, loserId_str: string, timestamp: BigInt): void {
-  let winner = Player.load(winnerId_str);
-  let loser = Player.load(loserId_str);
-
-  if (winner && loser) {
-    // Calculate win percentages
-    winner.totalFights = winner.wins + winner.losses;
-    loser.totalFights = loser.wins + loser.losses;
-    
-    if (winner.totalFights > 0) {
-      winner.winPercentage = BigDecimal.fromString(winner.wins.toString())
-        .times(BigDecimal.fromString("100"))
-        .div(BigDecimal.fromString(winner.totalFights.toString()));
-    } else {
-      winner.winPercentage = BigDecimal.fromString("0");
-    }
-    
-    if (loser.totalFights > 0) {
-      loser.winPercentage = BigDecimal.fromString(loser.wins.toString())
-        .times(BigDecimal.fromString("100"))
-        .div(BigDecimal.fromString(loser.totalFights.toString()));
-    } else {
-      loser.winPercentage = BigDecimal.fromString("0");
-    }
-    
-    winner.lastUpdatedAt = timestamp;
-    loser.lastUpdatedAt = timestamp;
-
-    winner.save();
-    loser.save();
-    
-    log.info("Updated win percentages. Winner {}: {}% ({}/{}), Loser {}: {}% ({}/{})", [
-      winnerId_str, 
-      winner.winPercentage.toString(),
-      winner.wins.toString(),
-      winner.totalFights.toString(),
-      loserId_str, 
-      loser.winPercentage.toString(),
-      loser.wins.toString(),
-      loser.totalFights.toString()
-    ]);
-
-  } else {
-    if (!winner) {
-      log.warning("Winner Player entity not found for ID: {}. Skipping win percentage update.", [winnerId_str]);
-    }
-    if (!loser) {
-      log.warning("Loser Player entity not found for ID: {}. Skipping win percentage update.", [loserId_str]);
-    }
-  }
-}
-
 // NEW: Update skin combat analytics with comprehensive metrics
 export function updateSkinCombatAnalytics(
   playerData: PlayerData, 
