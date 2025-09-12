@@ -1,4 +1,4 @@
-import { BigInt, Bytes, log, ethereum, Address, store, TypedMap } from "@graphprotocol/graph-ts";
+import { BigInt, log } from "@graphprotocol/graph-ts";
 import { 
   PlayerQueued as PlayerQueuedEvent,
   PlayerWithdrew as PlayerWithdrewEvent,
@@ -22,11 +22,6 @@ import {
   Tournament,
   TournamentParticipant,
   Player,
-  DefaultPlayer,
-  Monster,
-  Skin,
-  SkinCollection,
-  Stats,
   TournamentPlayerQueued,
   TournamentPlayerWithdrew,
   QueueCommitted,
@@ -41,13 +36,12 @@ import {
   TournamentSizeSet,
   LethalityFactorSet,
   TournamentRewardConfigUpdated,
-  TournamentGameEnabledChanged,
-  CombatResult
+  TournamentGameEnabledChanged
 } from "../generated/schema";
 
-import { getOrCreateStats, getOrCreatePlayerSeasonalStats } from "./utils/stats-utils";
+import { getOrCreatePlayerSeasonalStats } from "./utils/stats-utils";
 import { updateStatsForTournamentWin } from "./utils/stats-utils";
-import { getOrCreateFighterSnapshotById, createFighterSnapshotFromPlayerData, processCombatResultEvent } from "./utils/fighter-utils";
+import { getOrCreateFighterSnapshotById, processCombatResultEvent } from "./utils/fighter-utils";
 
 // Define ZERO_BI directly
 const ZERO_BI = BigInt.fromI32(0);
@@ -153,8 +147,6 @@ export function handleTournamentStarted(event: TournamentStartedEvent): void {
   const tournament = new Tournament(tournamentId);
   tournament.size = event.params.size;
   tournament.state = "PENDING";
-  tournament.startTimestamp = event.block.timestamp;
-  tournament.completionTimestamp = null;
   tournament.roundWinners = [];
   tournament.championSnapshot = null;
   tournament.runnerUpSnapshot = null;
@@ -162,6 +154,8 @@ export function handleTournamentStarted(event: TournamentStartedEvent): void {
   tournament.startedTx = event.transaction.hash;
   tournament.completedAt = null;
   tournament.completedTx = null;
+  tournament.recoveredAt = null;
+  tournament.recoveredTx = null;
   tournament.finalParticipantIds = [];
   
   let participantsArray = event.params.participants;
@@ -256,7 +250,6 @@ export function handleTournamentCompleted(event: TournamentCompletedEvent): void
   
   // Update tournament state
   tournament.state = "COMPLETED";
-  tournament.completionTimestamp = event.block.timestamp;
   tournament.completedAt = event.block.timestamp;
   tournament.completedTx = event.transaction.hash;
   

@@ -1,4 +1,4 @@
-import { log, BigInt, Bytes, ethereum } from "@graphprotocol/graph-ts";
+import { log, BigInt, Bytes } from "@graphprotocol/graph-ts";
 import { Name, Player, DefaultPlayer, Monster, FighterSnapshot, Skin, SnapshotCounter, FighterParticipant, CombatResult } from "../../generated/schema";
 import { decodePlayerData, processCombatResultsWithPlayerData, updateSkinCombatAnalytics, updatePlayerSkinCombatAnalytics } from "./stats-utils";
 

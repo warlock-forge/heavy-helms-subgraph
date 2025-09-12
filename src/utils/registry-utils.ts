@@ -1,5 +1,5 @@
-import { Address, BigInt, log } from "@graphprotocol/graph-ts";
-import { SkinAddressMapping, Skin, SkinCollection } from "../../generated/schema";
+import { Address, BigInt } from "@graphprotocol/graph-ts";
+import { SkinAddressMapping } from "../../generated/schema";
 
 // Store a mapping from contract address to collection ID
 export function storeCollectionIdForAddress(address: Address, registryId: BigInt): void {

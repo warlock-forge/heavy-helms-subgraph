@@ -1,4 +1,3 @@
-import { BigInt } from "@graphprotocol/graph-ts";
 import { NameAdded } from "../generated/PlayerNameRegistry/PlayerNameRegistry";
 import { Name, Player } from "../generated/schema";
 import { log } from "@graphprotocol/graph-ts";

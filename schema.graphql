@@ -1183,9 +1183,6 @@ type Gauntlet @entity {
   size: Int!               # 4, 8, 16, or 32
   state: GauntletState!    # PENDING or COMPLETED
   levelBracket: Int!       # 0=LEVELS_1_TO_4, 1=LEVELS_5_TO_9, 2=LEVEL_10
-  vrfRequestId: BigInt     # ID of the associated VRF request
-  vrfRequestTimestamp: BigInt! # Timestamp of VRF request
-  completionTimestamp: BigInt # Timestamp of completion or recovery
   participants: [GauntletParticipant!]! @derivedFrom(field: "gauntlet") # List of participants (INITIAL REGISTRANTS)
   roundWinners: [String!]  # List of Fighter IDs for each round winner (size - 1)
   championSnapshot: FighterSnapshot # Historical snapshot of champion when they won
@@ -1212,8 +1209,6 @@ type Tournament @entity {
   id: ID!                  # Tournament ID (uint256 from contract)
   size: Int!               # 16, 32, or 64
   state: TournamentState!  # PENDING or COMPLETED
-  startTimestamp: BigInt!  # When tournament started
-  completionTimestamp: BigInt # When tournament completed
   participants: [TournamentParticipant!]! @derivedFrom(field: "tournament") # List of participants
   roundWinners: [String!]  # List of Fighter IDs for each round winner (size - 1)
   championSnapshot: FighterSnapshot # Historical snapshot of champion when they won
@@ -1222,6 +1217,8 @@ type Tournament @entity {
   startedTx: Bytes!        # Transaction hash of TournamentStarted
   completedAt: BigInt      # Timestamp TournamentCompleted event occurred
   completedTx: Bytes       # Transaction hash of TournamentCompleted
+  recoveredAt: BigInt      # Timestamp TournamentAutoRecovered event occurred
+  recoveredTx: Bytes       # Transaction hash of TournamentAutoRecovered
   finalParticipantIds: [String!] # List of final participant IDs (INCLUDING SUBSTITUTIONS)
 }
 

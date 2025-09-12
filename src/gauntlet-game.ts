@@ -33,12 +33,9 @@ import {
   GauntletStarted,
   GauntletCompleted,
   GauntletRecovered,
-  CombatResult,
   Gauntlet,
   GauntletParticipant,
-  Stats,
   Player,
-  DefaultPlayer,
   Skin,
   SkinCollection,
   QueuePartiallyCleared,
@@ -59,13 +56,12 @@ import {
   PlayerReplaced,
   FutureBlocksForSelectionSet,
   FutureBlocksForTournamentSet,
-  EmergencyQueueCleared,
-  Accounting
+  EmergencyQueueCleared
 } from "../generated/schema";
 
 import { getOrCreateStats, getOrCreateAccounting } from "./utils/stats-utils";
 import { updateStatsForGauntletWin } from "./utils/stats-utils";
-import { getOrCreateFighterSnapshotById, createFighterSnapshotFromPlayerData, processCombatResultEvent } from "./utils/fighter-utils";
+import { getOrCreateFighterSnapshotById, processCombatResultEvent } from "./utils/fighter-utils";
 
 // Define ZERO_BI directly
 const ZERO_BI = BigInt.fromI32(0);
@@ -136,8 +132,6 @@ export function handleGauntletStarted(event: GauntletStartedEvent, defaultPlayer
   gauntlet.size = event.params.size;
   gauntlet.state = "PENDING";
   gauntlet.levelBracket = event.params.levelBracket;
-  gauntlet.vrfRequestTimestamp = event.block.timestamp;
-  gauntlet.completionTimestamp = null;
   gauntlet.championSnapshot = null;
   gauntlet.startedAt = event.block.timestamp;
   gauntlet.startedTx = event.transaction.hash;
@@ -253,7 +247,6 @@ export function handleGauntletCompleted(event: GauntletCompletedEvent, defaultPl
 
   if (gauntlet != null) {
     gauntlet.state = "COMPLETED";
-    gauntlet.completionTimestamp = event.block.timestamp;
     gauntlet.completedAt = event.block.timestamp;
     gauntlet.completedTx = event.transaction.hash;
     

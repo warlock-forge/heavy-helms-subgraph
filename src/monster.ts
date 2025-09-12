@@ -7,7 +7,6 @@ import {
   Monster,
   MonsterCreated,
   MonsterStatsUpdated,
-  Skin
 } from "../generated/schema";
 import { 
   loadFirstName,

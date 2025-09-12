@@ -1,4 +1,4 @@
-import { BigInt, Address, log } from "@graphprotocol/graph-ts";
+import { Address, log } from "@graphprotocol/graph-ts";
 import {
   SkinRegistered as SkinRegisteredEvent,
   SkinVerificationUpdated as SkinVerificationUpdatedEvent,

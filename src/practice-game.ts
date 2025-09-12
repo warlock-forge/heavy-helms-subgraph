@@ -1,4 +1,4 @@
-import { BigInt, Bytes, log } from "@graphprotocol/graph-ts";
+import { log } from "@graphprotocol/graph-ts";
 import {
   DefaultPlayerContractUpdated as DefaultPlayerContractUpdatedEvent,
   MonsterContractUpdated as MonsterContractUpdatedEvent,

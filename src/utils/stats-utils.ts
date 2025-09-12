@@ -1,5 +1,5 @@
 import { BigInt, Address, Bytes, BigDecimal } from "@graphprotocol/graph-ts"
-import { Stats, Owner, Player, DefaultPlayer, SkinCombatStat, PlayerSkinCombatStat, Skin, PlayerSeasonalStats, Accounting } from "../../generated/schema"
+import { Stats, Owner, Player, SkinCombatStat, PlayerSkinCombatStat, Skin, PlayerSeasonalStats, Accounting } from "../../generated/schema"
 import { log } from "@graphprotocol/graph-ts"
 
 // Little-endian helper functions

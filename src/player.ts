@@ -31,13 +31,10 @@ import {
   PlayerLossRecorded as PlayerLossRecordedEvent,
   PlayerKillRecorded as PlayerKillRecordedEvent
 } from "../generated/Player/Player";
-
 import {
-  AttributeSwapAwarded,
   CreatePlayerFeeUpdated,
   EquipmentRequirementsUpdated,
   GameContractPermissionsUpdated,
-  NameChangeAwarded,
   OwnershipTransferred,
   PausedStateChanged,
   PlayerAttributesSwapped,
@@ -55,7 +52,6 @@ import {
   StanceUpdated,
   VrfRequestTimeoutUpdated,
   RequestRecovered,
-  Skin,
   ExperienceGained,
   PlayerLevelUp,
   AttributePointAwarded,
@@ -66,9 +62,7 @@ import {
   SeasonLengthUpdated,
   VRFConfigUpdated,
   SubscriptionIdUpdated,
-  Season,
-  PlayerSeasonalStats,
-  Accounting
+  Season
 } from "../generated/schema";
 import { loadFirstName, loadSurname, createFullName, loadSkinIdOrDefault } from "./utils/fighter-utils";
 import { 
@@ -452,6 +446,7 @@ export function handlePlayerSkinEquipped(
   entity.playerId = event.params.playerId;
   entity.skinIndex = event.params.skinIndex;
   entity.tokenId = event.params.tokenId;
+  entity.stance = event.params.stance;
 
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;

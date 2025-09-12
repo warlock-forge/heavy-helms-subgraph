@@ -1,4 +1,4 @@
-import { BigInt, Bytes } from "@graphprotocol/graph-ts";
+import { BigInt } from "@graphprotocol/graph-ts";
 import {
   ChallengeCreated as ChallengeCreatedEvent,
   ChallengeAccepted as ChallengeAcceptedEvent,
@@ -11,7 +11,6 @@ import {
   GameEngineUpdated as GameEngineUpdatedEvent,
   VrfRequestTimeoutUpdated as VrfRequestTimeoutUpdatedEvent,
 } from "../generated/DuelGame/DuelGame";
-
 import {
   DuelChallenge,
   ChallengeCreated,
@@ -23,24 +22,17 @@ import {
   TimeUntilExpireUpdated,
   ChallengeRecovered,
   GameEngineUpdated,
-  VrfRequestTimeoutUpdated
+  VrfRequestTimeoutUpdated,
+  Player
 } from "../generated/schema";
-
 import { log } from "@graphprotocol/graph-ts";
-import { Player, DefaultPlayer, Owner, GameEngineUpdated } from "../generated/schema";
 import {
   updateStatsForChallengeCreation,
   updateStatsForChallengeCancellation,
-  updateStatsForChallengeForfeit,
-  processCombatResultsWithPlayerData,
-  decodePlayerData,
-  updateSkinCombatAnalytics,
-  updatePlayerSkinCombatAnalytics,
   updateSeasonalDuelStats
 } from "./utils/stats-utils";
-import { createFighterSnapshotFromPlayerData, getOrCreateFighterParticipant, processCombatResultEvent } from "./utils/fighter-utils";
+import { getOrCreateFighterParticipant, processCombatResultEvent } from "./utils/fighter-utils";
 import { DuelGame } from "../generated/DuelGame/DuelGame";
-import { Skin } from "../generated/schema";
 
 /**
  * Handle ChallengeCreated events
