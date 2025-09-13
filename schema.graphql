@@ -118,7 +118,7 @@ type Player implements Fighter @entity {
 # DefaultPlayer entities implement Fighter directly - no more separate "Progression" entities
 type DefaultPlayer implements Fighter @entity {
   id: ID!                    # "{playerId}-{level}"
-  fighterId: BigInt!         # playerId * 100 + level (e.g., 12305 for player 123 level 5)
+  fighterId: BigInt!         # The base player ID (same for all levels)
   fighterType: String!       # "DefaultPlayer"
   level: Int!               # Level (1-10)
   isRetired: Boolean!       # Always false
@@ -160,7 +160,7 @@ type DefaultPlayer implements Fighter @entity {
 # Monster entities implement Fighter directly - no more separate "Progression" entities
 type Monster implements Fighter @entity {
   id: ID!                    # "{monsterId}-{level}"
-  fighterId: BigInt!         # monsterId * 100 + level (e.g., 45607 for monster 456 level 7)
+  fighterId: BigInt!         # The base monster ID (same for all levels)
   fighterType: String!       # "Monster"
   level: Int!               # Level (1-10)
   isRetired: Boolean!       # Always false

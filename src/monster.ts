@@ -10,7 +10,8 @@ import {
 } from "../generated/schema";
 import { 
   loadFirstName,
-  loadSkinIdOrDefault
+  loadSkinIdOrDefault,
+  loadSkinIdTrusted
 } from "./utils/fighter-utils";
 import { 
   updateStatsForMonsterCreation
@@ -87,7 +88,7 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
     const monsterLevel = new Monster(monsterLevelId);
     
     // Set Fighter interface fields
-    monsterLevel.fighterId = event.params.monsterId.times(BigInt.fromI32(100)).plus(BigInt.fromI32(level));
+    monsterLevel.fighterId = event.params.monsterId;
     monsterLevel.fighterType = "Monster";
     monsterLevel.level = level;
     monsterLevel.isRetired = false;
@@ -108,8 +109,8 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
     monsterLevel.firstName = monsterName;
     monsterLevel.surname = null; // No surname for monsters
     monsterLevel.fullName = monsterName; // Just use the monster name
-    // Set skin with fallback to default
-    monsterLevel.currentSkin = loadSkinIdOrDefault(skinId);
+    // Set skin - trust contract data for Monsters
+    monsterLevel.currentSkin = loadSkinIdTrusted(skinId);
     monsterLevel.stance = firstStats.stance;
     
     // Set progression fields (always 0 for Monsters)
@@ -211,8 +212,8 @@ export function handleMonsterStatsUpdated(event: MonsterStatsUpdatedEvent): void
   const skinIndex = event.params.stats.skin.skinIndex;
   const skinTokenId = event.params.stats.skin.skinTokenId;
   const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
-  // Set skin with fallback to default
-  monsterLevel.currentSkin = loadSkinIdOrDefault(skinId);
+  // Set skin - trust contract data for Monsters
+  monsterLevel.currentSkin = loadSkinIdTrusted(skinId);
   
   monsterLevel.lastUpdatedAt = event.block.timestamp;
   monsterLevel.save();

@@ -514,6 +514,7 @@ export function handleMinTimeBetweenGauntletsSet(event: MinTimeBetweenGauntletsS
   
   // Update stats
   const stats = getOrCreateStats();
+  stats.currentMinTimeBetweenGauntlets = event.params.newMinTime;
   stats.lastUpdated = event.block.timestamp;
   stats.save();
 }

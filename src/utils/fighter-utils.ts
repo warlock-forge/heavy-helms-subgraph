@@ -27,6 +27,18 @@ export function loadSkinIdOrDefault(skinId: string): string {
 }
 
 /**
+ * Load a skin by ID for DefaultPlayers/Monsters - always trust the contract data
+ * @param skinId The skin ID to load (format: "collectionId-tokenId")
+ * @returns Skin ID string (always the original skinId, trusting contract data)
+ */
+export function loadSkinIdTrusted(skinId: string): string {
+  // For DefaultPlayers/Monsters, always trust the contract data
+  // The skin entities will be created in the same transaction
+  log.info("Using trusted skin ID {} for DefaultPlayer/Monster (race condition handled)", [skinId]);
+  return skinId;
+}
+
+/**
  * Loads a fighter's first name based on index
  * @returns The name string or null if not found
  */

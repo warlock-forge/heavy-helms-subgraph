@@ -15,7 +15,8 @@ import {
   loadFirstName, 
   loadSurname, 
   createFullName,
-  loadSkinIdOrDefault
+  loadSkinIdOrDefault,
+  loadSkinIdTrusted
 } from "./utils/fighter-utils";
 
 import { updateStatsForDefaultPlayerCreation } from "./utils/stats-utils";
@@ -94,7 +95,7 @@ export function handleDefaultPlayerCreated(event: DefaultPlayerCreatedEvent): vo
     const defaultPlayerLevel = new DefaultPlayer(defaultPlayerLevelId);
     
     // Set Fighter interface fields
-    defaultPlayerLevel.fighterId = event.params.playerId.times(BigInt.fromI32(100)).plus(BigInt.fromI32(level));
+    defaultPlayerLevel.fighterId = event.params.playerId;
     defaultPlayerLevel.fighterType = "DefaultPlayer";
     defaultPlayerLevel.level = level;
     defaultPlayerLevel.isRetired = false;
@@ -115,8 +116,8 @@ export function handleDefaultPlayerCreated(event: DefaultPlayerCreatedEvent): vo
     defaultPlayerLevel.firstName = firstName;
     defaultPlayerLevel.surname = surname;
     defaultPlayerLevel.fullName = fullName;
-    // Set skin with fallback to default
-    defaultPlayerLevel.currentSkin = loadSkinIdOrDefault(skinId);
+    // Set skin - trust contract data for DefaultPlayers
+    defaultPlayerLevel.currentSkin = loadSkinIdTrusted(skinId);
     defaultPlayerLevel.stance = firstStats.stance;
     
     // Set progression fields (always 0 for DefaultPlayers)
@@ -219,8 +220,8 @@ export function handleDefaultPlayerStatsUpdated(event: DefaultPlayerStatsUpdated
   const skinIndex = event.params.stats.skin.skinIndex;
   const skinTokenId = event.params.stats.skin.skinTokenId;
   const skinId = skinIndex.toString() + "-" + skinTokenId.toString();
-  // Set skin with fallback to default
-  defaultPlayerLevel.currentSkin = loadSkinIdOrDefault(skinId);
+  // Set skin - trust contract data for DefaultPlayers
+  defaultPlayerLevel.currentSkin = loadSkinIdTrusted(skinId);
   
   defaultPlayerLevel.lastUpdatedAt = event.block.timestamp;
   defaultPlayerLevel.save();
