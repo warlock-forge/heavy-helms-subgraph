@@ -1384,7 +1384,6 @@ type PlayerLevelUp @entity(immutable: true) {
   id: Bytes!               # Transaction hash + log index  
   playerId: BigInt!        # uint32 indexed playerId
   newLevel: Int!           # uint8 newLevel
-  attributePointsAwarded: Int! # uint8 attributePointsAwarded
   player: Player!          # Link to Player entity
   blockNumber: BigInt!
   blockTimestamp: BigInt!
@@ -1394,6 +1393,7 @@ type PlayerLevelUp @entity(immutable: true) {
 type AttributePointAwarded @entity(immutable: true) {
   id: Bytes!               # Transaction hash + log index
   playerId: BigInt!        # uint32 indexed playerId
+  player: Player!          # Link to Player entity
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -1666,7 +1666,20 @@ type QueueCommitted @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
-type ParticipantsSelected @entity(immutable: true) {
+# Gauntlet-specific participant selection event
+type GauntletParticipantsSelected @entity(immutable: true) {
+  id: Bytes!               # Transaction hash + log index
+  gauntletId: BigInt!      # uint256 indexed gauntletId
+  tournamentBlock: BigInt! # uint256 tournamentBlock (reusing field name for consistency)
+  selectedIds: [BigInt!]!  # uint32[] selectedIds
+  gauntlet: Gauntlet!      # Link to Gauntlet entity
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+# Tournament-specific participant selection event
+type TournamentParticipantsSelected @entity(immutable: true) {
   id: Bytes!
   tournamentId: BigInt!
   tournamentBlock: BigInt!

@@ -25,7 +25,7 @@ import {
   TournamentPlayerQueued,
   TournamentPlayerWithdrew,
   QueueCommitted,
-  ParticipantsSelected,
+  TournamentParticipantsSelected,
   TournamentStarted,
   TournamentCompleted,
   TournamentRatingsAwarded,
@@ -41,7 +41,7 @@ import {
 
 import { getOrCreatePlayerSeasonalStats } from "./utils/stats-utils";
 import { updateStatsForTournamentWin } from "./utils/stats-utils";
-import { getOrCreateFighterSnapshotById, processCombatResultEvent } from "./utils/fighter-utils";
+import { getOrCreateFighterSnapshotById, processCombatResultEvent, getOrCreateFighterParticipant } from "./utils/fighter-utils";
 
 // Define ZERO_BI directly
 const ZERO_BI = BigInt.fromI32(0);
@@ -119,7 +119,7 @@ export function handleQueueCommitted(event: QueueCommittedEvent): void {
 export function handleParticipantsSelected(event: ParticipantsSelectedEvent): void {
   // Create event entity
   const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const eventEntity = new ParticipantsSelected(eventId);
+  const eventEntity = new TournamentParticipantsSelected(eventId);
   
   eventEntity.tournamentId = event.params.tournamentId;
   eventEntity.tournamentBlock = event.params.tournamentBlock;
@@ -176,6 +176,13 @@ export function handleTournamentStarted(event: TournamentStartedEvent): void {
       playerId_bigInt.toString()
     ]);
     
+    // Extract loadout data from the participant struct
+    let loadoutStruct = participantStruct.loadout;
+    let skinInfoStruct = loadoutStruct.skin;
+    let skinIndex = skinInfoStruct.skinIndex;
+    let skinTokenId = skinInfoStruct.skinTokenId;
+    let stance = loadoutStruct.stance;
+    
     participantIdsForEventEntity.push(playerId_bigInt);
     let participantIdString = playerId_bigInt.toString();
     
@@ -183,6 +190,19 @@ export function handleTournamentStarted(event: TournamentStartedEvent): void {
     let participant = new TournamentParticipant(tournamentParticipantId);
     
     participant.tournament = tournamentId;
+    
+    // Create the FighterParticipant entity for the locked loadout
+    let fighterParticipant = getOrCreateFighterParticipant(
+      playerId_bigInt,
+      skinIndex,
+      skinTokenId,
+      stance,
+      event.block.timestamp
+    );
+    fighterParticipant.save();
+    
+    // Link the FighterParticipant to the TournamentParticipant
+    participant.participant = fighterParticipant.id;
     
     // Note: Individual FighterSnapshots will be created per combat in CombatResult events
     
@@ -472,6 +492,7 @@ export function handleRewardDistributed(event: RewardDistributedEvent): void {
   eventEntity.rewardType = event.params.rewardType;
   eventEntity.ticketId = event.params.ticketId;
   eventEntity.tournament = event.params.tournamentId.toString();
+  eventEntity.player = event.params.playerId.toString(); // Link to Player entity
   eventEntity.blockNumber = event.block.number;
   eventEntity.blockTimestamp = event.block.timestamp;
   eventEntity.transactionHash = event.transaction.hash;

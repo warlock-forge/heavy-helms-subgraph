@@ -74,6 +74,33 @@ import {
   getOrCreateAccounting
 } from "./utils/stats-utils";
 
+/**
+ * Calculates XP required for a specific level (matches contract logic exactly)
+ * @param level The level to calculate XP requirement for (1-10)
+ * @return XP required to reach that level from previous level
+ */
+function getXPRequiredForLevel(level: i32): i32 {
+  if (level == 1) return 0; // Already at level 1
+  if (level > 10) return 0; // Invalid level
+
+  // Pre-calculated XP requirements for each level (matches contract)
+  // Formula: BASE_XP * 1.5^(level-2)
+  const xpRequirements: i32[] = [
+    0, // Level 0 (unused)
+    0, // Level 1 (already at level 1)
+    100, // Level 2: 100
+    150, // Level 3: 100 * 1.5
+    225, // Level 4: 100 * 1.5^2
+    338, // Level 5: 100 * 1.5^3 (337.5 rounded)
+    506, // Level 6: 100 * 1.5^4 (506.25 rounded)
+    759, // Level 7: 100 * 1.5^5 (759.375 rounded)
+    1139, // Level 8: 100 * 1.5^6
+    1709, // Level 9: 100 * 1.5^7
+    2563 // Level 10: 100 * 1.5^8
+  ];
+
+  return xpRequirements[level];
+}
 
 export function handleCreatePlayerFeeUpdated(
   event: CreatePlayerFeeUpdatedEvent
@@ -625,6 +652,7 @@ export function handleExperienceGained(event: ExperienceGainedEvent): void {
   entity.newXP = event.params.newXP;
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
+  entity.player = event.params.playerId.toString(); // Link to Player entity
   entity.transactionHash = event.transaction.hash;
   entity.save();
 
@@ -644,6 +672,7 @@ export function handlePlayerLevelUp(event: PlayerLevelUpEvent): void {
   );
   entity.playerId = event.params.playerId;
   entity.newLevel = event.params.newLevel;
+  entity.player = event.params.playerId.toString(); // Link to Player entity
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
   entity.transactionHash = event.transaction.hash;
@@ -653,8 +682,20 @@ export function handlePlayerLevelUp(event: PlayerLevelUpEvent): void {
   let player = Player.load(event.params.playerId.toString());
   if (player) {
     player.level = event.params.newLevel;
+    
+    // Subtract XP cost for this level up (matches contract behavior)
+    const xpCost = getXPRequiredForLevel(event.params.newLevel);
+    player.currentXP = player.currentXP - xpCost;
+    
     player.lastUpdatedAt = event.block.timestamp;
     player.save();
+    
+    log.info("handlePlayerLevelUp: Player {} leveled up to {} (XP cost: {}, remaining XP: {})", [
+      event.params.playerId.toString(),
+      event.params.newLevel.toString(),
+      xpCost.toString(),
+      player.currentXP.toString()
+    ]);
   }
 }
 
@@ -664,6 +705,7 @@ export function handleAttributePointAwarded(event: AttributePointAwardedEvent): 
     event.transaction.hash.concatI32(event.logIndex.toI32())
   );
   entity.playerId = event.params.playerId;
+  entity.player = event.params.playerId.toString(); // Link to Player entity
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
   entity.transactionHash = event.transaction.hash;
@@ -687,6 +729,7 @@ export function handlePlayerAttributePointUsed(event: PlayerAttributePointUsedEv
   entity.attribute = event.params.attribute;
   entity.newValue = event.params.newValue;
   entity.remainingPoints = event.params.remainingPoints;
+  entity.player = event.params.playerId.toString(); // Link to Player entity
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
   entity.transactionHash = event.transaction.hash;
@@ -720,6 +763,7 @@ export function handlePlayerWeaponSpecializationChanged(event: PlayerWeaponSpeci
   );
   entity.playerId = event.params.playerId;
   entity.weaponClass = event.params.weaponClass;
+  entity.player = event.params.playerId.toString(); // Link to Player entity
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
   entity.transactionHash = event.transaction.hash;
@@ -741,6 +785,7 @@ export function handlePlayerArmorSpecializationChanged(event: PlayerArmorSpecial
   );
   entity.playerId = event.params.playerId;
   entity.armorType = event.params.armorType;
+  entity.player = event.params.playerId.toString(); // Link to Player entity
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
   entity.transactionHash = event.transaction.hash;

@@ -125,6 +125,74 @@ export function getOrCreateFighterSnapshotById(fighterId: string, blockTimestamp
 }
 
 /**
+ * DRY utility method to create a FighterSnapshot from any fighter entity
+ */
+function createFighterSnapshot(
+  fighterId: BigInt,
+  fighterType: string,
+  strength: i32,
+  constitution: i32,
+  size: i32,
+  agility: i32,
+  stamina: i32,
+  luck: i32,
+  skinCollectionId: BigInt,
+  skinTokenId: i32,
+  currentSkinId: string,
+  stance: i32,
+  firstNameIndex: i32,
+  surnameIndex: i32,
+  fullName: string,
+  wins: i32,
+  losses: i32,
+  kills: i32,
+  level: i32,
+  currentXP: i32,
+  weaponSpecialization: i32,
+  armorSpecialization: i32,
+  blockTimestamp: BigInt
+): string {
+  // Use sequential UUID system
+  const snapshotId = getNextSnapshotId();
+  const snapshot = new FighterSnapshot(snapshotId);
+  
+  // Set all required fields
+  snapshot.playerId = fighterId;
+  snapshot.fighterType = fighterType;
+  snapshot.strength = strength;
+  snapshot.constitution = constitution;
+  snapshot.size = size;
+  snapshot.agility = agility;
+  snapshot.stamina = stamina;
+  snapshot.luck = luck;
+  snapshot.skinIndex = skinCollectionId;
+  snapshot.skinTokenId = skinTokenId;
+  snapshot.currentSkin = currentSkinId;
+  snapshot.stance = stance;
+  snapshot.firstNameIndex = firstNameIndex;
+  snapshot.surnameIndex = surnameIndex;
+  snapshot.fullName = fullName;
+  snapshot.wins = wins;
+  snapshot.losses = losses;
+  snapshot.kills = kills;
+  snapshot.level = level;
+  snapshot.currentXP = currentXP;
+  snapshot.weaponSpecialization = weaponSpecialization;
+  snapshot.armorSpecialization = armorSpecialization;
+  snapshot.createdAt = blockTimestamp;
+  
+  snapshot.save();
+  
+  log.info("createFighterSnapshot: Created snapshot {} for fighter {} ({})", [
+    snapshotId, 
+    fighterId.toString(),
+    fighterType
+  ]);
+  
+  return snapshotId;
+}
+
+/**
  * Create snapshot for Player entity
  */
 function createPlayerSnapshot(fighter: Player, blockTimestamp: BigInt): string | null {
@@ -134,28 +202,33 @@ function createPlayerSnapshot(fighter: Player, blockTimestamp: BigInt): string |
   }
   
   const fighterName = fighter.fullName || "Unknown";
-  const fighterNameStr = fighterName as string; // Cast to non-null
-  const skinId = fighter.currentSkin as string; // Cast Skin ID to string
-  const snapshotId = fighter.id + "-" + fighterNameStr + "-" + skinId + "-" + fighter.stance.toString() + "-" + fighter.level.toString();
-  let snapshot = FighterSnapshot.load(snapshotId);
+  const skinParts = fighter.currentSkin.split("-");
   
-  if (snapshot) {
-    log.info("createPlayerSnapshot: Reusing existing snapshot {}", [snapshotId]);
-    return snapshotId;
-  }
-  
-  snapshot = new FighterSnapshot(snapshotId);
-  snapshot.playerId = BigInt.fromString(fighter.id);
-  snapshot.fighterType = fighter.fighterType;
-  snapshot.fullName = fighterNameStr;
-  snapshot.currentSkin = fighter.currentSkin;
-  snapshot.stance = fighter.stance;
-  snapshot.level = fighter.level;
-  snapshot.createdAt = blockTimestamp;
-  snapshot.save();
-  
-  log.info("createPlayerSnapshot: Created snapshot {} for fighter {}", [snapshotId, fighter.id]);
-  return snapshotId;
+  return createFighterSnapshot(
+    BigInt.fromString(fighter.id),
+    fighter.fighterType,
+    fighter.strength,
+    fighter.constitution,
+    fighter.size,
+    fighter.agility,
+    fighter.stamina,
+    fighter.luck,
+    BigInt.fromString(skinParts[0]),
+    parseInt(skinParts[1]) as i32,
+    fighter.currentSkin,
+    fighter.stance,
+    fighter.firstNameIndex,
+    fighter.surnameIndex,
+    fighterName ? fighterName : "Unknown",
+    fighter.wins,
+    fighter.losses,
+    fighter.kills,
+    fighter.level,
+    fighter.currentXP,
+    fighter.weaponSpecialization,
+    fighter.armorSpecialization,
+    blockTimestamp
+  );
 }
 
 /**
@@ -168,30 +241,35 @@ function createDefaultPlayerSnapshot(fighter: DefaultPlayer, blockTimestamp: Big
   }
   
   const fighterName = fighter.fullName || "Unknown";
-  const fighterNameStr = fighterName as string; // Cast to non-null
-  const skinId = fighter.currentSkin as string; // Cast Skin ID to string
-  const snapshotId = fighter.id + "-" + fighterNameStr + "-" + skinId + "-" + fighter.stance.toString() + "-" + fighter.level.toString();
-  let snapshot = FighterSnapshot.load(snapshotId);
-  
-  if (snapshot) {
-    log.info("createDefaultPlayerSnapshot: Reusing existing snapshot {}", [snapshotId]);
-    return snapshotId;
-  }
-  
-  snapshot = new FighterSnapshot(snapshotId);
+  const skinParts = fighter.currentSkin.split("-");
   // Extract base ID from fighter.id (format: "baseId-level")
   const idParts = fighter.id.split("-");
-  snapshot.playerId = BigInt.fromString(idParts[0]); // Use the base DefaultPlayer ID
-  snapshot.fighterType = fighter.fighterType;
-  snapshot.fullName = fighterNameStr;
-  snapshot.currentSkin = fighter.currentSkin;
-  snapshot.stance = fighter.stance;
-  snapshot.level = fighter.level;
-  snapshot.createdAt = blockTimestamp;
-  snapshot.save();
   
-  log.info("createDefaultPlayerSnapshot: Created snapshot {} for fighter {}", [snapshotId, fighter.id]);
-  return snapshotId;
+  return createFighterSnapshot(
+    BigInt.fromString(idParts[0]), // Use the base DefaultPlayer ID
+    fighter.fighterType,
+    fighter.strength,
+    fighter.constitution,
+    fighter.size,
+    fighter.agility,
+    fighter.stamina,
+    fighter.luck,
+    BigInt.fromString(skinParts[0]),
+    parseInt(skinParts[1]) as i32,
+    fighter.currentSkin,
+    fighter.stance,
+    fighter.firstNameIndex,
+    fighter.surnameIndex,
+    fighterName ? fighterName : "Unknown",
+    fighter.wins,
+    fighter.losses,
+    fighter.kills,
+    fighter.level,
+    fighter.currentXP,
+    fighter.weaponSpecialization,
+    fighter.armorSpecialization,
+    blockTimestamp
+  );
 }
 
 /**
@@ -204,30 +282,35 @@ function createMonsterSnapshot(fighter: Monster, blockTimestamp: BigInt): string
   }
   
   const fighterName = fighter.fullName || "Unknown";
-  const fighterNameStr = fighterName as string; // Cast to non-null
-  const skinId = fighter.currentSkin as string; // Cast Skin ID to string
-  const snapshotId = fighter.id + "-" + fighterNameStr + "-" + skinId + "-" + fighter.stance.toString() + "-" + fighter.level.toString();
-  let snapshot = FighterSnapshot.load(snapshotId);
-  
-  if (snapshot) {
-    log.info("createMonsterSnapshot: Reusing existing snapshot {}", [snapshotId]);
-    return snapshotId;
-  }
-  
-  snapshot = new FighterSnapshot(snapshotId);
+  const skinParts = fighter.currentSkin.split("-");
   // Extract base ID from fighter.id (format: "baseId-level")
   const idParts = fighter.id.split("-");
-  snapshot.playerId = BigInt.fromString(idParts[0]); // Use the base Monster ID
-  snapshot.fighterType = fighter.fighterType;
-  snapshot.fullName = fighterNameStr;
-  snapshot.currentSkin = fighter.currentSkin;
-  snapshot.stance = fighter.stance;
-  snapshot.level = fighter.level;
-  snapshot.createdAt = blockTimestamp;
-  snapshot.save();
   
-  log.info("createMonsterSnapshot: Created snapshot {} for fighter {}", [snapshotId, fighter.id]);
-  return snapshotId;
+  return createFighterSnapshot(
+    BigInt.fromString(idParts[0]), // Use the base Monster ID
+    fighter.fighterType,
+    fighter.strength,
+    fighter.constitution,
+    fighter.size,
+    fighter.agility,
+    fighter.stamina,
+    fighter.luck,
+    BigInt.fromString(skinParts[0]),
+    parseInt(skinParts[1]) as i32,
+    fighter.currentSkin,
+    fighter.stance,
+    fighter.firstNameIndex,
+    fighter.surnameIndex,
+    fighterName ? fighterName : "Unknown",
+    fighter.wins,
+    fighter.losses,
+    fighter.kills,
+    fighter.level,
+    fighter.currentXP,
+    fighter.weaponSpecialization,
+    fighter.armorSpecialization,
+    blockTimestamp
+  );
 }
 
 /**

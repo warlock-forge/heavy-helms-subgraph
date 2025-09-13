@@ -51,7 +51,7 @@ import {
   GauntletSizeSet,
   RewardConfigUpdated,
   QueueCommitted,
-  ParticipantsSelected,
+  GauntletParticipantsSelected,
   GauntletAutoRecovered,
   PlayerReplaced,
   FutureBlocksForSelectionSet,
@@ -61,7 +61,7 @@ import {
 
 import { getOrCreateStats, getOrCreateAccounting } from "./utils/stats-utils";
 import { updateStatsForGauntletWin } from "./utils/stats-utils";
-import { getOrCreateFighterSnapshotById, processCombatResultEvent } from "./utils/fighter-utils";
+import { getOrCreateFighterSnapshotById, processCombatResultEvent, getOrCreateFighterParticipant } from "./utils/fighter-utils";
 
 // Define ZERO_BI directly
 const ZERO_BI = BigInt.fromI32(0);
@@ -153,14 +153,14 @@ export function handleGauntletStarted(event: GauntletStartedEvent, defaultPlayer
 
     let loadoutStruct = participantStruct.loadout;
     let skinInfoStruct = loadoutStruct.skin;
-    let skinIndex_i32 = skinInfoStruct.skinIndex;
-    let skinTokenId_i32 = skinInfoStruct.skinTokenId;
-    let stance_i32 = loadoutStruct.stance;
+    let skinIndex = skinInfoStruct.skinIndex;
+    let skinTokenId = skinInfoStruct.skinTokenId;
+    let stance = loadoutStruct.stance;
 
     participantIdsForEventEntity.push(playerId_bigInt);
     let participantIdString = playerId_bigInt.toString();
 
-    let collectionId = skinIndex_i32.toString(); 
+    let collectionId = skinIndex.toString(); 
     log.info("[Gauntlet {}] Participant [{}]: Using SkinCollection (Registry) ID: {}", [gauntletId, participantIdString, collectionId]);
     
     let skinCollection = SkinCollection.load(collectionId); 
@@ -176,9 +176,21 @@ export function handleGauntletStarted(event: GauntletStartedEvent, defaultPlayer
     let participant = new GauntletParticipant(gauntletParticipantId);
 
     participant.gauntlet = gauntletId;
-    // We'll create the fighter snapshot after we save the participant
+    
+    // Create the FighterParticipant entity for the locked loadout
+    let fighterParticipant = getOrCreateFighterParticipant(
+      playerId_bigInt,
+      skinIndex,
+      skinTokenId,
+      stance,
+      event.block.timestamp
+    );
+    fighterParticipant.save();
+    
+    // Link the FighterParticipant to the GauntletParticipant
+    participant.participant = fighterParticipant.id;
 
-    let skinTokenIdString = `${skinTokenId_i32}`;
+    let skinTokenIdString = `${skinTokenId}`;
     let skinId = `${collectionId}-${skinTokenIdString}`;
     log.info("[Gauntlet {}] Participant [{}]: Checking for Skin ID (Format: collectionId-tokenId): {}", [gauntletId, participantIdString, skinId]);
 
@@ -578,6 +590,7 @@ export function handleGauntletXPAwarded(event: GauntletXPAwardedEvent): void {
   xpAwarded.levelBracket = event.params.levelBracket;
   xpAwarded.playerIds = event.params.playerIds;
   xpAwarded.xpAmounts = event.params.xpAmounts;
+  xpAwarded.gauntlet = event.params.gauntletId.toString(); // Link to Gauntlet entity
   xpAwarded.blockNumber = event.block.number;
   xpAwarded.blockTimestamp = event.block.timestamp;
   xpAwarded.transactionHash = event.transaction.hash;
@@ -676,6 +689,8 @@ export function handleGauntletRewardDistributed(event: GauntletRewardDistributed
   rewardDistributed.playerId = event.params.playerId;
   rewardDistributed.rewardType = event.params.rewardType;
   rewardDistributed.ticketId = event.params.ticketId;
+  rewardDistributed.gauntlet = event.params.gauntletId.toString(); // Link to Gauntlet entity
+  rewardDistributed.player = event.params.playerId.toString(); // Link to Player entity
   rewardDistributed.blockNumber = event.block.number;
   rewardDistributed.blockTimestamp = event.block.timestamp;
   rewardDistributed.transactionHash = event.transaction.hash;
@@ -739,13 +754,17 @@ export function handleQueueCommitted(event: QueueCommittedEvent): void {
 // Handle ParticipantsSelected event - ParticipantsSelected(indexed uint256,uint256,uint32[])
 export function handleParticipantsSelected(event: ParticipantsSelectedEvent): void {
   const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const participantsSelected = new ParticipantsSelected(eventId);
+  const participantsSelected = new GauntletParticipantsSelected(eventId);
   
   // Event signature: ParticipantsSelected(indexed uint256 gauntletId, uint256 tournamentBlock, uint32[] selectedIds)
-  // Map gauntletId → tournamentId field (unified schema)
-  participantsSelected.tournamentId = event.params.gauntletId;      // Indexed gauntletId
+  participantsSelected.gauntletId = event.params.gauntletId;      // Indexed gauntletId
   participantsSelected.tournamentBlock = event.params.tournamentBlock;   // Tournament block
   participantsSelected.selectedIds = event.params.selectedIds; // Already BigInt[] from codegen
+  
+  // Link to the Gauntlet entity (should exist from previous phase)
+  let gauntletId = event.params.gauntletId.toString();
+  participantsSelected.gauntlet = gauntletId;
+  
   participantsSelected.blockNumber = event.block.number;
   participantsSelected.blockTimestamp = event.block.timestamp;
   participantsSelected.transactionHash = event.transaction.hash;
