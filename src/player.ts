@@ -441,6 +441,7 @@ export function handlePlayerRetired(event: PlayerRetiredEvent): void {
     event.transaction.hash.concatI32(event.logIndex.toI32())
   );
   entity.playerId = event.params.playerId;
+  entity.caller = event.params.caller;
   entity.retired = event.params.retired;
 
   entity.blockNumber = event.block.number;
@@ -489,7 +490,11 @@ export function handlePlayerSkinEquipped(
     
     // Update skin (with fallback to default if needed)
     player.currentSkin = loadSkinIdOrDefault(skinId);
-    log.info("Equipped skin {} on player {}", [skinId, player.id]);
+    
+    // Update stance
+    player.stance = event.params.stance;
+    
+    log.info("Equipped skin {} with stance {} on player {}", [skinId, event.params.stance.toString(), player.id]);
     
     player.lastUpdatedAt = event.block.timestamp;
     player.save();
