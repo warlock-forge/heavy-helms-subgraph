@@ -669,7 +669,8 @@ export function handleCombatResult(event: CombatResultEvent): void {
     event.params.packedResults,
     event.block.number,
     event.block.timestamp,
-    true  // updateSkinStats: true for official tournament combats
+    true,  // updateSkinStats: true for official tournament combats
+    10     // defaultPlayerLevel: 10 (tournaments are level 10)
   );
   
   log.info("[TOURNAMENT] Completed CombatResult processing for tx {}", [event.transaction.hash.toHex()]);

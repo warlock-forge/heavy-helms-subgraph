@@ -1039,8 +1039,25 @@ export function decodePlayerData(data: Bytes): PlayerData {
     return playerData;
   }
   
-  // FIXED: Decode playerId with proper u32 casting to prevent AssemblyScript truncation
-  playerData.playerId = u32BE(data, 0);
+  // FIXED: Decode playerId from uint256 bytes32 (for default players) or structured data (for regular players)
+  // For default players: uint32 cast to uint256 puts value in rightmost 4 bytes (big-endian)
+  // For regular players: structured 32-byte encoding with ID in first 4 bytes
+  
+  // Try reading as uint256 first (for default players)
+  // uint32 cast to uint256 places value in bytes 28-31 (rightmost 4 bytes)
+  let potentialPlayerId = u32BE(data, 28);
+  
+  // Check if this looks like a valid player ID
+  if (potentialPlayerId >= 1 && potentialPlayerId <= 2000) {
+    // Default player range - use the uint256 decoded value
+    playerData.playerId = potentialPlayerId;
+    log.info("decodePlayerData: Decoded default player ID {} from uint256", [potentialPlayerId.toString()]);
+  } else {
+    // Try structured decoding for regular players (ID in bytes 0-3)
+    let structuredPlayerId = u32BE(data, 0);
+    playerData.playerId = structuredPlayerId;
+    log.warning("decodePlayerData: Fallback to structured decoding, player ID: {}", [structuredPlayerId.toString()]);
+  }
 
   // Decode attributes (bytes 4-9) - Single bytes, no casting needed
   playerData.strength = data[4];

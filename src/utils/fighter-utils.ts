@@ -477,6 +477,90 @@ export function getOrCreateFighterParticipant(
 }
 
 /**
+ * Creates a FighterSnapshot from a DefaultPlayer entity for a specific level
+ * This is used when default players participate in combat but only send player ID (gas optimization)
+ * @param playerId The default player ID
+ * @param level The level to use for the default player (determines which entity to load)
+ * @param combatResultId Combat result ID for generating snapshot ID
+ * @param playerPosition "1" or "2" for player1/player2
+ * @param blockTimestamp Block timestamp for the snapshot
+ * @returns FighterSnapshot entity ready to be saved, or null if not found
+ */
+function createFighterSnapshotFromDefaultPlayer(
+  playerId: BigInt,
+  level: i32,
+  combatResultId: string,
+  playerPosition: string,
+  blockTimestamp: BigInt
+): FighterSnapshot | null {
+  // Load the DefaultPlayer entity for the specified level
+  const defaultPlayerLevelId = playerId.toString() + "-" + level.toString();
+  const defaultPlayer = DefaultPlayer.load(defaultPlayerLevelId);
+  
+  if (!defaultPlayer) {
+    log.warning("createFighterSnapshotFromDefaultPlayer: DefaultPlayer {} not found for level {}", [
+      playerId.toString(),
+      level.toString()
+    ]);
+    return null;
+  }
+
+  // Generate unique sequential snapshot ID
+  const snapshotId = getNextSnapshotId();
+  
+  // Create the snapshot entity
+  const snapshot = new FighterSnapshot(snapshotId);
+  
+  // Fighter identification  
+  snapshot.playerId = playerId;
+  snapshot.fighterType = "DefaultPlayer";
+  
+  // Combat attributes from DefaultPlayer entity
+  snapshot.strength = defaultPlayer.strength;
+  snapshot.constitution = defaultPlayer.constitution;
+  snapshot.size = defaultPlayer.size;
+  snapshot.agility = defaultPlayer.agility;
+  snapshot.stamina = defaultPlayer.stamina;
+  snapshot.luck = defaultPlayer.luck;
+  
+  // Name information from DefaultPlayer entity
+  snapshot.firstNameIndex = defaultPlayer.firstNameIndex;
+  snapshot.surnameIndex = defaultPlayer.surnameIndex;
+  snapshot.fullName = defaultPlayer.fullName ? defaultPlayer.fullName! : "Unknown DefaultPlayer";
+  
+  // Record information from DefaultPlayer entity
+  snapshot.wins = defaultPlayer.wins;
+  snapshot.losses = defaultPlayer.losses;
+  snapshot.kills = defaultPlayer.kills;
+  
+  // Progression information from DefaultPlayer entity
+  snapshot.level = defaultPlayer.level;
+  snapshot.currentXP = defaultPlayer.currentXP;
+  snapshot.weaponSpecialization = defaultPlayer.weaponSpecialization;
+  snapshot.armorSpecialization = defaultPlayer.armorSpecialization;
+  
+  // Skin and stance from DefaultPlayer entity
+  snapshot.currentSkin = defaultPlayer.currentSkin;
+  snapshot.stance = defaultPlayer.stance;
+  
+  // Extract skinIndex and skinTokenId from currentSkin (format: "collectionId-tokenId")
+  const skinParts = defaultPlayer.currentSkin.split("-");
+  snapshot.skinIndex = BigInt.fromString(skinParts[0]);
+  snapshot.skinTokenId = parseInt(skinParts[1]) as i32;
+  
+  // Metadata
+  snapshot.createdAt = blockTimestamp;
+  
+  log.info("createFighterSnapshotFromDefaultPlayer: Created snapshot {} for defaultPlayer {} level {}", [
+    snapshotId,
+    playerId.toString(),
+    level.toString()
+  ]);
+  
+  return snapshot;
+}
+
+/**
  * Shared CombatResult event processing logic
  * Used across all game modes (duels, gauntlets, tournaments)
  * @param transactionHash Transaction hash for the combat event
@@ -488,6 +572,7 @@ export function getOrCreateFighterParticipant(
  * @param blockNumber Block number from event
  * @param blockTimestamp Block timestamp from event
  * @param updateSkinStats Whether to update skin combat analytics (false for exhibition duels)
+ * @param defaultPlayerLevel Optional: level for default player snapshots (0 = no injection)
  * @returns The created and saved CombatResult entity
  */
 export function processCombatResultEvent(
@@ -499,7 +584,8 @@ export function processCombatResultEvent(
   packedResults: Bytes,
   blockNumber: BigInt,
   blockTimestamp: BigInt,
-  updateSkinStats: boolean
+  updateSkinStats: boolean,
+  defaultPlayerLevel: i32 = 0  // Optional: level for default player snapshots (0 = auto-detect)
 ): CombatResult {
   // Generate the ID using txHash-logIndex string format
   const eventId = transactionHash.toHex() + "-" + logIndex.toString();
@@ -592,31 +678,123 @@ export function processCombatResultEvent(
   combatResult.player2EndingHealth = decodedStats.player2EndingHealth;
   combatResult.player2EndingStamina = decodedStats.player2EndingStamina;
 
-  // Create historical fighter snapshots from player data
-  const player1Snapshot = createFighterSnapshotFromPlayerData(
-    eventId,
-    "1", 
-    player1Data,
-    blockTimestamp
-  );
-  const player2Snapshot = createFighterSnapshotFromPlayerData(
-    eventId,
-    "2",
-    player2Data, 
-    blockTimestamp
-  );
+  // Create historical fighter snapshots from player data or DefaultPlayer entities
+  let player1Snapshot: FighterSnapshot | null = null;
+  let player2Snapshot: FighterSnapshot | null = null;
+  
+  // Handle Player 1 snapshot creation
+  if (defaultPlayerLevel > 0 && p1Data.playerId >= 1 && p1Data.playerId <= 2000) {
+    // Player 1 is a default player - create snapshot from DefaultPlayer entity
+    player1Snapshot = createFighterSnapshotFromDefaultPlayer(
+      BigInt.fromI32(p1Data.playerId),
+      defaultPlayerLevel,
+      eventId,
+      "1",
+      blockTimestamp
+    );
+    if (!player1Snapshot) {
+      // Fallback to encoded data if DefaultPlayer not found
+      log.warning("Falling back to encoded data for defaultPlayer {} level {}", [
+        p1Data.playerId.toString(),
+        defaultPlayerLevel.toString()
+      ]);
+      player1Snapshot = createFighterSnapshotFromPlayerData(eventId, "1", player1Data, blockTimestamp);
+    }
+  } else {
+    // Player 1 is a regular player/monster - use encoded data
+    player1Snapshot = createFighterSnapshotFromPlayerData(eventId, "1", player1Data, blockTimestamp);
+  }
+  
+  // Handle Player 2 snapshot creation
+  if (defaultPlayerLevel > 0 && p2Data.playerId >= 1 && p2Data.playerId <= 2000) {
+    // Player 2 is a default player - create snapshot from DefaultPlayer entity
+    player2Snapshot = createFighterSnapshotFromDefaultPlayer(
+      BigInt.fromI32(p2Data.playerId),
+      defaultPlayerLevel,
+      eventId,
+      "2",
+      blockTimestamp
+    );
+    if (!player2Snapshot) {
+      // Fallback to encoded data if DefaultPlayer not found
+      log.warning("Falling back to encoded data for defaultPlayer {} level {}", [
+        p2Data.playerId.toString(),
+        defaultPlayerLevel.toString()
+      ]);
+      player2Snapshot = createFighterSnapshotFromPlayerData(eventId, "2", player2Data, blockTimestamp);
+    }
+  } else {
+    // Player 2 is a regular player/monster - use encoded data
+    player2Snapshot = createFighterSnapshotFromPlayerData(eventId, "2", player2Data, blockTimestamp);
+  }
   
   // Save snapshots and link to combat result
   player1Snapshot.save();
   player2Snapshot.save();
   combatResult.player1Snapshot = player1Snapshot.id;
   combatResult.player2Snapshot = player2Snapshot.id;
+  
+  // IMPORTANT: For default players, recalculate health/stamina using DefaultPlayer entity data
+  // since the encoded data only contains player ID
+  if (defaultPlayerLevel > 0 && p1Data.playerId >= 1 && p1Data.playerId <= 2000) {
+    // Player 1 is a default player - calculate health/stamina from snapshot data
+    let p1Health = 50 + (player1Snapshot.constitution * 17) + (player1Snapshot.size * 6) + (player1Snapshot.stamina * 3);
+    let p1Stamina = 35 + (player1Snapshot.stamina * 20) + (player1Snapshot.strength * 5);
+    
+    // Apply level scaling for level > 1
+    if (player1Snapshot.level > 1) {
+      let levelBonus = (player1Snapshot.level - 1) * 5;
+      p1Health = (p1Health * (100 + levelBonus)) / 100;
+    }
+    
+    combatResult.player1MaxHealth = p1Health;
+    combatResult.player1MaxStamina = p1Stamina;
+    combatResult.player1EndingHealth = p1Health - decodedStats.player2TotalDamage;
+    combatResult.player1EndingStamina = p1Stamina - decodedStats.player1TotalStaminaLost;
+    
+    if (combatResult.player1EndingHealth < 0) combatResult.player1EndingHealth = 0;
+    if (combatResult.player1EndingStamina < 0) combatResult.player1EndingStamina = 0;
+    
+    log.info("Recalculated default player 1 health/stamina: {}HP→{} {}STA→{}", [
+      p1Health.toString(),
+      combatResult.player1EndingHealth.toString(),
+      p1Stamina.toString(),
+      combatResult.player1EndingStamina.toString()
+    ]);
+  }
+  
+  if (defaultPlayerLevel > 0 && p2Data.playerId >= 1 && p2Data.playerId <= 2000) {
+    // Player 2 is a default player - calculate health/stamina from snapshot data
+    let p2Health = 50 + (player2Snapshot.constitution * 17) + (player2Snapshot.size * 6) + (player2Snapshot.stamina * 3);
+    let p2Stamina = 35 + (player2Snapshot.stamina * 20) + (player2Snapshot.strength * 5);
+    
+    // Apply level scaling for level > 1
+    if (player2Snapshot.level > 1) {
+      let levelBonus = (player2Snapshot.level - 1) * 5;
+      p2Health = (p2Health * (100 + levelBonus)) / 100;
+    }
+    
+    combatResult.player2MaxHealth = p2Health;
+    combatResult.player2MaxStamina = p2Stamina;
+    combatResult.player2EndingHealth = p2Health - decodedStats.player1TotalDamage;
+    combatResult.player2EndingStamina = p2Stamina - decodedStats.player2TotalStaminaLost;
+    
+    if (combatResult.player2EndingHealth < 0) combatResult.player2EndingHealth = 0;
+    if (combatResult.player2EndingStamina < 0) combatResult.player2EndingStamina = 0;
+    
+    log.info("Recalculated default player 2 health/stamina: {}HP→{} {}STA→{}", [
+      p2Health.toString(),
+      combatResult.player2EndingHealth.toString(),
+      p2Stamina.toString(),
+      combatResult.player2EndingStamina.toString()
+    ]);
+  }
 
   // Set damage mitigation metrics (cross-reference for defensive analytics)
   combatResult.player1DamageTaken = decodedStats.player2TotalDamage;
-  combatResult.player1HealthLost = p1Data.maxHealth - decodedStats.player1EndingHealth;
+  combatResult.player1HealthLost = combatResult.player1MaxHealth - combatResult.player1EndingHealth;
   combatResult.player2DamageTaken = decodedStats.player1TotalDamage;
-  combatResult.player2HealthLost = p2Data.maxHealth - decodedStats.player2EndingHealth;
+  combatResult.player2HealthLost = combatResult.player2MaxHealth - combatResult.player2EndingHealth;
 
   combatResult.save();
 

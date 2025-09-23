@@ -368,9 +368,12 @@ export function handleGauntletRecovered(event: GauntletRecoveredEvent): void {
   log.warning("GauntletRecovered event missing gauntletId - cannot update gauntlet state", []);
 }
 
-// Handle the GauntletCombatResult event
-export function handleGauntletCombatResult(event: CombatResultEvent): void {
-  log.info("[GAUNTLET] Processing CombatResult event in tx {}", [event.transaction.hash.toHex()]);
+// Handle the GauntletCombatResult event with default player level injection
+function handleGauntletCombatResultWithLevel(event: CombatResultEvent, defaultPlayerLevel: i32): void {
+  log.info("[GAUNTLET] Processing CombatResult event in tx {} with defaultPlayerLevel {}", [
+    event.transaction.hash.toHex(),
+    defaultPlayerLevel.toString()
+  ]);
   
   // Use shared combat result processing logic (gauntlets are official - include skin stats)
   processCombatResultEvent(
@@ -382,10 +385,16 @@ export function handleGauntletCombatResult(event: CombatResultEvent): void {
     event.params.packedResults,
     event.block.number,
     event.block.timestamp,
-    true  // updateSkinStats: true for official gauntlet combats
+    true,  // updateSkinStats: true for official gauntlet combats
+    defaultPlayerLevel  // Pass the default player level for snapshot injection
   );
   
   log.info("[GAUNTLET] Completed CombatResult processing for tx {}", [event.transaction.hash.toHex()]);
+}
+
+// Handle the GauntletCombatResult event (fallback - no level injection)
+export function handleGauntletCombatResult(event: CombatResultEvent): void {
+  handleGauntletCombatResultWithLevel(event, 0); // No default player level injection
 }
 
 // Admin event handlers
@@ -814,9 +823,39 @@ export function handlePlayerReplaced(event: PlayerReplacedEvent): void {
   playerReplaced.blockTimestamp = event.block.timestamp;
   playerReplaced.transactionHash = event.transaction.hash;
   
+  // Set the tournament field to the gauntlet ID (schema expects tournament relation)
+  playerReplaced.tournament = event.params.gauntletId.toString();
+  
   playerReplaced.save();
   
-  log.info("GauntletGame PlayerReplaced: {} replaced {} with {} (reason: {})", [
+  // Update the gauntlet participant if replacement happened
+  const gauntletId = event.params.gauntletId.toString();
+  const originalPlayerIdString = event.params.originalPlayerId.toString();
+  const replacementPlayerIdString = event.params.replacementPlayerId.toString();
+  
+  // Update original player's status if they were in gauntlet
+  let originalPlayer = Player.load(originalPlayerIdString);
+  if (originalPlayer) {
+    if (originalPlayer.gauntletStatus == "IN_GAUNTLET" && originalPlayer.currentGauntlet == gauntletId) {
+      originalPlayer.gauntletStatus = "NONE";
+      originalPlayer.currentGauntlet = null;
+      originalPlayer.lastUpdatedAt = event.block.timestamp;
+      originalPlayer.save();
+      log.info("PlayerReplaced: Set original player {} status to NONE", [originalPlayerIdString]);
+    }
+  }
+  
+  // Update replacement player's status
+  let replacementPlayer = Player.load(replacementPlayerIdString);
+  if (replacementPlayer) {
+    replacementPlayer.gauntletStatus = "IN_GAUNTLET";
+    replacementPlayer.currentGauntlet = gauntletId;
+    replacementPlayer.lastUpdatedAt = event.block.timestamp;
+    replacementPlayer.save();
+    log.info("PlayerReplaced: Set replacement player {} status to IN_GAUNTLET", [replacementPlayerIdString]);
+  }
+  
+  log.info("GauntletGame PlayerReplaced: gauntlet {} replaced {} with {} (reason: {})", [
     event.params.gauntletId.toString(),
     event.params.originalPlayerId.toString(),
     event.params.replacementPlayerId.toString(),
@@ -890,7 +929,7 @@ export function handlePlayerWithdrewLow(event: PlayerWithdrewEvent): void { hand
 export function handleGauntletStartedLow(event: GauntletStartedEvent): void { handleGauntletStarted(event, 4); }
 export function handleGauntletCompletedLow(event: GauntletCompletedEvent): void { handleGauntletCompleted(event, 4); }
 export function handleGauntletRecoveredLow(event: GauntletRecoveredEvent): void { handleGauntletRecovered(event); }
-export function handleGauntletCombatResultLow(event: CombatResultEvent): void { handleGauntletCombatResult(event); }
+export function handleGauntletCombatResultLow(event: CombatResultEvent): void { handleGauntletCombatResultWithLevel(event, 4); }
 export function handleGauntletSizeSetLow(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event); }
 export function handleGameEnabledUpdatedLow(event: GameEnabledUpdatedEvent): void { handleGameEnabledUpdated(event); }
 export function handleGameEngineUpdatedLow(event: GameEngineUpdatedEvent): void { handleGameEngineUpdated(event); }
@@ -915,7 +954,7 @@ export function handlePlayerWithdrewMid(event: PlayerWithdrewEvent): void { hand
 export function handleGauntletStartedMid(event: GauntletStartedEvent): void { handleGauntletStarted(event, 9); }
 export function handleGauntletCompletedMid(event: GauntletCompletedEvent): void { handleGauntletCompleted(event, 9); }
 export function handleGauntletRecoveredMid(event: GauntletRecoveredEvent): void { handleGauntletRecovered(event); }
-export function handleGauntletCombatResultMid(event: CombatResultEvent): void { handleGauntletCombatResult(event); }
+export function handleGauntletCombatResultMid(event: CombatResultEvent): void { handleGauntletCombatResultWithLevel(event, 9); }
 export function handleGauntletSizeSetMid(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event); }
 export function handleGameEnabledUpdatedMid(event: GameEnabledUpdatedEvent): void { handleGameEnabledUpdated(event); }
 export function handleGameEngineUpdatedMid(event: GameEngineUpdatedEvent): void { handleGameEngineUpdated(event); }
@@ -940,7 +979,7 @@ export function handlePlayerWithdrewHigh(event: PlayerWithdrewEvent): void { han
 export function handleGauntletStartedHigh(event: GauntletStartedEvent): void { handleGauntletStarted(event, 10); }
 export function handleGauntletCompletedHigh(event: GauntletCompletedEvent): void { handleGauntletCompleted(event, 10); }
 export function handleGauntletRecoveredHigh(event: GauntletRecoveredEvent): void { handleGauntletRecovered(event); }
-export function handleGauntletCombatResultHigh(event: CombatResultEvent): void { handleGauntletCombatResult(event); }
+export function handleGauntletCombatResultHigh(event: CombatResultEvent): void { handleGauntletCombatResultWithLevel(event, 10); }
 export function handleGauntletSizeSetHigh(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event); }
 export function handleGameEnabledUpdatedHigh(event: GameEnabledUpdatedEvent): void { handleGameEnabledUpdated(event); }
 export function handleGameEngineUpdatedHigh(event: GameEngineUpdatedEvent): void { handleGameEngineUpdated(event); }

@@ -300,7 +300,8 @@ export function handleCombatResult(event: CombatResultEvent): void {
     event.params.packedResults,
     event.block.number,
     event.block.timestamp,
-    false  // updateSkinStats: false for exhibition duels
+    false,  // updateSkinStats: false for exhibition duels
+    0       // defaultPlayerLevel: 0 (no default player injection for duels)
   );
   
   log.info("[DUEL] Completed CombatResult processing for tx {}", [event.transaction.hash.toHex()]);
