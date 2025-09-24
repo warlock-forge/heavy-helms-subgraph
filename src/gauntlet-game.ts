@@ -59,7 +59,7 @@ import {
   EmergencyQueueCleared
 } from "../generated/schema";
 
-import { getOrCreateStats, getOrCreateAccounting } from "./utils/stats-utils";
+import { getOrCreateStats, getOrCreateAccounting, getOrCreateGauntletBracket } from "./utils/stats-utils";
 import { updateStatsForGauntletWin } from "./utils/stats-utils";
 import { getOrCreateFighterSnapshotById, processCombatResultEvent, getOrCreateFighterParticipant } from "./utils/fighter-utils";
 
@@ -70,7 +70,7 @@ const ZERO_I32 = 0; // Helper constant
 
 
 // Handle the PlayerQueued event
-export function handlePlayerQueued(event: PlayerQueuedEvent): void {
+export function handlePlayerQueued(event: PlayerQueuedEvent, bracketLevel: i32 = 0): void {
   const entityId = event.transaction.hash.concatI32(event.logIndex.toI32());
   const entity = new PlayerQueued(entityId);
   
@@ -81,10 +81,27 @@ export function handlePlayerQueued(event: PlayerQueuedEvent): void {
   entity.transactionHash = event.transaction.hash;
   entity.save();
   
-  const stats = getOrCreateStats();
-  // Note: Queue sizes now tracked per bracket in GauntletBracket entities
-  stats.lastUpdated = event.block.timestamp;
-  stats.save();
+  // Determine bracket ID for GauntletBracket update
+  let bracketId: string;
+  if (bracketLevel == 4) {
+    bracketId = "low";
+  } else if (bracketLevel == 9) {
+    bracketId = "mid";
+  } else if (bracketLevel == 10) {
+    bracketId = "high";
+  } else {
+    log.error("Unknown bracket level: {}", [bracketLevel.toString()]);
+    return;
+  }
+  
+  // Update GauntletBracket entity with the correct queue size
+  const bracket = getOrCreateGauntletBracket(bracketId, event.address, event.block.timestamp);
+  bracket.currentQueueSize = event.params.queueSize.toI32();
+  if (bracket.currentQueueSize > bracket.maxQueueSize) {
+    bracket.maxQueueSize = bracket.currentQueueSize;
+  }
+  bracket.lastUpdated = event.block.timestamp;
+  bracket.save();
 
   let playerIdString = `${event.params.playerId}`;
   let player = Player.load(playerIdString);
@@ -97,7 +114,7 @@ export function handlePlayerQueued(event: PlayerQueuedEvent): void {
 }
 
 // Handle the PlayerWithdrew event
-export function handlePlayerWithdrew(event: PlayerWithdrewEvent): void {
+export function handlePlayerWithdrew(event: PlayerWithdrewEvent, bracketLevel: i32 = 0): void {
   const entityId = event.transaction.hash.concatI32(event.logIndex.toI32());
   const entity = new PlayerWithdrew(entityId);
   
@@ -108,10 +125,24 @@ export function handlePlayerWithdrew(event: PlayerWithdrewEvent): void {
   entity.transactionHash = event.transaction.hash;
   entity.save();
 
-  const stats = getOrCreateStats();
-  // Note: Queue sizes now tracked per bracket in GauntletBracket entities
-  stats.lastUpdated = event.block.timestamp;
-  stats.save();
+  // Determine bracket ID for GauntletBracket update
+  let bracketId: string;
+  if (bracketLevel == 4) {
+    bracketId = "low";
+  } else if (bracketLevel == 9) {
+    bracketId = "mid";
+  } else if (bracketLevel == 10) {
+    bracketId = "high";
+  } else {
+    log.error("Unknown bracket level: {}", [bracketLevel.toString()]);
+    return;
+  }
+  
+  // Update GauntletBracket entity with the correct queue size
+  const bracket = getOrCreateGauntletBracket(bracketId, event.address, event.block.timestamp);
+  bracket.currentQueueSize = event.params.queueSize.toI32();
+  bracket.lastUpdated = event.block.timestamp;
+  bracket.save();
 
   let playerIdString = `${event.params.playerId}`;
   let player = Player.load(playerIdString);
@@ -131,7 +162,23 @@ export function handleGauntletStarted(event: GauntletStartedEvent, defaultPlayer
   const gauntlet = new Gauntlet(gauntletId);
   gauntlet.size = event.params.size;
   gauntlet.state = "PENDING";
-  gauntlet.levelBracket = event.params.levelBracket;
+  
+  // Determine bracket based on defaultPlayerLevel and link to GauntletBracket
+  let bracketId: string;
+  if (defaultPlayerLevel == 4) {
+    bracketId = "low";
+  } else if (defaultPlayerLevel == 9) {
+    bracketId = "mid";
+  } else if (defaultPlayerLevel == 10) {
+    bracketId = "high";
+  } else {
+    log.error("Unknown defaultPlayerLevel for GauntletStarted: {}", [defaultPlayerLevel.toString()]);
+    return;
+  }
+  
+  // Create/get the bracket and link it
+  const bracket = getOrCreateGauntletBracket(bracketId, event.address, event.block.timestamp);
+  gauntlet.bracket = bracket.id;
   gauntlet.championSnapshot = null;
   gauntlet.startedAt = event.block.timestamp;
   gauntlet.startedTx = event.transaction.hash;
@@ -235,13 +282,13 @@ export function handleGauntletStarted(event: GauntletStartedEvent, defaultPlayer
   entity.transactionHash = event.transaction.hash;
   entity.save();
 
-  const stats = getOrCreateStats();
-  stats.totalGauntletsStarted += 1;
-
-  // Note: Queue size adjustments now handled per bracket in GauntletBracket entities
-
-  stats.lastUpdated = event.block.timestamp;
-  stats.save();
+  // Update bracket-specific stats
+  bracket.totalGauntletsStarted += 1;
+  bracket.lastGauntletStarted = event.block.timestamp;
+  // Update queue size: subtract selected participants who were removed from queue
+  bracket.currentQueueSize = bracket.currentQueueSize - event.params.participants.length;
+  bracket.lastUpdated = event.block.timestamp;
+  bracket.save();
 }
 
 // Handle the GauntletCompleted event
@@ -336,11 +383,6 @@ export function handleGauntletCompleted(event: GauntletCompletedEvent, defaultPl
   entity.transactionHash = event.transaction.hash;
   entity.save();
 
-  // --- (Keep existing logic to update Stats entity) ---
-  const stats = getOrCreateStats();
-  stats.totalGauntletsCompleted += 1;
-  stats.lastUpdated = event.block.timestamp;
-  stats.save();
 }
 
 // Handle the GauntletRecovered event
@@ -354,11 +396,6 @@ export function handleGauntletRecovered(event: GauntletRecoveredEvent): void {
   entity.transactionHash = event.transaction.hash;
   entity.save();
   
-  // Update stats for recovery tracking
-  const stats = getOrCreateStats();
-  stats.totalGauntletsRecovered += 1;
-  stats.lastUpdated = event.block.timestamp;
-  stats.save();
   
   log.warning("GauntletRecovered event missing gauntletId - cannot update gauntlet state", []);
 }
@@ -396,7 +433,7 @@ export function handleGauntletCombatResult(event: CombatResultEvent): void {
 
 
 
-export function handleGauntletSizeSet(event: GauntletSizeSetEvent): void {
+export function handleGauntletSizeSet(event: GauntletSizeSetEvent, bracketLevel: i32 = 0): void {
   const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
   const sizeSet = new GauntletSizeSet(eventId);
   
@@ -408,10 +445,24 @@ export function handleGauntletSizeSet(event: GauntletSizeSetEvent): void {
   
   sizeSet.save();
   
-  // Update bracket-specific size (handled in GauntletBracket entities)
-  const stats = getOrCreateStats();
-  stats.lastUpdated = event.block.timestamp;
-  stats.save();
+  // Update bracket-specific gauntlet size in GauntletBracket entity
+  let bracketId: string;
+  if (bracketLevel == 4) {
+    bracketId = "low";
+  } else if (bracketLevel == 9) {
+    bracketId = "mid";
+  } else if (bracketLevel == 10) {
+    bracketId = "high";
+  } else {
+    log.error("Unknown bracket level for GauntletSizeSet: {}", [bracketLevel.toString()]);
+    return;
+  }
+  
+  // Update GauntletBracket entity with new gauntlet size
+  const bracket = getOrCreateGauntletBracket(bracketId, event.address, event.block.timestamp);
+  bracket.currentGauntletSize = event.params.newSize;
+  bracket.lastUpdated = event.block.timestamp;
+  bracket.save();
 }
 
 
@@ -473,11 +524,7 @@ export function handleQueueClearedDueToGameDisabled(event: QueueClearedDueToGame
 // handleGameEnabledUpdated is moved outside the comment block below
 
 export function handleMinTimeBetweenGauntletsSet(event: MinTimeBetweenGauntletsSetEvent): void {
-  const stats = getOrCreateStats();
-  // Update the min time field
-  // Min time now tracked per bracket in GauntletBracket entities 
-  stats.lastUpdated = event.block.timestamp;
-  stats.save();
+  // Min time now tracked per bracket in GauntletBracket entities
 }
 
 export function handleDefaultPlayerContractSet(event: DefaultPlayerContractSetEvent): void {
@@ -528,10 +575,7 @@ export function handleMinTimeBetweenGauntletsSet(event: MinTimeBetweenGauntletsS
   minTimeSet.save();
   
   // Update stats
-  const stats = getOrCreateStats();
   // Min time now tracked per bracket in GauntletBracket entities
-  stats.lastUpdated = event.block.timestamp;
-  stats.save();
 }
 
 // Handle DefaultPlayerContractSet event
@@ -560,9 +604,6 @@ export function handleGameEnabledUpdated(event: GameEnabledUpdatedEvent): void {
   enabledUpdated.save();
   
   // Update stats to track enabled state
-  const stats = getOrCreateStats();
-  stats.lastUpdated = event.block.timestamp;
-  stats.save();
 }
 
 export function handleGameEngineUpdated(event: GameEngineUpdatedEvent): void {
@@ -748,7 +789,7 @@ export function handleQueueCommitted(event: QueueCommittedEvent): void {
   
   queueCommitted.save();
   
-  log.info("GauntletGame QueueCommitted: block {} with {} players", [
+  log.info("GauntletGame QueueCommitted: block {} with {} players total", [
     event.params.selectionBlock.toString(),
     event.params.queueSize.toString()
   ]);
@@ -918,13 +959,13 @@ export function handleEmergencyQueueCleared(event: EmergencyQueueClearedEvent): 
 // =======================================================
 
 // Low Bracket (Levels 1-4) Handlers
-export function handlePlayerQueuedLow(event: PlayerQueuedEvent): void { handlePlayerQueued(event); }
-export function handlePlayerWithdrewLow(event: PlayerWithdrewEvent): void { handlePlayerWithdrew(event); }
+export function handlePlayerQueuedLow(event: PlayerQueuedEvent): void { handlePlayerQueued(event, 4); }
+export function handlePlayerWithdrewLow(event: PlayerWithdrewEvent): void { handlePlayerWithdrew(event, 4); }
 export function handleGauntletStartedLow(event: GauntletStartedEvent): void { handleGauntletStarted(event, 4); }
 export function handleGauntletCompletedLow(event: GauntletCompletedEvent): void { handleGauntletCompleted(event, 4); }
 export function handleGauntletRecoveredLow(event: GauntletRecoveredEvent): void { handleGauntletRecovered(event); }
 export function handleGauntletCombatResultLow(event: CombatResultEvent): void { handleGauntletCombatResultWithLevel(event, 4); }
-export function handleGauntletSizeSetLow(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event); }
+export function handleGauntletSizeSetLow(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event, 4); }
 export function handleGameEnabledUpdatedLow(event: GameEnabledUpdatedEvent): void { handleGameEnabledUpdated(event); }
 export function handleGameEngineUpdatedLow(event: GameEngineUpdatedEvent): void { handleGameEngineUpdated(event); }
 export function handleQueuePartiallyClearedLow(event: QueuePartiallyClearedEvent): void { handleQueuePartiallyCleared(event); }
@@ -943,13 +984,13 @@ export function handleDailyResetCostUpdatedLow(event: DailyResetCostUpdatedEvent
 export function handleDailyGauntletLimitUpdatedLow(event: DailyGauntletLimitUpdatedEvent): void { handleDailyGauntletLimitUpdated(event); }
 
 // Mid Bracket (Levels 5-9) Handlers
-export function handlePlayerQueuedMid(event: PlayerQueuedEvent): void { handlePlayerQueued(event); }
-export function handlePlayerWithdrewMid(event: PlayerWithdrewEvent): void { handlePlayerWithdrew(event); }
+export function handlePlayerQueuedMid(event: PlayerQueuedEvent): void { handlePlayerQueued(event, 9); }
+export function handlePlayerWithdrewMid(event: PlayerWithdrewEvent): void { handlePlayerWithdrew(event, 9); }
 export function handleGauntletStartedMid(event: GauntletStartedEvent): void { handleGauntletStarted(event, 9); }
 export function handleGauntletCompletedMid(event: GauntletCompletedEvent): void { handleGauntletCompleted(event, 9); }
 export function handleGauntletRecoveredMid(event: GauntletRecoveredEvent): void { handleGauntletRecovered(event); }
 export function handleGauntletCombatResultMid(event: CombatResultEvent): void { handleGauntletCombatResultWithLevel(event, 9); }
-export function handleGauntletSizeSetMid(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event); }
+export function handleGauntletSizeSetMid(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event, 9); }
 export function handleGameEnabledUpdatedMid(event: GameEnabledUpdatedEvent): void { handleGameEnabledUpdated(event); }
 export function handleGameEngineUpdatedMid(event: GameEngineUpdatedEvent): void { handleGameEngineUpdated(event); }
 export function handleQueuePartiallyClearedMid(event: QueuePartiallyClearedEvent): void { handleQueuePartiallyCleared(event); }
@@ -968,13 +1009,13 @@ export function handleDailyResetCostUpdatedMid(event: DailyResetCostUpdatedEvent
 export function handleDailyGauntletLimitUpdatedMid(event: DailyGauntletLimitUpdatedEvent): void { handleDailyGauntletLimitUpdated(event); }
 
 // High Bracket (Level 10) Handlers
-export function handlePlayerQueuedHigh(event: PlayerQueuedEvent): void { handlePlayerQueued(event); }
-export function handlePlayerWithdrewHigh(event: PlayerWithdrewEvent): void { handlePlayerWithdrew(event); }
+export function handlePlayerQueuedHigh(event: PlayerQueuedEvent): void { handlePlayerQueued(event, 10); }
+export function handlePlayerWithdrewHigh(event: PlayerWithdrewEvent): void { handlePlayerWithdrew(event, 10); }
 export function handleGauntletStartedHigh(event: GauntletStartedEvent): void { handleGauntletStarted(event, 10); }
 export function handleGauntletCompletedHigh(event: GauntletCompletedEvent): void { handleGauntletCompleted(event, 10); }
 export function handleGauntletRecoveredHigh(event: GauntletRecoveredEvent): void { handleGauntletRecovered(event); }
 export function handleGauntletCombatResultHigh(event: CombatResultEvent): void { handleGauntletCombatResultWithLevel(event, 10); }
-export function handleGauntletSizeSetHigh(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event); }
+export function handleGauntletSizeSetHigh(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event, 10); }
 export function handleGameEnabledUpdatedHigh(event: GameEnabledUpdatedEvent): void { handleGameEnabledUpdated(event); }
 export function handleGameEngineUpdatedHigh(event: GameEngineUpdatedEvent): void { handleGameEngineUpdated(event); }
 export function handleQueuePartiallyClearedHigh(event: QueuePartiallyClearedEvent): void { handleQueuePartiallyCleared(event); }

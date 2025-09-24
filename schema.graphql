@@ -981,18 +981,44 @@ type Stats @entity {
   # Timestamps
   lastUpdated: BigInt!
   
-  # Gauntlet statistics
-  totalGauntletsStarted: Int!
-  totalGauntletsCompleted: Int!
-  totalGauntletsRecovered: Int!
-  queueSizeLow: Int!        # Level 1-4 bracket queue size
-  queueSizeMid: Int!        # Level 5-9 bracket queue size  
-  queueSizeHigh: Int!       # Level 10 bracket queue size
   
   # Tournament statistics
   totalTournamentsStarted: BigInt!
   totalTournamentsCompleted: BigInt!
   totalTournamentWins: BigInt!
+}
+
+# ==========================================================
+#                   GAUNTLET BRACKET ENTITY                  
+# ==========================================================
+type GauntletBracket @entity {
+  id: ID!                           # "low", "mid", or "high"
+  bracketType: String!              # "LEVELS_1_TO_4", "LEVELS_5_TO_9", "LEVEL_10"
+  levelBracket: Int!                # 0, 1, 2 (for filtering)
+  contractAddress: Bytes!           # Contract address for this bracket
+  
+  # Queue tracking
+  currentQueueSize: Int!            # Current players queued
+  maxQueueSize: Int!                # Highest queue size ever reached
+  
+  # Gauntlet tracking
+  totalGauntletsStarted: Int!       # Total gauntlets started in this bracket
+  totalGauntletsCompleted: Int!     # Total gauntlets completed in this bracket
+  totalGauntletsRecovered: Int!     # Total gauntlets recovered in this bracket
+  
+  # Performance metrics
+  averageQueueTime: BigDecimal!     # Average time in queue (seconds)
+  lastGauntletStarted: BigInt       # Timestamp of last gauntlet start
+  lastGauntletCompleted: BigInt     # Timestamp of last gauntlet completion
+  
+  # Settings tracking
+  currentGauntletSize: Int!         # Current gauntlet size for this bracket
+  minTimeBetweenGauntlets: BigInt!  # Min time between gauntlets
+  isEnabled: Boolean!               # Whether bracket is enabled
+  
+  # Timestamps
+  createdAt: BigInt!
+  lastUpdated: BigInt!
 }
 
 # ==========================================================
@@ -1183,7 +1209,7 @@ type Gauntlet @entity {
   id: ID!                  # Gauntlet ID (uint256 from contract)
   size: Int!               # 4, 8, 16, or 32
   state: GauntletState!    # PENDING or COMPLETED
-  levelBracket: Int!       # 0=LEVELS_1_TO_4, 1=LEVELS_5_TO_9, 2=LEVEL_10
+  bracket: GauntletBracket! # Link to the bracket entity (required)
   participants: [GauntletParticipant!]! @derivedFrom(field: "gauntlet") # List of participants (INITIAL REGISTRANTS)
   roundWinners: [String!]  # List of Fighter IDs for each round winner (size - 1)
   championSnapshot: FighterSnapshot # Historical snapshot of champion when they won

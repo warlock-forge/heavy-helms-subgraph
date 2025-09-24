@@ -1,5 +1,5 @@
 import { BigInt, Address, Bytes, BigDecimal } from "@graphprotocol/graph-ts"
-import { Stats, Owner, Player, SkinCombatStat, PlayerSkinCombatStat, Skin, PlayerSeasonalStats, Accounting } from "../../generated/schema"
+import { Stats, Owner, Player, SkinCombatStat, PlayerSkinCombatStat, Skin, PlayerSeasonalStats, Accounting, GauntletBracket } from "../../generated/schema"
 import { log } from "@graphprotocol/graph-ts"
 
 // Little-endian helper functions
@@ -60,14 +60,9 @@ export function getOrCreateStats(): Stats {
     stats.lastUpdated = BigInt.fromI32(0)
     
     // Initialize Gauntlet-related fields
-    stats.totalGauntletsStarted = 0
-    stats.totalGauntletsCompleted = 0
-    stats.totalGauntletsRecovered = 0
+    // Gauntlet stats now tracked in GauntletBracket entities only
     
-    // Initialize bracket-specific queue sizes
-    stats.queueSizeLow = 0
-    stats.queueSizeMid = 0
-    stats.queueSizeHigh = 0
+    // Queue sizes are now tracked in GauntletBracket entities only
     
     // Initialize Tournament-related fields
     stats.totalTournamentsStarted = BigInt.fromI32(0)
@@ -76,6 +71,63 @@ export function getOrCreateStats(): Stats {
   }
   
   return stats as Stats
+}
+
+export function getOrCreateGauntletBracket(
+  bracketId: string, 
+  contractAddress: Address,
+  timestamp: BigInt
+): GauntletBracket {
+  let bracket = GauntletBracket.load(bracketId)
+  
+  if (bracket == null) {
+    bracket = new GauntletBracket(bracketId)
+    
+    // Set bracket type and level based on ID
+    if (bracketId == "low") {
+      bracket.bracketType = "LEVELS_1_TO_4"
+      bracket.levelBracket = 0
+    } else if (bracketId == "mid") {
+      bracket.bracketType = "LEVELS_5_TO_9"
+      bracket.levelBracket = 1
+    } else if (bracketId == "high") {
+      bracket.bracketType = "LEVEL_10"
+      bracket.levelBracket = 2
+    } else {
+      // Fallback - should never happen
+      bracket.bracketType = "UNKNOWN"
+      bracket.levelBracket = -1
+    }
+    
+    bracket.contractAddress = contractAddress
+    
+    // Initialize queue tracking
+    bracket.currentQueueSize = 0
+    bracket.maxQueueSize = 0
+    
+    // Initialize gauntlet tracking
+    bracket.totalGauntletsStarted = 0
+    bracket.totalGauntletsCompleted = 0
+    bracket.totalGauntletsRecovered = 0
+    
+    // Initialize performance metrics
+    bracket.averageQueueTime = BigDecimal.zero()
+    bracket.lastGauntletStarted = null
+    bracket.lastGauntletCompleted = null
+    
+    // Initialize settings
+    bracket.currentGauntletSize = 0 // Will be set by GauntletSizeSet event
+    bracket.minTimeBetweenGauntlets = BigInt.fromI32(0)
+    bracket.isEnabled = true // Default to enabled
+    
+    // Timestamps
+    bracket.createdAt = timestamp
+    bracket.lastUpdated = timestamp
+    
+    bracket.save()
+  }
+  
+  return bracket as GauntletBracket
 }
 
 export function getOrCreateAccounting(timestamp: BigInt): Accounting {
