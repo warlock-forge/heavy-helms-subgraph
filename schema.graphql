@@ -984,9 +984,9 @@ type Stats @entity {
   totalGauntletsStarted: Int!
   totalGauntletsCompleted: Int!
   totalGauntletsRecovered: Int!
-  currentGauntletQueueSize: Int!
-  currentGauntletSize: Int!
-  currentMinTimeBetweenGauntlets: BigInt!
+  queueSizeLow: Int!        # Level 1-4 bracket queue size
+  queueSizeMid: Int!        # Level 5-9 bracket queue size  
+  queueSizeHigh: Int!       # Level 10 bracket queue size
   
   # Tournament statistics
   totalTournamentsStarted: BigInt!

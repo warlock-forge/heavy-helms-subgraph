@@ -82,7 +82,7 @@ export function handlePlayerQueued(event: PlayerQueuedEvent): void {
   entity.save();
   
   const stats = getOrCreateStats();
-  stats.currentGauntletQueueSize = event.params.queueSize.toI32();
+  // Note: Queue sizes now tracked per bracket in GauntletBracket entities
   stats.lastUpdated = event.block.timestamp;
   stats.save();
 
@@ -109,7 +109,7 @@ export function handlePlayerWithdrew(event: PlayerWithdrewEvent): void {
   entity.save();
 
   const stats = getOrCreateStats();
-  stats.currentGauntletQueueSize = event.params.queueSize.toI32();
+  // Note: Queue sizes now tracked per bracket in GauntletBracket entities
   stats.lastUpdated = event.block.timestamp;
   stats.save();
 
@@ -238,12 +238,7 @@ export function handleGauntletStarted(event: GauntletStartedEvent, defaultPlayer
   const stats = getOrCreateStats();
   stats.totalGauntletsStarted += 1;
 
-  // --- Corrected Logic ---
-  let currentQueueSize = stats.currentGauntletQueueSize;
-  let gauntletSize = event.params.size;
-  // Explicitly cast the result of Math.max to i32
-  stats.currentGauntletQueueSize = i32(Math.max(0, currentQueueSize - gauntletSize)); 
-  // --- End Correction ---
+  // Note: Queue size adjustments now handled per bracket in GauntletBracket entities
 
   stats.lastUpdated = event.block.timestamp;
   stats.save();
@@ -413,9 +408,8 @@ export function handleGauntletSizeSet(event: GauntletSizeSetEvent): void {
   
   sizeSet.save();
   
-  // Update stats with the new gauntlet size
+  // Update bracket-specific size (handled in GauntletBracket entities)
   const stats = getOrCreateStats();
-  stats.currentGauntletSize = event.params.newSize;
   stats.lastUpdated = event.block.timestamp;
   stats.save();
 }
@@ -481,7 +475,7 @@ export function handleQueueClearedDueToGameDisabled(event: QueueClearedDueToGame
 export function handleMinTimeBetweenGauntletsSet(event: MinTimeBetweenGauntletsSetEvent): void {
   const stats = getOrCreateStats();
   // Update the min time field
-  stats.currentMinTimeBetweenGauntlets = event.params.newMinTime; 
+  // Min time now tracked per bracket in GauntletBracket entities 
   stats.lastUpdated = event.block.timestamp;
   stats.save();
 }
@@ -535,7 +529,7 @@ export function handleMinTimeBetweenGauntletsSet(event: MinTimeBetweenGauntletsS
   
   // Update stats
   const stats = getOrCreateStats();
-  stats.currentMinTimeBetweenGauntlets = event.params.newMinTime;
+  // Min time now tracked per bracket in GauntletBracket entities
   stats.lastUpdated = event.block.timestamp;
   stats.save();
 }

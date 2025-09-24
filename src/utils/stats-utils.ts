@@ -62,9 +62,11 @@ export function getOrCreateStats(): Stats {
     stats.totalGauntletsStarted = 0
     stats.totalGauntletsCompleted = 0
     stats.totalGauntletsRecovered = 0
-    stats.currentGauntletQueueSize = 0
-    stats.currentGauntletSize = 0
-    stats.currentMinTimeBetweenGauntlets = BigInt.fromI32(0)
+    
+    // Initialize bracket-specific queue sizes
+    stats.queueSizeLow = 0
+    stats.queueSizeMid = 0
+    stats.queueSizeHigh = 0
     
     // Initialize Tournament-related fields
     stats.totalTournamentsStarted = BigInt.fromI32(0)
