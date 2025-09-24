@@ -40,6 +40,7 @@ export function getOrCreateStats(): Stats {
     stats.retiredMonsterCount = 0
     stats.totalFightersCount = 0
     
+    stats.totalFights = 0
     stats.totalWins = 0
     stats.totalLosses = 0
     stats.totalKills = 0

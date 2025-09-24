@@ -1,6 +1,6 @@
 import { log, BigInt, Bytes } from "@graphprotocol/graph-ts";
 import { Name, Player, DefaultPlayer, Monster, FighterSnapshot, Skin, SnapshotCounter, FighterParticipant, CombatResult } from "../../generated/schema";
-import { decodePlayerData, processCombatResultsWithPlayerData, updateSkinCombatAnalytics, updatePlayerSkinCombatAnalytics } from "./stats-utils";
+import { decodePlayerData, processCombatResultsWithPlayerData, updateSkinCombatAnalytics, updatePlayerSkinCombatAnalytics, getOrCreateStats } from "./stats-utils";
 
 
 /**
@@ -840,6 +840,12 @@ export function processCombatResultEvent(
       blockTimestamp
     );
   }
+
+  // Update total fights counter for every combat result
+  const stats = getOrCreateStats();
+  stats.totalFights++;
+  stats.lastUpdated = blockTimestamp;
+  stats.save();
 
   log.info("processCombatResultEvent: Created combat result {} with player1Id={} player2Id={}", [
     eventId,

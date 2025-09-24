@@ -958,8 +958,9 @@ type Stats @entity {
   totalFightersCount: Int!
   
   # Combat statistics
-  totalWins: Int!
-  totalLosses: Int!
+  totalFights: Int!     # Total combat events across all game modes
+  totalWins: Int!       # Player wins (subset of totalFights affecting records)
+  totalLosses: Int!     # Player losses (subset of totalFights affecting records)
   totalKills: Int!
   
   # Duel statistics
