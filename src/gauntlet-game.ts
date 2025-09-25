@@ -90,8 +90,7 @@ function getBracketId(bracketLevel: i32): string {
 function getOrUpdatePlayerDailyStats(
   playerId: BigInt, 
   bracketId: string, 
-  currentDay: BigInt, 
-  currentLimit: i32,
+  currentDay: BigInt,
   timestamp: BigInt
 ): PlayerDailyGauntletStats {
   let statsId = `${playerId.toString()}-${bracketId}`;
@@ -106,8 +105,7 @@ function getOrUpdatePlayerDailyStats(
     stats.player = playerId.toString(); // Will be set properly in handler
     stats.dayNumber = currentDay;
     stats.entriesUsed = 0;
-    stats.dailyLimit = currentLimit;
-    stats.canQueue = true;
+    stats.canQueue = true; // Will be calculated in handler using bracket.currentDailyLimit
     
     // Initialize today's tracking
     stats.resetsWithETHToday = 0;
@@ -125,8 +123,7 @@ function getOrUpdatePlayerDailyStats(
     // New day - reset daily counters but keep all-time stats
     stats.dayNumber = currentDay;
     stats.entriesUsed = 0;
-    stats.dailyLimit = currentLimit;
-    stats.canQueue = true;
+    stats.canQueue = true; // Will be calculated in handler using bracket.currentDailyLimit
     
     // Reset today's tracking (but preserve all-time)
     stats.resetsWithETHToday = 0;
@@ -185,7 +182,6 @@ export function handlePlayerQueued(event: PlayerQueuedEvent, bracketLevel: i32 =
       event.params.playerId,
       bracketId,
       currentDay,
-      bracket.currentDailyLimit,
       event.block.timestamp
     );
     
@@ -193,9 +189,9 @@ export function handlePlayerQueued(event: PlayerQueuedEvent, bracketLevel: i32 =
     dailyStats.player = playerIdString;
     dailyStats.bracket = bracketId;
     
-    // Increment entries used and update canQueue status
+    // Increment entries used and update canQueue status using bracket limit
     dailyStats.entriesUsed = dailyStats.entriesUsed + 1;
-    dailyStats.canQueue = dailyStats.entriesUsed < dailyStats.dailyLimit;
+    dailyStats.canQueue = dailyStats.entriesUsed < bracket.currentDailyLimit;
     dailyStats.lastUpdated = event.block.timestamp;
     dailyStats.save();
     
@@ -844,7 +840,6 @@ export function handleDailyLimitReset(event: DailyLimitResetEvent): void {
       event.params.playerId,
       player.gauntletBracket,
       currentDay,
-      bracket.currentDailyLimit,
       event.block.timestamp
     );
     
@@ -880,7 +875,7 @@ export function handleDailyLimitReset(event: DailyLimitResetEvent): void {
 }
 
 // Handle DailyResetCostUpdated event
-export function handleDailyResetCostUpdated(event: DailyResetCostUpdatedEvent): void {
+export function handleDailyResetCostUpdated(event: DailyResetCostUpdatedEvent, bracketLevel: i32 = 0): void {
   const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
   const costUpdated = new DailyResetCostUpdated(eventId);
   
@@ -897,6 +892,24 @@ export function handleDailyResetCostUpdated(event: DailyResetCostUpdatedEvent): 
   accounting.currentDailyResetCost = event.params.newCost;
   accounting.lastUpdated = event.block.timestamp;
   accounting.save();
+  
+  // Update cached daily reset cost in GauntletBracket entity
+  let bracketId = getBracketId(bracketLevel);
+  if (bracketId == "low" && bracketLevel != 4 && bracketLevel != 9 && bracketLevel != 10) {
+    log.error("Unknown bracket level for DailyResetCostUpdated: {}", [bracketLevel.toString()]);
+    return;
+  }
+  
+  let bracket = getOrCreateGauntletBracket(bracketId, event.address, event.block.timestamp);
+  bracket.dailyResetCost = event.params.newCost;
+  bracket.lastUpdated = event.block.timestamp;
+  bracket.save();
+  
+  log.info("DailyResetCostUpdated: Bracket {} cost changed from {} to {}", [
+    bracketId,
+    event.params.oldCost.toString(),
+    event.params.newCost.toString()
+  ]);
 }
 
 // Handle DailyGauntletLimitUpdated event
@@ -1201,7 +1214,7 @@ export function handleFutureBlocksForTournamentSetLow(event: FutureBlocksForTour
 export function handleEmergencyQueueClearedLow(event: EmergencyQueueClearedEvent): void { handleEmergencyQueueCleared(event); }
 export function handleGauntletXPAwardedLow(event: GauntletXPAwardedEvent): void { handleGauntletXPAwarded(event); }
 export function handleDailyLimitResetLow(event: DailyLimitResetEvent): void { handleDailyLimitReset(event); }
-export function handleDailyResetCostUpdatedLow(event: DailyResetCostUpdatedEvent): void { handleDailyResetCostUpdated(event); }
+export function handleDailyResetCostUpdatedLow(event: DailyResetCostUpdatedEvent): void { handleDailyResetCostUpdated(event, 4); }
 export function handleDailyGauntletLimitUpdatedLow(event: DailyGauntletLimitUpdatedEvent): void { handleDailyGauntletLimitUpdated(event, 4); }
 
 // Mid Bracket (Levels 5-9) Handlers
@@ -1226,7 +1239,7 @@ export function handleFutureBlocksForTournamentSetMid(event: FutureBlocksForTour
 export function handleEmergencyQueueClearedMid(event: EmergencyQueueClearedEvent): void { handleEmergencyQueueCleared(event); }
 export function handleGauntletXPAwardedMid(event: GauntletXPAwardedEvent): void { handleGauntletXPAwarded(event); }
 export function handleDailyLimitResetMid(event: DailyLimitResetEvent): void { handleDailyLimitReset(event); }
-export function handleDailyResetCostUpdatedMid(event: DailyResetCostUpdatedEvent): void { handleDailyResetCostUpdated(event); }
+export function handleDailyResetCostUpdatedMid(event: DailyResetCostUpdatedEvent): void { handleDailyResetCostUpdated(event, 9); }
 export function handleDailyGauntletLimitUpdatedMid(event: DailyGauntletLimitUpdatedEvent): void { handleDailyGauntletLimitUpdated(event, 9); }
 
 // High Bracket (Level 10) Handlers
@@ -1251,6 +1264,6 @@ export function handleFutureBlocksForTournamentSetHigh(event: FutureBlocksForTou
 export function handleEmergencyQueueClearedHigh(event: EmergencyQueueClearedEvent): void { handleEmergencyQueueCleared(event); }
 export function handleGauntletRewardDistributedHigh(event: GauntletRewardDistributedEvent): void { handleGauntletRewardDistributed(event); }
 export function handleDailyLimitResetHigh(event: DailyLimitResetEvent): void { handleDailyLimitReset(event); }
-export function handleDailyResetCostUpdatedHigh(event: DailyResetCostUpdatedEvent): void { handleDailyResetCostUpdated(event); }
+export function handleDailyResetCostUpdatedHigh(event: DailyResetCostUpdatedEvent): void { handleDailyResetCostUpdated(event, 10); }
 export function handleDailyGauntletLimitUpdatedHigh(event: DailyGauntletLimitUpdatedEvent): void { handleDailyGauntletLimitUpdated(event, 10); }
 export function handleRewardConfigUpdatedHigh(event: RewardConfigUpdatedEvent): void { handleRewardConfigUpdated(event); } 

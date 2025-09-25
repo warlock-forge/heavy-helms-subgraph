@@ -1012,8 +1012,7 @@ type PlayerDailyGauntletStats @entity {
   
   # Core daily tracking (what we actually need!)
   entriesUsed: Int!           # Number of gauntlet entries used today
-  dailyLimit: Int!            # Daily limit cached from bracket
-  canQueue: Boolean!          # Cached boolean: entriesUsed < dailyLimit
+  canQueue: Boolean!          # Cached boolean: entriesUsed < bracket.currentDailyLimit
   
   # Reset tracking for TODAY (gets reset daily but keeps history)
   resetsWithETHToday: Int!    # Number of ETH resets today
@@ -1057,6 +1056,7 @@ type GauntletBracket @entity {
   minTimeBetweenGauntlets: BigInt!  # Min time between gauntlets
   isEnabled: Boolean!               # Whether bracket is enabled
   currentDailyLimit: Int!           # Current daily gauntlet limit for this bracket
+  dailyResetCost: BigInt!           # Current cost to reset daily limit (ETH)
   
   # Timestamps
   createdAt: BigInt!

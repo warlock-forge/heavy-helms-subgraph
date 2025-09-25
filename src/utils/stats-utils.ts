@@ -124,6 +124,7 @@ export function getOrCreateGauntletBracket(
     bracket.minTimeBetweenGauntlets = BigInt.fromI32(0)
     bracket.isEnabled = true // Default to enabled
     bracket.currentDailyLimit = 0 // Will be set by DailyGauntletLimitUpdated event on deploy
+    bracket.dailyResetCost = BigInt.fromI32(0) // Will be set by DailyResetCostUpdated event on deploy
     
     // Timestamps
     bracket.createdAt = timestamp
