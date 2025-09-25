@@ -110,6 +110,10 @@ type Player implements Fighter @entity {
   totalFights: Int!             # Total number of fights (wins + losses)
   gauntletStatus: PlayerGauntletStatus! # Default to NONE
   currentGauntlet: Gauntlet # Link to Gauntlet if IN_GAUNTLET
+  
+  # NEW: Gauntlet bracket and daily limit tracking
+  gauntletBracket: GauntletBracket!  # Current bracket based on player level
+  currentGauntletDailyStats: PlayerDailyGauntletStats # Link to current gauntlet daily stats
   tournamentStatus: PlayerTournamentStatus! # Default to NONE
   currentTournament: Tournament # Link to Tournament if IN_TOURNAMENT
 }
@@ -986,6 +990,44 @@ type Stats @entity {
   totalTournamentsStarted: BigInt!
   totalTournamentsCompleted: BigInt!
   totalTournamentWins: BigInt!
+  
+  # Gauntlet daily reset statistics
+  totalDailyResetsWithETH: Int!     # Total resets purchased with ETH across all brackets
+  totalDailyResetsWithTicket: Int!  # Total resets purchased with tickets across all brackets
+  totalDailyResets: Int!            # totalDailyResetsWithETH + totalDailyResetsWithTicket
+}
+
+# ==========================================================
+#                   DAILY GAUNTLET TRACKING                  
+# ==========================================================
+# Efficiently tracks daily gauntlet participation per player per bracket
+# Uses STATIC ID approach - same entity gets updated daily (zero garbage!)
+type PlayerDailyGauntletStats @entity {
+  id: ID!                     # "{playerId}-{bracketId}" (STATIC - no dayNumber!)
+  player: Player!             # Reference to Player entity
+  playerId: BigInt!           # uint32 player ID for fast filtering
+  bracket: GauntletBracket!   # Which bracket these stats apply to
+  bracketId: String!          # "low", "mid", or "high" for fast filtering
+  dayNumber: BigInt!          # Current day number being tracked
+  
+  # Core daily tracking (what we actually need!)
+  entriesUsed: Int!           # Number of gauntlet entries used today
+  dailyLimit: Int!            # Daily limit cached from bracket
+  canQueue: Boolean!          # Cached boolean: entriesUsed < dailyLimit
+  
+  # Reset tracking for TODAY (gets reset daily but keeps history)
+  resetsWithETHToday: Int!    # Number of ETH resets today
+  resetsWithTicketToday: Int! # Number of ticket resets today
+  totalResetsToday: Int!      # resetsWithETHToday + resetsWithTicketToday
+  lastResetTimestamp: BigInt  # When the most recent reset occurred today
+  
+  # All-time reset tracking (persists across days)
+  totalResetsWithETH: Int!    # Total ETH resets ever for this player+bracket
+  totalResetsWithTicket: Int! # Total ticket resets ever for this player+bracket  
+  totalResets: Int!           # totalResetsWithETH + totalResetsWithTicket
+  
+  # Timestamps
+  lastUpdated: BigInt!        # Last time this entity was updated
 }
 
 # ==========================================================
@@ -1008,6 +1050,8 @@ type GauntletBracket @entity {
   
   # Performance metrics
   averageQueueTime: BigDecimal!     # Average time in queue (seconds)
+  totalQueueTime: BigInt!           # Total accumulated queue time for calculating average
+  totalPlayersProcessed: Int!       # Total players who have left queue (for average calculation)
   lastGauntletStarted: BigInt       # Timestamp of last gauntlet start
   lastGauntletCompleted: BigInt     # Timestamp of last gauntlet completion
   
@@ -1015,6 +1059,7 @@ type GauntletBracket @entity {
   currentGauntletSize: Int!         # Current gauntlet size for this bracket
   minTimeBetweenGauntlets: BigInt!  # Min time between gauntlets
   isEnabled: Boolean!               # Whether bracket is enabled
+  currentDailyLimit: Int!           # Current daily gauntlet limit for this bracket
   
   # Timestamps
   createdAt: BigInt!

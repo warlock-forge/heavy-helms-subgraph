@@ -312,6 +312,10 @@ export function handlePlayerCreationComplete(
   // Set gauntlet status to NONE by default
   player.gauntletStatus = "NONE";
   
+  // New players start at level 1, so they're in the low bracket (levels 1-4)
+  player.gauntletBracket = "low";
+  player.currentGauntletDailyStats = null; // Will be created when they first queue
+  
   // Set tournament status to NONE by default
   player.tournamentStatus = "NONE";
   player.currentTournament = null;
@@ -687,6 +691,27 @@ export function handlePlayerLevelUp(event: PlayerLevelUpEvent): void {
   let player = Player.load(event.params.playerId.toString());
   if (player) {
     player.level = event.params.newLevel;
+    
+    // Update gauntlet bracket based on new level
+    let newBracket: string;
+    if (event.params.newLevel <= 4) {
+      newBracket = "low";
+    } else if (event.params.newLevel <= 9) {
+      newBracket = "mid"; 
+    } else {
+      newBracket = "high";
+    }
+    
+    // If bracket changed, update player and clear daily stats reference
+    if (player.gauntletBracket != newBracket) {
+      player.gauntletBracket = newBracket;
+      player.currentGauntletDailyStats = null; // Will be recreated when they queue
+      log.info("Player {} changed gauntlet bracket to {} at level {}", [
+        event.params.playerId.toString(),
+        newBracket,
+        event.params.newLevel.toString()
+      ]);
+    }
     
     // Subtract XP cost for this level up (matches contract behavior)
     const xpCost = getXPRequiredForLevel(event.params.newLevel);

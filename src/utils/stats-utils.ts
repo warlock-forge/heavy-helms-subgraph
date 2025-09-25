@@ -68,6 +68,11 @@ export function getOrCreateStats(): Stats {
     stats.totalTournamentsStarted = BigInt.fromI32(0)
     stats.totalTournamentsCompleted = BigInt.fromI32(0)
     stats.totalTournamentWins = BigInt.fromI32(0)
+    
+    // Initialize daily reset tracking fields
+    stats.totalDailyResetsWithETH = 0
+    stats.totalDailyResetsWithTicket = 0
+    stats.totalDailyResets = 0
   }
   
   return stats as Stats
@@ -112,6 +117,8 @@ export function getOrCreateGauntletBracket(
     
     // Initialize performance metrics
     bracket.averageQueueTime = BigDecimal.zero()
+    bracket.totalQueueTime = BigInt.fromI32(0)
+    bracket.totalPlayersProcessed = 0
     bracket.lastGauntletStarted = null
     bracket.lastGauntletCompleted = null
     
@@ -119,6 +126,7 @@ export function getOrCreateGauntletBracket(
     bracket.currentGauntletSize = 0 // Will be set by GauntletSizeSet event
     bracket.minTimeBetweenGauntlets = BigInt.fromI32(0)
     bracket.isEnabled = true // Default to enabled
+    bracket.currentDailyLimit = 0 // Will be set by DailyGauntletLimitUpdated event on deploy
     
     // Timestamps
     bracket.createdAt = timestamp
