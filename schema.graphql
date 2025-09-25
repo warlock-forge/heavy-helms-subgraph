@@ -1049,9 +1049,6 @@ type GauntletBracket @entity {
   totalGauntletsRecovered: Int!     # Total gauntlets recovered in this bracket
   
   # Performance metrics
-  averageQueueTime: BigDecimal!     # Average time in queue (seconds)
-  totalQueueTime: BigInt!           # Total accumulated queue time for calculating average
-  totalPlayersProcessed: Int!       # Total players who have left queue (for average calculation)
   lastGauntletStarted: BigInt       # Timestamp of last gauntlet start
   lastGauntletCompleted: BigInt     # Timestamp of last gauntlet completion
   

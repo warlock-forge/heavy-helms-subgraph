@@ -116,9 +116,6 @@ export function getOrCreateGauntletBracket(
     bracket.totalGauntletsRecovered = 0
     
     // Initialize performance metrics
-    bracket.averageQueueTime = BigDecimal.zero()
-    bracket.totalQueueTime = BigInt.fromI32(0)
-    bracket.totalPlayersProcessed = 0
     bracket.lastGauntletStarted = null
     bracket.lastGauntletCompleted = null
     
