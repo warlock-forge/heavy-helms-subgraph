@@ -956,6 +956,14 @@ export function handleQueuePartiallyCleared(event: QueuePartiallyClearedEvent): 
   queueCleared.transactionHash = event.transaction.hash;
   
   queueCleared.save();
+
+  log.info("GauntletGame QueuePartiallyCleared: cleared {} remaining {}", [
+    event.params.cleared.toString(),
+    event.params.remaining.toString()
+  ]);
+
+  // Clear all queued players (contract cleared the queue, so should we)
+  _clearAllQueuedPlayersForContract(event.address, event.block.timestamp);
 }
 
 // Handle GauntletRewardDistributed event (Level 10 only)
@@ -1186,6 +1194,65 @@ export function handleEmergencyQueueCleared(event: EmergencyQueueClearedEvent): 
     event.params.cleared.toString(),
     event.params.remaining.toString()
   ]);
+
+  // Clear all queued players (contract cleared the queue, so should we)
+  _clearAllQueuedPlayersForContract(event.address, event.block.timestamp);
+}
+
+// Helper function to clear all queued players for a specific gauntlet contract
+function _clearAllQueuedPlayersForContract(contractAddress: Address, timestamp: BigInt): void {
+  // Determine bracket from contract address
+  let bracketId: string;
+  if (contractAddress.toHexString() == "0x71ad5e337efa81fde0eb737ab17342f25fe4c93b") {
+    bracketId = "low";
+  } else if (contractAddress.toHexString() == "0xf1639b58af4cf0097b253c13ec229082826224ca") {
+    bracketId = "mid";
+  } else if (contractAddress.toHexString() == "0x757bccee1aaf9fb7c44ac1ce8bedd434f71a2c0e") {
+    bracketId = "high";
+  } else {
+    log.error("Unknown gauntlet contract address for queue clearing: {}", [contractAddress.toHexString()]);
+    return;
+  }
+
+  log.info("Clearing all queued players for bracket: {}", [bracketId]);
+
+  // Clear individual player statuses
+  // We'll iterate through a reasonable range of player IDs and check their status
+  // This is not perfect but handles the majority case since player IDs are sequential
+  let clearedCount = 0;
+  let maxPlayerId = 20000; // Reasonable upper bound for now
+  
+  for (let playerId = 1; playerId <= maxPlayerId; playerId++) {
+    let playerIdString = playerId.toString();
+    let player = Player.load(playerIdString);
+    
+    if (player && 
+        player.gauntletStatus == "QUEUED" && 
+        player.gauntletBracket == bracketId) {
+      // Clear the player's queue status (match what contract does)
+      player.gauntletStatus = "NONE";
+      player.currentGauntlet = null;
+      player.lastUpdatedAt = timestamp;
+      player.save();
+      
+      clearedCount++;
+      
+      log.info("Cleared queued player {} from {} bracket", [playerIdString, bracketId]);
+    }
+  }
+
+  log.info("Total players cleared from {} bracket: {}", [bracketId, clearedCount.toString()]);
+
+  // Update bracket queue size
+  let bracket = getOrCreateGauntletBracket(bracketId, contractAddress, timestamp);
+  bracket.currentQueueSize = 0;
+  bracket.lastUpdated = timestamp;
+  bracket.save();
+
+  // Update global stats to reflect queue clearing
+  let stats = getOrCreateStats();
+  stats.lastUpdated = timestamp;
+  stats.save();
 }
 
 // =======================================================
