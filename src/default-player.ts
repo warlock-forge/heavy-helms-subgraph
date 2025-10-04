@@ -127,7 +127,6 @@ export function handleDefaultPlayerCreated(event: DefaultPlayerCreatedEvent): vo
     defaultPlayerLevel.wins = 0;
     defaultPlayerLevel.losses = 0;
     defaultPlayerLevel.kills = 0;
-    defaultPlayerLevel.gauntletWins = 0;
     defaultPlayerLevel.duelWins = 0;
     defaultPlayerLevel.tournamentWins = 0;
     

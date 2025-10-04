@@ -60,8 +60,7 @@ import {
   PlayerDailyGauntletStats
 } from "../generated/schema";
 
-import { getOrCreateStats, getOrCreateAccounting, getOrCreateGauntletBracket } from "./utils/stats-utils";
-import { updateStatsForGauntletWin } from "./utils/stats-utils";
+import { getOrCreateStats, getOrCreateAccounting, getOrCreateGauntletBracket, getOrCreatePlayerGauntletStats } from "./utils/stats-utils";
 import { getOrCreateFighterSnapshotById, processCombatResultEvent, getOrCreateFighterParticipant } from "./utils/fighter-utils";
 
 // Define ZERO_BI directly
@@ -461,9 +460,67 @@ export function handleGauntletCompleted(event: GauntletCompletedEvent, defaultPl
     }
     // --- END ADDED LOGIC ---
 
-    // Update the champion's gauntlet wins counter
-    updateStatsForGauntletWin(championIdString, event.block.timestamp);
-    
+    // Update gauntlet stats for all participants (completed) and champion (wins)
+    for (let i = 0; i < finalParticipantIdsString.length; i++) {
+      let participantIdString = finalParticipantIdsString[i];
+      let player = Player.load(participantIdString);
+
+      if (player) {
+        // Get or create gauntlet stats for this player
+        let gauntletStats = getOrCreatePlayerGauntletStats(participantIdString, event.block.timestamp);
+
+        // Increment total completed
+        gauntletStats.totalGauntletsCompleted += 1;
+
+        // Increment bracket-specific completed
+        if (bracketId == "low") {
+          gauntletStats.lowBracketCompleted += 1;
+        } else if (bracketId == "mid") {
+          gauntletStats.midBracketCompleted += 1;
+        } else if (bracketId == "high") {
+          gauntletStats.highBracketCompleted += 1;
+        }
+
+        // If this is the champion, also increment wins
+        if (participantIdString == championIdString) {
+          gauntletStats.totalGauntletWins += 1;
+
+          if (bracketId == "low") {
+            gauntletStats.lowBracketWins += 1;
+          } else if (bracketId == "mid") {
+            gauntletStats.midBracketWins += 1;
+          } else if (bracketId == "high") {
+            gauntletStats.highBracketWins += 1;
+          }
+
+          log.info("[GauntletCompleted {}] Updated champion {} wins: total={}, bracket={}", [
+            gauntletId,
+            championIdString,
+            gauntletStats.totalGauntletWins.toString(),
+            bracketId
+          ]);
+        }
+
+        // Update timestamps
+        gauntletStats.lastGauntlet = event.block.timestamp;
+        gauntletStats.lastUpdated = event.block.timestamp;
+        gauntletStats.save();
+
+        // Link to player entity if not already linked
+        if (player.gauntletStats == null) {
+          player.gauntletStats = gauntletStats.id;
+          player.save();
+        }
+
+        log.info("[GauntletCompleted {}] Updated stats for player {}: completed={}, wins={}", [
+          gauntletId,
+          participantIdString,
+          gauntletStats.totalGauntletsCompleted.toString(),
+          gauntletStats.totalGauntletWins.toString()
+        ]);
+      }
+    }
+
     // Update bracket-specific completion stats
     let bracket = gauntlet.bracket;
     let bracketEntity = getOrCreateGauntletBracket(bracket, event.address, event.block.timestamp);

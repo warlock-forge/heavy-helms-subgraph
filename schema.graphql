@@ -15,7 +15,7 @@ interface Fighter {
   id: ID!                  # Unique identifier
   fighterId: BigInt!       # Numeric ID from contract
   fighterType: String!     # "Player", "DefaultPlayer", or "Monster"
-  
+
   # Common attributes
   strength: Int!
   constitution: Int!
@@ -23,25 +23,24 @@ interface Fighter {
   agility: Int!
   stamina: Int!
   luck: Int!
-  
+
   # Name fields
   firstNameIndex: Int!
   surnameIndex: Int!
   firstName: String
   surname: String
   fullName: String
-  
+
   # Skin information
   currentSkin: Skin!
-  
+
   # Record fields
   wins: Int!
   losses: Int!
   kills: Int!
-  gauntletWins: Int!       # Number of gauntlets won
   duelWins: Int!           # Number of duels won
   tournamentWins: Int!     # Number of tournaments won
-  
+
   # Stance field (new)
   stance: Int!            # uint8 stance value
   
@@ -56,7 +55,34 @@ interface Fighter {
 }
 
 # ==========================================================
-#                   CORE ENTITIES                            
+#                   PLAYER GAUNTLET STATS
+# ==========================================================
+type PlayerGauntletStats @entity {
+  id: ID!                    # playerId
+  player: Player!
+
+  # Total across all brackets
+  totalGauntletsCompleted: Int!
+  totalGauntletWins: Int!
+
+  # Per-bracket completions
+  lowBracketCompleted: Int!
+  midBracketCompleted: Int!
+  highBracketCompleted: Int!
+
+  # Per-bracket wins
+  lowBracketWins: Int!
+  midBracketWins: Int!
+  highBracketWins: Int!
+
+  # Metadata
+  firstGauntlet: BigInt      # Timestamp of first gauntlet
+  lastGauntlet: BigInt       # Timestamp of most recent gauntlet
+  lastUpdated: BigInt!
+}
+
+# ==========================================================
+#                   CORE ENTITIES
 # ==========================================================
 # Keep your existing Player entity but implement the Fighter interface
 type Player implements Fighter @entity {
@@ -66,7 +92,7 @@ type Player implements Fighter @entity {
   owner: Owner!
   isRetired: Boolean!
   isImmortal: Boolean!    # Only players have this
-  
+
   # Common attributes from Fighter
   strength: Int!
   constitution: Int!
@@ -74,22 +100,21 @@ type Player implements Fighter @entity {
   agility: Int!
   stamina: Int!
   luck: Int!
-  
+
   # Name fields
   firstNameIndex: Int!
   surnameIndex: Int!
   firstName: String
   surname: String
   fullName: String
-  
+
   # Skin information
   currentSkin: Skin!
-  
+
   # Record fields
   wins: Int!
   losses: Int!
   kills: Int!
-  gauntletWins: Int!       # Number of gauntlets won
   duelWins: Int!           # Number of duels won
   tournamentWins: Int!     # Number of tournaments won
   
@@ -110,10 +135,12 @@ type Player implements Fighter @entity {
   totalFights: Int!             # Total number of fights (wins + losses)
   gauntletStatus: PlayerGauntletStatus! # Default to NONE
   currentGauntlet: Gauntlet # Link to Gauntlet if IN_GAUNTLET
-  
-  # NEW: Gauntlet bracket and daily limit tracking
+
+  # Gauntlet statistics
+  gauntletStats: PlayerGauntletStats # Link to gauntlet statistics (created on first gauntlet)
   gauntletBracket: GauntletBracket!  # Current bracket based on player level
   currentGauntletDailyStats: PlayerDailyGauntletStats # Link to current gauntlet daily stats
+
   tournamentStatus: PlayerTournamentStatus! # Default to NONE
   currentTournament: Tournament # Link to Tournament if IN_TOURNAMENT
 }
@@ -153,7 +180,6 @@ type DefaultPlayer implements Fighter @entity {
   wins: Int!                # Always 0
   losses: Int!              # Always 0
   kills: Int!               # Always 0
-  gauntletWins: Int!        # Always 0
   duelWins: Int!            # Always 0
   tournamentWins: Int!      # Always 0
   
@@ -195,7 +221,6 @@ type Monster implements Fighter @entity {
   wins: Int!                # Always 0
   losses: Int!              # Always 0
   kills: Int!               # Always 0
-  gauntletWins: Int!        # Always 0
   duelWins: Int!            # Always 0
   tournamentWins: Int!      # Always 0
   

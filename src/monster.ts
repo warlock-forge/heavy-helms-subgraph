@@ -120,7 +120,6 @@ export function handleMonsterCreated(event: MonsterCreatedEvent): void {
     monsterLevel.wins = 0;
     monsterLevel.losses = 0;
     monsterLevel.kills = 0;
-    monsterLevel.gauntletWins = 0;
     monsterLevel.duelWins = 0;
     monsterLevel.tournamentWins = 0;
     

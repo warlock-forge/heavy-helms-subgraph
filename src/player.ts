@@ -302,8 +302,7 @@ export function handlePlayerCreationComplete(
   // New players always start with default skin 0-1 (schema requires non-null currentSkin)
   player.currentSkin = "0-1";
   log.info("Set default skin 0-1 for new player: {}", [player.id]);
-  
-  player.gauntletWins = 0; // Initialize gauntlet wins counter
+
   player.duelWins = 0; // Initialize duel wins counter
   player.tournamentWins = 0; // Initialize tournament wins counter
   player.totalFights = 0; // Initialize total fights counter

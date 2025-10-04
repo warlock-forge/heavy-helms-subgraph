@@ -1,5 +1,5 @@
 import { BigInt, Address, Bytes, BigDecimal } from "@graphprotocol/graph-ts"
-import { Stats, Owner, Player, SkinCombatStat, PlayerSkinCombatStat, Skin, PlayerSeasonalStats, Accounting, GauntletBracket } from "../../generated/schema"
+import { Stats, Owner, Player, SkinCombatStat, PlayerSkinCombatStat, Skin, PlayerSeasonalStats, Accounting, GauntletBracket, PlayerGauntletStats } from "../../generated/schema"
 import { log } from "@graphprotocol/graph-ts"
 
 // Little-endian helper functions
@@ -239,18 +239,37 @@ export function updateStatsForKills(timestamp: BigInt, killsDelta: i32): void {
   stats.save()
 }
 
-// New function to update gauntlet wins
-export function updateStatsForGauntletWin(winnerId: string, timestamp: BigInt): void {
-  // Update the winner's gauntlet wins counter - only Players can win gauntlets
-  let player = Player.load(winnerId)
-  if (player) {
-    player.gauntletWins += 1
-    player.lastUpdatedAt = timestamp
-    player.save()
-    return
+// Get or create PlayerGauntletStats for a player
+export function getOrCreatePlayerGauntletStats(playerId: string, timestamp: BigInt): PlayerGauntletStats {
+  let stats = PlayerGauntletStats.load(playerId)
+
+  if (stats == null) {
+    stats = new PlayerGauntletStats(playerId)
+    stats.player = playerId
+
+    // Initialize totals
+    stats.totalGauntletsCompleted = 0
+    stats.totalGauntletWins = 0
+
+    // Initialize per-bracket completions
+    stats.lowBracketCompleted = 0
+    stats.midBracketCompleted = 0
+    stats.highBracketCompleted = 0
+
+    // Initialize per-bracket wins
+    stats.lowBracketWins = 0
+    stats.midBracketWins = 0
+    stats.highBracketWins = 0
+
+    // Set first gauntlet timestamp
+    stats.firstGauntlet = timestamp
+    stats.lastGauntlet = timestamp
+    stats.lastUpdated = timestamp
+
+    log.info("[PlayerGauntletStats] Created new stats for player {}", [playerId])
   }
-  
-  log.warning("Player with ID {} not found when updating gauntlet wins", [winnerId])
+
+  return stats
 }
 
 
