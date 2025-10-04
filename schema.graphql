@@ -1248,7 +1248,7 @@ enum PlayerTournamentStatus {
 
 # Represents a single Gauntlet run
 type Gauntlet @entity {
-  id: ID!                  # Gauntlet ID (uint256 from contract)
+  id: ID!                  # Composite ID: "{bracketId}-{gauntletId}" (e.g., "low-5", "mid-12", "high-3")
   size: Int!               # 4, 8, 16, or 32
   state: GauntletState!    # PENDING or COMPLETED
   bracket: GauntletBracket! # Link to the bracket entity (required)
@@ -1266,8 +1266,8 @@ type Gauntlet @entity {
 
 # Represents a player's participation in a specific Gauntlet
 type GauntletParticipant @entity {
-  id: ID!                  # Composite ID: "{gauntletId}-{playerId}"
-  gauntlet: Gauntlet!      # Link back to the Gauntlet
+  id: ID!                  # Composite ID: "{bracketId}-{gauntletId}-{playerId}" (e.g., "low-5-123")
+  gauntlet: Gauntlet!      # Link back to the Gauntlet (uses composite bracket-aware ID)
   participant: FighterParticipant! # Locked loadout commitment when joining gauntlet
 }
 

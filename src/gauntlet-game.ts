@@ -245,13 +245,7 @@ export function handlePlayerWithdrew(event: PlayerWithdrewEvent, bracketLevel: i
 
 // Handle the GauntletStarted event
 export function handleGauntletStarted(event: GauntletStartedEvent, defaultPlayerLevel: i32 = 10): void {
-  const gauntletId = event.params.gauntletId.toString();
-
-  const gauntlet = new Gauntlet(gauntletId);
-  gauntlet.size = event.params.size;
-  gauntlet.state = "PENDING";
-  
-  // Determine bracket based on defaultPlayerLevel and link to GauntletBracket
+  // Determine bracket based on defaultPlayerLevel first
   let bracketId: string;
   if (defaultPlayerLevel == 4) {
     bracketId = "low";
@@ -263,7 +257,14 @@ export function handleGauntletStarted(event: GauntletStartedEvent, defaultPlayer
     log.error("Unknown defaultPlayerLevel for GauntletStarted: {}", [defaultPlayerLevel.toString()]);
     return;
   }
-  
+
+  // Create composite ID: {bracketId}-{gauntletId}
+  const gauntletId = `${bracketId}-${event.params.gauntletId.toString()}`;
+
+  const gauntlet = new Gauntlet(gauntletId);
+  gauntlet.size = event.params.size;
+  gauntlet.state = "PENDING";
+
   // Create/get the bracket and link it
   const bracket = getOrCreateGauntletBracket(bracketId, event.address, event.block.timestamp);
   gauntlet.bracket = bracket.id;
@@ -381,7 +382,21 @@ export function handleGauntletStarted(event: GauntletStartedEvent, defaultPlayer
 
 // Handle the GauntletCompleted event
 export function handleGauntletCompleted(event: GauntletCompletedEvent, defaultPlayerLevel: i32 = 10): void {
-  const gauntletId = event.params.gauntletId.toString();
+  // Determine bracket based on defaultPlayerLevel first
+  let bracketId: string;
+  if (defaultPlayerLevel == 4) {
+    bracketId = "low";
+  } else if (defaultPlayerLevel == 9) {
+    bracketId = "mid";
+  } else if (defaultPlayerLevel == 10) {
+    bracketId = "high";
+  } else {
+    log.error("Unknown defaultPlayerLevel for GauntletCompleted: {}", [defaultPlayerLevel.toString()]);
+    return;
+  }
+
+  // Create composite ID: {bracketId}-{gauntletId}
+  const gauntletId = `${bracketId}-${event.params.gauntletId.toString()}`;
   const gauntlet = Gauntlet.load(gauntletId);
   
   let finalParticipantIdsString: string[] = []; 
@@ -482,8 +497,22 @@ export function handleGauntletCompleted(event: GauntletCompletedEvent, defaultPl
 }
 
 // Handle the GauntletRecovered event
-export function handleGauntletRecovered(event: GauntletRecoveredEvent): void {
-  const gauntletId = event.params.gauntletId.toString();
+export function handleGauntletRecovered(event: GauntletRecoveredEvent, defaultPlayerLevel: i32 = 10): void {
+  // Determine bracket based on defaultPlayerLevel first
+  let bracketId: string;
+  if (defaultPlayerLevel == 4) {
+    bracketId = "low";
+  } else if (defaultPlayerLevel == 9) {
+    bracketId = "mid";
+  } else if (defaultPlayerLevel == 10) {
+    bracketId = "high";
+  } else {
+    log.error("Unknown defaultPlayerLevel for GauntletRecovered: {}", [defaultPlayerLevel.toString()]);
+    return;
+  }
+
+  // Create composite ID: {bracketId}-{gauntletId}
+  const gauntletId = `${bracketId}-${event.params.gauntletId.toString()}`;
   const entity = new GauntletRecovered(event.transaction.hash);
   entity.commitTimestamp = event.params.commitTimestamp;
   entity.blockNumber = event.block.number;
@@ -772,12 +801,28 @@ export function handleGameEngineUpdated(event: GameEngineUpdatedEvent): void {
 export function handleGauntletXPAwarded(event: GauntletXPAwardedEvent): void {
   const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
   const xpAwarded = new GauntletXPAwarded(eventId);
-  
+
+  // Determine bracket based on levelBracket from event
+  let bracketId: string;
+  if (event.params.levelBracket == 0) {
+    bracketId = "low";
+  } else if (event.params.levelBracket == 1) {
+    bracketId = "mid";
+  } else if (event.params.levelBracket == 2) {
+    bracketId = "high";
+  } else {
+    log.error("Unknown levelBracket for GauntletXPAwarded: {}", [event.params.levelBracket.toString()]);
+    return;
+  }
+
+  // Create composite ID: {bracketId}-{gauntletId}
+  const gauntletId = `${bracketId}-${event.params.gauntletId.toString()}`;
+
   xpAwarded.gauntletId = event.params.gauntletId;
   xpAwarded.levelBracket = event.params.levelBracket;
   xpAwarded.playerIds = event.params.playerIds;
   xpAwarded.xpAmounts = event.params.xpAmounts;
-  xpAwarded.gauntlet = event.params.gauntletId.toString(); // Link to Gauntlet entity
+  xpAwarded.gauntlet = gauntletId; // Link to Gauntlet entity with composite ID
   xpAwarded.blockNumber = event.block.number;
   xpAwarded.blockTimestamp = event.block.timestamp;
   xpAwarded.transactionHash = event.transaction.hash;
@@ -967,15 +1012,31 @@ export function handleQueuePartiallyCleared(event: QueuePartiallyClearedEvent): 
 }
 
 // Handle GauntletRewardDistributed event (Level 10 only)
-export function handleGauntletRewardDistributed(event: GauntletRewardDistributedEvent): void {
+export function handleGauntletRewardDistributed(event: GauntletRewardDistributedEvent, defaultPlayerLevel: i32 = 10): void {
+  // Determine bracket based on defaultPlayerLevel first
+  let bracketId: string;
+  if (defaultPlayerLevel == 4) {
+    bracketId = "low";
+  } else if (defaultPlayerLevel == 9) {
+    bracketId = "mid";
+  } else if (defaultPlayerLevel == 10) {
+    bracketId = "high";
+  } else {
+    log.error("Unknown defaultPlayerLevel for GauntletRewardDistributed: {}", [defaultPlayerLevel.toString()]);
+    return;
+  }
+
+  // Create composite ID: {bracketId}-{gauntletId}
+  const gauntletId = `${bracketId}-${event.params.gauntletId.toString()}`;
+
   const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
   const rewardDistributed = new GauntletRewardDistributed(eventId);
-  
+
   rewardDistributed.gauntletId = event.params.gauntletId;
   rewardDistributed.playerId = event.params.playerId;
   rewardDistributed.rewardType = event.params.rewardType;
   rewardDistributed.ticketId = event.params.ticketId;
-  rewardDistributed.gauntlet = event.params.gauntletId.toString(); // Link to Gauntlet entity
+  rewardDistributed.gauntlet = gauntletId; // Link to Gauntlet entity with composite ID
   rewardDistributed.player = event.params.playerId.toString(); // Link to Player entity
   rewardDistributed.blockNumber = event.block.number;
   rewardDistributed.blockTimestamp = event.block.timestamp;
@@ -1038,17 +1099,32 @@ export function handleQueueCommitted(event: QueueCommittedEvent): void {
 }
 
 // Handle ParticipantsSelected event - ParticipantsSelected(indexed uint256,uint256,uint32[])
-export function handleParticipantsSelected(event: ParticipantsSelectedEvent): void {
+export function handleParticipantsSelected(event: ParticipantsSelectedEvent, defaultPlayerLevel: i32 = 10): void {
+  // Determine bracket based on defaultPlayerLevel first
+  let bracketId: string;
+  if (defaultPlayerLevel == 4) {
+    bracketId = "low";
+  } else if (defaultPlayerLevel == 9) {
+    bracketId = "mid";
+  } else if (defaultPlayerLevel == 10) {
+    bracketId = "high";
+  } else {
+    log.error("Unknown defaultPlayerLevel for ParticipantsSelected: {}", [defaultPlayerLevel.toString()]);
+    return;
+  }
+
+  // Create composite ID: {bracketId}-{gauntletId}
+  const gauntletId = `${bracketId}-${event.params.gauntletId.toString()}`;
+
   const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
   const participantsSelected = new GauntletParticipantsSelected(eventId);
-  
+
   // Event signature: ParticipantsSelected(indexed uint256 gauntletId, uint256 tournamentBlock, uint32[] selectedIds)
   participantsSelected.gauntletId = event.params.gauntletId;      // Indexed gauntletId
   participantsSelected.tournamentBlock = event.params.tournamentBlock;   // Tournament block
   participantsSelected.selectedIds = event.params.selectedIds; // Already BigInt[] from codegen
-  
+
   // Link to the Gauntlet entity (should exist from previous phase)
-  let gauntletId = event.params.gauntletId.toString();
   participantsSelected.gauntlet = gauntletId;
   
   participantsSelected.blockNumber = event.block.number;
@@ -1086,10 +1162,23 @@ export function handleGauntletAutoRecovered(event: GauntletAutoRecoveredEvent): 
 }
 
 // Handle PlayerReplaced event - PlayerReplaced(indexed uint256,indexed uint32,indexed uint32,uint8)
-export function handlePlayerReplaced(event: PlayerReplacedEvent): void {
+export function handlePlayerReplaced(event: PlayerReplacedEvent, defaultPlayerLevel: i32 = 10): void {
+  // Determine bracket based on defaultPlayerLevel first
+  let bracketId: string;
+  if (defaultPlayerLevel == 4) {
+    bracketId = "low";
+  } else if (defaultPlayerLevel == 9) {
+    bracketId = "mid";
+  } else if (defaultPlayerLevel == 10) {
+    bracketId = "high";
+  } else {
+    log.error("Unknown defaultPlayerLevel for PlayerReplaced: {}", [defaultPlayerLevel.toString()]);
+    return;
+  }
+
   const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
   const playerReplaced = new PlayerReplaced(eventId);
-  
+
   // Event signature: PlayerReplaced(indexed uint256 gauntletId, indexed uint32 originalPlayerId, indexed uint32 replacementPlayerId, uint8 reason)
   // Map gauntletId → tournamentId field (unified schema)
   playerReplaced.tournamentId = event.params.gauntletId;           // gauntletId → tournamentId
@@ -1099,14 +1188,16 @@ export function handlePlayerReplaced(event: PlayerReplacedEvent): void {
   playerReplaced.blockNumber = event.block.number;
   playerReplaced.blockTimestamp = event.block.timestamp;
   playerReplaced.transactionHash = event.transaction.hash;
-  
-  // Set the tournament field to the gauntlet ID (schema expects tournament relation)
-  playerReplaced.tournament = event.params.gauntletId.toString();
-  
+
+  // Create composite ID: {bracketId}-{gauntletId}
+  const gauntletId = `${bracketId}-${event.params.gauntletId.toString()}`;
+
+  // Set the tournament field to the composite gauntlet ID (schema expects tournament relation)
+  playerReplaced.tournament = gauntletId;
+
   playerReplaced.save();
-  
+
   // Update the gauntlet participant if replacement happened
-  const gauntletId = event.params.gauntletId.toString();
   const originalPlayerIdString = event.params.originalPlayerId.toString();
   const replacementPlayerIdString = event.params.replacementPlayerId.toString();
   
@@ -1264,7 +1355,7 @@ export function handlePlayerQueuedLow(event: PlayerQueuedEvent): void { handlePl
 export function handlePlayerWithdrewLow(event: PlayerWithdrewEvent): void { handlePlayerWithdrew(event, 4); }
 export function handleGauntletStartedLow(event: GauntletStartedEvent): void { handleGauntletStarted(event, 4); }
 export function handleGauntletCompletedLow(event: GauntletCompletedEvent): void { handleGauntletCompleted(event, 4); }
-export function handleGauntletRecoveredLow(event: GauntletRecoveredEvent): void { handleGauntletRecovered(event); }
+export function handleGauntletRecoveredLow(event: GauntletRecoveredEvent): void { handleGauntletRecovered(event, 4); }
 export function handleGauntletCombatResultLow(event: CombatResultEvent): void { handleGauntletCombatResultWithLevel(event, 4); }
 export function handleGauntletSizeSetLow(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event, 4); }
 export function handleGameEnabledUpdatedLow(event: GameEnabledUpdatedEvent): void { handleGameEnabledUpdated(event, 4); }
@@ -1273,9 +1364,9 @@ export function handleQueuePartiallyClearedLow(event: QueuePartiallyClearedEvent
 export function handleMinTimeBetweenGauntletsSetLow(event: MinTimeBetweenGauntletsSetEvent): void { handleMinTimeBetweenGauntletsSet(event, 4); }
 export function handleDefaultPlayerContractSetLow(event: DefaultPlayerContractSetEvent): void { handleDefaultPlayerContractSet(event); }
 export function handleQueueCommittedLow(event: QueueCommittedEvent): void { handleQueueCommitted(event); }
-export function handleParticipantsSelectedLow(event: ParticipantsSelectedEvent): void { handleParticipantsSelected(event); }
+export function handleParticipantsSelectedLow(event: ParticipantsSelectedEvent): void { handleParticipantsSelected(event, 4); }
 export function handleGauntletAutoRecoveredLow(event: GauntletAutoRecoveredEvent): void { handleGauntletAutoRecovered(event); }
-export function handlePlayerReplacedLow(event: PlayerReplacedEvent): void { handlePlayerReplaced(event); }
+export function handlePlayerReplacedLow(event: PlayerReplacedEvent): void { handlePlayerReplaced(event, 4); }
 export function handleFutureBlocksForSelectionSetLow(event: FutureBlocksForSelectionSetEvent): void { handleFutureBlocksForSelectionSet(event); }
 export function handleFutureBlocksForTournamentSetLow(event: FutureBlocksForTournamentSetEvent): void { handleFutureBlocksForTournamentSet(event); }
 export function handleEmergencyQueueClearedLow(event: EmergencyQueueClearedEvent): void { handleEmergencyQueueCleared(event); }
@@ -1289,7 +1380,7 @@ export function handlePlayerQueuedMid(event: PlayerQueuedEvent): void { handlePl
 export function handlePlayerWithdrewMid(event: PlayerWithdrewEvent): void { handlePlayerWithdrew(event, 9); }
 export function handleGauntletStartedMid(event: GauntletStartedEvent): void { handleGauntletStarted(event, 9); }
 export function handleGauntletCompletedMid(event: GauntletCompletedEvent): void { handleGauntletCompleted(event, 9); }
-export function handleGauntletRecoveredMid(event: GauntletRecoveredEvent): void { handleGauntletRecovered(event); }
+export function handleGauntletRecoveredMid(event: GauntletRecoveredEvent): void { handleGauntletRecovered(event, 9); }
 export function handleGauntletCombatResultMid(event: CombatResultEvent): void { handleGauntletCombatResultWithLevel(event, 9); }
 export function handleGauntletSizeSetMid(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event, 9); }
 export function handleGameEnabledUpdatedMid(event: GameEnabledUpdatedEvent): void { handleGameEnabledUpdated(event, 9); }
@@ -1298,9 +1389,9 @@ export function handleQueuePartiallyClearedMid(event: QueuePartiallyClearedEvent
 export function handleMinTimeBetweenGauntletsSetMid(event: MinTimeBetweenGauntletsSetEvent): void { handleMinTimeBetweenGauntletsSet(event, 9); }
 export function handleDefaultPlayerContractSetMid(event: DefaultPlayerContractSetEvent): void { handleDefaultPlayerContractSet(event); }
 export function handleQueueCommittedMid(event: QueueCommittedEvent): void { handleQueueCommitted(event); }
-export function handleParticipantsSelectedMid(event: ParticipantsSelectedEvent): void { handleParticipantsSelected(event); }
+export function handleParticipantsSelectedMid(event: ParticipantsSelectedEvent): void { handleParticipantsSelected(event, 9); }
 export function handleGauntletAutoRecoveredMid(event: GauntletAutoRecoveredEvent): void { handleGauntletAutoRecovered(event); }
-export function handlePlayerReplacedMid(event: PlayerReplacedEvent): void { handlePlayerReplaced(event); }
+export function handlePlayerReplacedMid(event: PlayerReplacedEvent): void { handlePlayerReplaced(event, 9); }
 export function handleFutureBlocksForSelectionSetMid(event: FutureBlocksForSelectionSetEvent): void { handleFutureBlocksForSelectionSet(event); }
 export function handleFutureBlocksForTournamentSetMid(event: FutureBlocksForTournamentSetEvent): void { handleFutureBlocksForTournamentSet(event); }
 export function handleEmergencyQueueClearedMid(event: EmergencyQueueClearedEvent): void { handleEmergencyQueueCleared(event); }
@@ -1314,7 +1405,7 @@ export function handlePlayerQueuedHigh(event: PlayerQueuedEvent): void { handleP
 export function handlePlayerWithdrewHigh(event: PlayerWithdrewEvent): void { handlePlayerWithdrew(event, 10); }
 export function handleGauntletStartedHigh(event: GauntletStartedEvent): void { handleGauntletStarted(event, 10); }
 export function handleGauntletCompletedHigh(event: GauntletCompletedEvent): void { handleGauntletCompleted(event, 10); }
-export function handleGauntletRecoveredHigh(event: GauntletRecoveredEvent): void { handleGauntletRecovered(event); }
+export function handleGauntletRecoveredHigh(event: GauntletRecoveredEvent): void { handleGauntletRecovered(event, 10); }
 export function handleGauntletCombatResultHigh(event: CombatResultEvent): void { handleGauntletCombatResultWithLevel(event, 10); }
 export function handleGauntletSizeSetHigh(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event, 10); }
 export function handleGameEnabledUpdatedHigh(event: GameEnabledUpdatedEvent): void { handleGameEnabledUpdated(event, 10); }
@@ -1323,13 +1414,13 @@ export function handleQueuePartiallyClearedHigh(event: QueuePartiallyClearedEven
 export function handleMinTimeBetweenGauntletsSetHigh(event: MinTimeBetweenGauntletsSetEvent): void { handleMinTimeBetweenGauntletsSet(event, 10); }
 export function handleDefaultPlayerContractSetHigh(event: DefaultPlayerContractSetEvent): void { handleDefaultPlayerContractSet(event); }
 export function handleQueueCommittedHigh(event: QueueCommittedEvent): void { handleQueueCommitted(event); }
-export function handleParticipantsSelectedHigh(event: ParticipantsSelectedEvent): void { handleParticipantsSelected(event); }
+export function handleParticipantsSelectedHigh(event: ParticipantsSelectedEvent): void { handleParticipantsSelected(event, 10); }
 export function handleGauntletAutoRecoveredHigh(event: GauntletAutoRecoveredEvent): void { handleGauntletAutoRecovered(event); }
-export function handlePlayerReplacedHigh(event: PlayerReplacedEvent): void { handlePlayerReplaced(event); }
+export function handlePlayerReplacedHigh(event: PlayerReplacedEvent): void { handlePlayerReplaced(event, 10); }
 export function handleFutureBlocksForSelectionSetHigh(event: FutureBlocksForSelectionSetEvent): void { handleFutureBlocksForSelectionSet(event); }
 export function handleFutureBlocksForTournamentSetHigh(event: FutureBlocksForTournamentSetEvent): void { handleFutureBlocksForTournamentSet(event); }
 export function handleEmergencyQueueClearedHigh(event: EmergencyQueueClearedEvent): void { handleEmergencyQueueCleared(event); }
-export function handleGauntletRewardDistributedHigh(event: GauntletRewardDistributedEvent): void { handleGauntletRewardDistributed(event); }
+export function handleGauntletRewardDistributedHigh(event: GauntletRewardDistributedEvent): void { handleGauntletRewardDistributed(event, 10); }
 export function handleDailyLimitResetHigh(event: DailyLimitResetEvent): void { handleDailyLimitReset(event); }
 export function handleDailyResetCostUpdatedHigh(event: DailyResetCostUpdatedEvent): void { handleDailyResetCostUpdated(event, 10); }
 export function handleDailyGauntletLimitUpdatedHigh(event: DailyGauntletLimitUpdatedEvent): void { handleDailyGauntletLimitUpdated(event, 10); }
