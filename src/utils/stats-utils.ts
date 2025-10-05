@@ -1,5 +1,5 @@
 import { BigInt, Address, Bytes, BigDecimal } from "@graphprotocol/graph-ts"
-import { Stats, Owner, Player, SkinCombatStat, PlayerSkinCombatStat, Skin, PlayerSeasonalStats, Accounting, GauntletBracket, PlayerGauntletStats } from "../../generated/schema"
+import { Stats, Owner, Player, SkinCombatStat, PlayerSkinCombatStat, Skin, PlayerSeasonalStats, Accounting, GauntletBracket, PlayerGauntletStat } from "../../generated/schema"
 import { log } from "@graphprotocol/graph-ts"
 
 // Little-endian helper functions
@@ -239,13 +239,14 @@ export function updateStatsForKills(timestamp: BigInt, killsDelta: i32): void {
   stats.save()
 }
 
-// Get or create PlayerGauntletStats for a player
-export function getOrCreatePlayerGauntletStats(playerId: string, timestamp: BigInt): PlayerGauntletStats {
-  let stats = PlayerGauntletStats.load(playerId)
+// Get or create PlayerGauntletStat for a player
+export function getOrCreatePlayerGauntletStats(playerId: string, timestamp: BigInt): PlayerGauntletStat {
+  let stats = PlayerGauntletStat.load(playerId)
 
   if (stats == null) {
-    stats = new PlayerGauntletStats(playerId)
+    stats = new PlayerGauntletStat(playerId)
     stats.player = playerId
+    stats.playerId = BigInt.fromString(playerId)
 
     // Initialize totals
     stats.totalGauntletsCompleted = 0
@@ -266,7 +267,7 @@ export function getOrCreatePlayerGauntletStats(playerId: string, timestamp: BigI
     stats.lastGauntlet = timestamp
     stats.lastUpdated = timestamp
 
-    log.info("[PlayerGauntletStats] Created new stats for player {}", [playerId])
+    log.info("[PlayerGauntletStat] Created new stats for player {}", [playerId])
   }
 
   return stats

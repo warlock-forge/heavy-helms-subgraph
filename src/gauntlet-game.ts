@@ -506,11 +506,7 @@ export function handleGauntletCompleted(event: GauntletCompletedEvent, defaultPl
         gauntletStats.lastUpdated = event.block.timestamp;
         gauntletStats.save();
 
-        // Link to player entity if not already linked
-        if (player.gauntletStats == null) {
-          player.gauntletStats = gauntletStats.id;
-          player.save();
-        }
+        // Note: player.gauntletStats is @derivedFrom, no need to set it manually
 
         log.info("[GauntletCompleted {}] Updated stats for player {}: completed={}, wins={}", [
           gauntletId,

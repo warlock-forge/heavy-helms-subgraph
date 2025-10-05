@@ -57,8 +57,9 @@ interface Fighter {
 # ==========================================================
 #                   PLAYER GAUNTLET STATS
 # ==========================================================
-type PlayerGauntletStats @entity {
-  id: ID!                    # playerId
+type PlayerGauntletStat @entity {
+  id: ID!                    # Unique identifier (playerId for now, but allows future expansion)
+  playerId: BigInt!          # Player ID for efficient filtering and sorting
   player: Player!
 
   # Total across all brackets
@@ -137,7 +138,7 @@ type Player implements Fighter @entity {
   currentGauntlet: Gauntlet # Link to Gauntlet if IN_GAUNTLET
 
   # Gauntlet statistics
-  gauntletStats: PlayerGauntletStats # Link to gauntlet statistics (created on first gauntlet)
+  gauntletStats: PlayerGauntletStat @derivedFrom(field: "player") # Link to gauntlet statistics (created on first gauntlet)
   gauntletBracket: GauntletBracket!  # Current bracket based on player level
   currentGauntletDailyStats: PlayerDailyGauntletStats # Link to current gauntlet daily stats
 
