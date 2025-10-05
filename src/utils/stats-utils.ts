@@ -2,6 +2,64 @@ import { BigInt, Address, Bytes, BigDecimal } from "@graphprotocol/graph-ts"
 import { Stats, Owner, Player, SkinCombatStat, PlayerSkinCombatStat, Skin, PlayerSeasonalStats, Accounting, GauntletBracket, PlayerGauntletStat } from "../../generated/schema"
 import { log } from "@graphprotocol/graph-ts"
 
+// Weapon class enum (matches contract)
+// enum WeaponClass {
+//   LIGHT_FINESSE = 0,      // Pure AGI damage
+//   CURVED_BLADE = 1,       // AGI*7 + STR*3 damage
+//   BALANCED_SWORD = 2,     // STR*7 + AGI*3 damage
+//   PURE_BLUNT = 3,         // Pure STR damage
+//   HEAVY_DEMOLITION = 4,   // STR*5 + SIZE*5 damage
+//   DUAL_WIELD_BRUTE = 5,   // STR*4 + SIZE*3 + AGI*3 damage
+//   REACH_CONTROL = 6       // AGI*8 + STR*8 damage
+// }
+
+/**
+ * Map weapon ID to weapon class based on contract's weapon definitions
+ * IMPORTANT: Update this mapping when game engine version changes weapon stats
+ * Current mapping is for game engine version 256
+ */
+function getWeaponClass(weaponId: i32): i32 {
+  // Weapon class constants
+  const LIGHT_FINESSE = 0;
+  const CURVED_BLADE = 1;
+  const BALANCED_SWORD = 2;
+  const PURE_BLUNT = 3;
+  const HEAVY_DEMOLITION = 4;
+  const DUAL_WIELD_BRUTE = 5;
+  const REACH_CONTROL = 6;
+
+  // Weapon ID to class mapping (from contract v256)
+  if (weaponId == 0) return BALANCED_SWORD;      // ARMING_SWORD_KITE
+  if (weaponId == 1) return PURE_BLUNT;          // MACE_TOWER
+  if (weaponId == 2) return LIGHT_FINESSE;       // RAPIER_BUCKLER
+  if (weaponId == 3) return HEAVY_DEMOLITION;    // GREATSWORD
+  if (weaponId == 4) return HEAVY_DEMOLITION;    // BATTLEAXE
+  if (weaponId == 5) return REACH_CONTROL;       // QUARTERSTAFF
+  if (weaponId == 6) return REACH_CONTROL;       // SPEAR
+  if (weaponId == 7) return LIGHT_FINESSE;       // SHORTSWORD_BUCKLER
+  if (weaponId == 8) return LIGHT_FINESSE;       // SHORTSWORD_TOWER
+  if (weaponId == 9) return LIGHT_FINESSE;       // DUAL_DAGGERS
+  if (weaponId == 10) return LIGHT_FINESSE;      // RAPIER_DAGGER
+  if (weaponId == 11) return CURVED_BLADE;       // SCIMITAR_BUCKLER
+  if (weaponId == 12) return HEAVY_DEMOLITION;   // AXE_KITE
+  if (weaponId == 13) return HEAVY_DEMOLITION;   // AXE_TOWER
+  if (weaponId == 14) return CURVED_BLADE;       // DUAL_SCIMITARS
+  if (weaponId == 16) return PURE_BLUNT;         // MACE_KITE
+  if (weaponId == 17) return PURE_BLUNT;         // CLUB_TOWER
+  if (weaponId == 18) return DUAL_WIELD_BRUTE;   // DUAL_CLUBS
+  if (weaponId == 19) return BALANCED_SWORD;     // ARMING_SWORD_SHORTSWORD
+  if (weaponId == 20) return CURVED_BLADE;       // SCIMITAR_DAGGER
+  if (weaponId == 21) return BALANCED_SWORD;     // ARMING_SWORD_CLUB
+  if (weaponId == 22) return DUAL_WIELD_BRUTE;   // AXE_MACE
+  if (weaponId == 24) return DUAL_WIELD_BRUTE;   // MACE_SHORTSWORD
+  if (weaponId == 25) return HEAVY_DEMOLITION;   // MAUL
+  if (weaponId == 26) return REACH_CONTROL;      // TRIDENT
+
+  // Unknown weapon - log warning and default to BALANCED_SWORD
+  log.warning("getWeaponClass: Unknown weapon ID {}, defaulting to BALANCED_SWORD", [weaponId.toString()]);
+  return BALANCED_SWORD;
+}
+
 // Little-endian helper functions
 function u32LE(data: Bytes, off: i32): i32 {
   return (data[off] as i32) |
@@ -1041,34 +1099,68 @@ export function processCombatResultsWithPlayerData(
 ): CombatStats {
   // First decode the basic combat results
   let stats = decodeCombatResults(packedResults);
-  
+
   // Decode player data for both players
   let p1Data = decodePlayerData(player1Data);
   let p2Data = decodePlayerData(player2Data);
-  
+
+  // Load Skin entities to get weapon and armor values
+  let p1SkinId = BigInt.fromI32(p1Data.skinCollectionId).toString() + "-" + BigInt.fromI32(p1Data.skinTokenId).toString();
+  let p2SkinId = BigInt.fromI32(p2Data.skinCollectionId).toString() + "-" + BigInt.fromI32(p2Data.skinTokenId).toString();
+
+  let p1Skin = Skin.load(p1SkinId);
+  let p2Skin = Skin.load(p2SkinId);
+
+  // Load weapon and armor values from Skin entities
+  // weapon and armor are non-nullable fields, so if Skin exists, they MUST have values
+  if (p1Skin) {
+    p1Data.weapon = p1Skin.weapon;
+    p1Data.armor = p1Skin.armor;
+    log.info("processCombatResultsWithPlayerData: P1 skin {} loaded - weapon:{} armor:{}", [
+      p1SkinId, p1Data.weapon.toString(), p1Data.armor.toString()
+    ]);
+  } else {
+    log.error("processCombatResultsWithPlayerData: CRITICAL - P1 skin {} not found! Cannot calculate accurate stats.", [p1SkinId]);
+    p1Data.weapon = 0;
+    p1Data.armor = 0;
+  }
+
+  if (p2Skin) {
+    p2Data.weapon = p2Skin.weapon;
+    p2Data.armor = p2Skin.armor;
+    log.info("processCombatResultsWithPlayerData: P2 skin {} loaded - weapon:{} armor:{}", [
+      p2SkinId, p2Data.weapon.toString(), p2Data.armor.toString()
+    ]);
+  } else {
+    log.error("processCombatResultsWithPlayerData: CRITICAL - P2 skin {} not found! Cannot calculate accurate stats.", [p2SkinId]);
+    p2Data.weapon = 0;
+    p2Data.armor = 0;
+  }
+
   // Calculate max health and stamina based on game engine version
+  // Now includes armor/weapon specialization bonuses
   p1Data = calculatePlayerStats(p1Data, stats.gameEngineVersion);
   p2Data = calculatePlayerStats(p2Data, stats.gameEngineVersion);
-  
+
   // Set the calculated max stats
   stats.player1MaxHealth = p1Data.maxHealth;
   stats.player1MaxStamina = p1Data.maxStamina;
   stats.player2MaxHealth = p2Data.maxHealth;
   stats.player2MaxStamina = p2Data.maxStamina;
-  
+
   // Calculate ending health and stamina
   // Player takes damage from opponent's attacks, loses their own stamina from actions
   stats.player1EndingHealth = stats.player1MaxHealth - stats.player2TotalDamage;
   stats.player1EndingStamina = stats.player1MaxStamina - stats.player1TotalStaminaLost;
   stats.player2EndingHealth = stats.player2MaxHealth - stats.player1TotalDamage;
   stats.player2EndingStamina = stats.player2MaxStamina - stats.player2TotalStaminaLost;
-  
+
   // Ensure ending values don't go below 0
   if (stats.player1EndingHealth < 0) stats.player1EndingHealth = 0;
   if (stats.player1EndingStamina < 0) stats.player1EndingStamina = 0;
   if (stats.player2EndingHealth < 0) stats.player2EndingHealth = 0;
   if (stats.player2EndingStamina < 0) stats.player2EndingStamina = 0;
-  
+
   log.info("processCombatResultsWithPlayerData: P1 {}HP→{} {}STA→{} | P2 {}HP→{} {}STA→{}", [
     stats.player1MaxHealth.toString(),
     stats.player1EndingHealth.toString(),
@@ -1079,7 +1171,7 @@ export function processCombatResultsWithPlayerData(
     stats.player2MaxStamina.toString(),
     stats.player2EndingStamina.toString()
   ]);
-  
+
   return stats;
 }
 
@@ -1205,25 +1297,65 @@ export function calculatePlayerStats(playerData: PlayerData, gameEngineVersion: 
     let healthFromSize = playerData.size * 6;
     let healthFromStamina = playerData.stamina * 3;
     playerData.maxHealth = healthBase + healthFromCon + healthFromSize + healthFromStamina;
-    
+
     // Version 256+ stamina calculation (rebalanced endurance)
     let staminaBase = 35;
     let staminaFromStamina = playerData.stamina * 20; // Increased from 16 to 20
     let staminaFromStrength = playerData.strength * 5; // Increased from 2 to 5
     playerData.maxStamina = staminaBase + staminaFromStamina + staminaFromStrength;
-    
+
     // Apply level scaling for version 256+ (+5% health per level above 1)
     if (playerData.level > 1) {
       let levelBonus = (playerData.level - 1) * 5; // 5% per level
       playerData.maxHealth = (playerData.maxHealth * (100 + levelBonus)) / 100;
     }
-    
-    log.info("calculatePlayerStats: Player {} v{} - MaxHP:{} MaxStamina:{} (Level {})", [
+
+    // Apply weapon specialization bonuses (v1.0)
+    // Check if player's weapon specialization matches their equipped weapon's class
+    if (playerData.weaponSpecialization != 255) {
+      let weaponClass = getWeaponClass(playerData.weapon);
+
+      if (weaponClass == playerData.weaponSpecialization) {
+        // Apply class-specific bonuses that affect health/stamina
+        if (weaponClass == 0) { // LIGHT_FINESSE
+          // +10 initiative, +10% endurance (stamina efficiency)
+          playerData.maxStamina = (playerData.maxStamina * 110) / 100;
+        } else if (weaponClass == 5) { // DUAL_WIELD_BRUTE
+          // +10% endurance (stamina efficiency), +3% parry
+          playerData.maxStamina = (playerData.maxStamina * 110) / 100;
+        }
+        // Other weapon classes don't affect maxHealth or maxStamina
+      }
+    }
+
+    // Apply armor specialization bonuses (v1.0)
+    // Armor constants: 0=CLOTH, 1=LEATHER, 2=CHAIN, 3=PLATE
+    if (playerData.armorSpecialization != 255) {
+      if (playerData.armor == playerData.armorSpecialization) {
+        if (playerData.armor == 0) { // ARMOR_CLOTH
+          // +10% dodge, +15% endurance (light & efficient)
+          playerData.maxStamina = (playerData.maxStamina * 115) / 100;
+        } else if (playerData.armor == 1) { // ARMOR_LEATHER
+          // +5% dodge, +10% endurance (moderate mobility)
+          playerData.maxStamina = (playerData.maxStamina * 110) / 100;
+        } else if (playerData.armor == 2) { // ARMOR_CHAIN
+          // +5% health, +3% block (balanced protection)
+          playerData.maxHealth = (playerData.maxHealth * 105) / 100;
+        } else if (playerData.armor == 3) { // ARMOR_PLATE
+          // +10% health, +5% block (maximum protection)
+          playerData.maxHealth = (playerData.maxHealth * 110) / 100;
+        }
+      }
+    }
+
+    log.info("calculatePlayerStats: Player {} v{} - MaxHP:{} MaxStamina:{} (Level {}, Armor {}, ArmorSpec {})", [
       playerData.playerId.toString(),
       gameEngineVersion.toString(),
       playerData.maxHealth.toString(),
       playerData.maxStamina.toString(),
-      playerData.level.toString()
+      playerData.level.toString(),
+      playerData.armor.toString(),
+      playerData.armorSpecialization.toString()
     ]);
   } else {
     // For other unknown versions, log a warning and use 0 values
@@ -1268,7 +1400,11 @@ class PlayerData {
   currentXP: i32;                // uint16 current experience points
   weaponSpecialization: i32;     // uint8 weapon class specialization (255 = none)
   armorSpecialization: i32;      // uint8 armor specialization (255 = none)
-  
+
+  // Actual equipped weapon/armor (loaded from Skin entity, not in bytes32 encoding)
+  weapon: i32;                   // uint8 weapon type
+  armor: i32;                    // uint8 armor type (0=CLOTH, 1=LEATHER, 2=CHAIN, 3=PLATE)
+
   constructor() {
     this.playerId = 0;
     this.strength = 0;
@@ -1291,6 +1427,8 @@ class PlayerData {
     this.currentXP = 0;
     this.weaponSpecialization = 255;
     this.armorSpecialization = 255;
+    this.weapon = 0;
+    this.armor = 0;
   }
 }
 
