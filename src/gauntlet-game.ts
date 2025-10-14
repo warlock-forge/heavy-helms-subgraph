@@ -19,8 +19,8 @@ import {
   GauntletRewardDistributed as GauntletRewardDistributedEvent,
   RewardConfigUpdated as RewardConfigUpdatedEvent,
   QueueCommitted as QueueCommittedEvent,
+  QueueRecovered as QueueRecoveredEvent,
   ParticipantsSelected as ParticipantsSelectedEvent,
-  GauntletAutoRecovered as GauntletAutoRecoveredEvent,
   PlayerReplaced as PlayerReplacedEvent,
   FutureBlocksForSelectionSet as FutureBlocksForSelectionSetEvent,
   FutureBlocksForTournamentSet as FutureBlocksForTournamentSetEvent,
@@ -51,8 +51,8 @@ import {
   GauntletSizeSet,
   RewardConfigUpdated,
   QueueCommitted,
+  QueueRecovered,
   GauntletParticipantsSelected,
-  GauntletAutoRecovered,
   PlayerReplaced,
   FutureBlocksForSelectionSet,
   FutureBlocksForTournamentSet,
@@ -567,11 +567,26 @@ export function handleGauntletRecovered(event: GauntletRecoveredEvent, defaultPl
   // Create composite ID: {bracketId}-{gauntletId}
   const gauntletId = `${bracketId}-${event.params.gauntletId.toString()}`;
   const entity = new GauntletRecovered(event.transaction.hash);
-  entity.commitTimestamp = event.params.commitTimestamp;
+  entity.gauntletId = event.params.gauntletId;
+  entity.targetBlock = event.params.targetBlock;
+  
+  // Convert uint32[] to string array for GraphQL
+  const participantIds: string[] = [];
+  for (let i = 0; i < event.params.participantIds.length; i++) {
+    participantIds.push(event.params.participantIds[i].toString());
+  }
+  entity.participantIds = participantIds;
+  
   entity.blockNumber = event.block.number;
   entity.blockTimestamp = event.block.timestamp;
   entity.transactionHash = event.transaction.hash;
   entity.save();
+  
+  log.info("GauntletGame GauntletRecovered: gauntletId {} targetBlock {} with {} participants", [
+    event.params.gauntletId.toString(),
+    event.params.targetBlock.toString(),
+    event.params.participantIds.length.toString()
+  ]);
   
   // Update the gauntlet entity state and recovery tracking
   let gauntlet = Gauntlet.load(gauntletId);
@@ -1042,8 +1057,8 @@ export function handleDailyGauntletLimitUpdated(event: DailyGauntletLimitUpdated
   ]);
 }
 
-// Handle QueuePartiallyCleared event
-export function handleQueuePartiallyCleared(event: QueuePartiallyClearedEvent): void {
+// Handle QueuePartiallyCleared event with bracket-specific clearing
+function handleQueuePartiallyClearedForBracket(event: QueuePartiallyClearedEvent, bracketId: string): void {
   const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
   const queueCleared = new QueuePartiallyCleared(eventId);
   
@@ -1055,13 +1070,14 @@ export function handleQueuePartiallyCleared(event: QueuePartiallyClearedEvent): 
   
   queueCleared.save();
 
-  log.info("GauntletGame QueuePartiallyCleared: cleared {} remaining {}", [
+  log.info("GauntletGame QueuePartiallyCleared ({}): cleared {} remaining {}", [
+    bracketId,
     event.params.cleared.toString(),
     event.params.remaining.toString()
   ]);
 
-  // Clear all queued players (contract cleared the queue, so should we)
-  _clearAllQueuedPlayersForContract(event.address, event.block.timestamp);
+  // Clear all queued players for this specific bracket
+  _clearQueuedPlayersForBracket(bracketId, event.address, event.block.timestamp);
 }
 
 // Handle GauntletRewardDistributed event (Level 10 only)
@@ -1151,6 +1167,24 @@ export function handleQueueCommitted(event: QueueCommittedEvent): void {
   ]);
 }
 
+// Handle QueueRecovered event - QueueRecovered(uint256)
+export function handleQueueRecovered(event: QueueRecoveredEvent): void {
+  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
+  const queueRecovered = new QueueRecovered(eventId);
+  
+  // Event signature: QueueRecovered(uint256 targetBlock)
+  queueRecovered.targetBlock = event.params.targetBlock;
+  queueRecovered.blockNumber = event.block.number;
+  queueRecovered.blockTimestamp = event.block.timestamp;
+  queueRecovered.transactionHash = event.transaction.hash;
+  
+  queueRecovered.save();
+  
+  log.info("GauntletGame QueueRecovered: targetBlock {}", [
+    event.params.targetBlock.toString()
+  ]);
+}
+
 // Handle ParticipantsSelected event - ParticipantsSelected(indexed uint256,uint256,uint32[])
 export function handleParticipantsSelected(event: ParticipantsSelectedEvent, defaultPlayerLevel: i32 = 10): void {
   // Determine bracket based on defaultPlayerLevel first
@@ -1192,27 +1226,6 @@ export function handleParticipantsSelected(event: ParticipantsSelectedEvent, def
   ]);
 }
 
-// Handle GauntletAutoRecovered event - GauntletAutoRecovered(uint256,uint256,uint8)
-export function handleGauntletAutoRecovered(event: GauntletAutoRecoveredEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const autoRecovered = new GauntletAutoRecovered(eventId);
-  
-  // Event signature: GauntletAutoRecovered(uint256 commitBlock, uint256 currentBlock, uint8 phase)
-  autoRecovered.gauntletId = BigInt.fromI32(0);  // Not available in this event - use placeholder
-  autoRecovered.randomness = event.params.currentBlock;    // currentBlock
-  autoRecovered.reason = event.params.phase;               // phase
-  autoRecovered.blockNumber = event.block.number;
-  autoRecovered.blockTimestamp = event.block.timestamp;
-  autoRecovered.transactionHash = event.transaction.hash;
-  
-  autoRecovered.save();
-  
-  log.info("GauntletGame AutoRecovered: commit {} current {} phase {}", [
-    event.params.commitBlock.toString(),
-    event.params.currentBlock.toString(),
-    event.params.phase.toString()
-  ]);
-}
 
 // Handle PlayerReplaced event - PlayerReplaced(indexed uint256,indexed uint32,indexed uint32,uint8)
 export function handlePlayerReplaced(event: PlayerReplacedEvent, defaultPlayerLevel: i32 = 10): void {
@@ -1321,7 +1334,8 @@ export function handleFutureBlocksForTournamentSet(event: FutureBlocksForTournam
 }
 
 // Handle EmergencyQueueCleared event - EmergencyQueueCleared(uint256,uint256)
-export function handleEmergencyQueueCleared(event: EmergencyQueueClearedEvent): void {
+// Handle EmergencyQueueCleared event with bracket-specific clearing
+function handleEmergencyQueueClearedForBracket(event: EmergencyQueueClearedEvent, bracketId: string): void {
   const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
   const emergencyCleared = new EmergencyQueueCleared(eventId);
   
@@ -1334,30 +1348,18 @@ export function handleEmergencyQueueCleared(event: EmergencyQueueClearedEvent): 
   
   emergencyCleared.save();
   
-  log.info("GauntletGame EmergencyQueueCleared: cleared {} remaining {}", [
+  log.info("GauntletGame EmergencyQueueCleared ({}): cleared {} remaining {}", [
+    bracketId,
     event.params.cleared.toString(),
     event.params.remaining.toString()
   ]);
 
-  // Clear all queued players (contract cleared the queue, so should we)
-  _clearAllQueuedPlayersForContract(event.address, event.block.timestamp);
+  // Clear all queued players for this specific bracket
+  _clearQueuedPlayersForBracket(bracketId, event.address, event.block.timestamp);
 }
 
-// Helper function to clear all queued players for a specific gauntlet contract
-function _clearAllQueuedPlayersForContract(contractAddress: Address, timestamp: BigInt): void {
-  // Determine bracket from contract address
-  let bracketId: string;
-  if (contractAddress.toHexString() == "0x71ad5e337efa81fde0eb737ab17342f25fe4c93b") {
-    bracketId = "low";
-  } else if (contractAddress.toHexString() == "0xf1639b58af4cf0097b253c13ec229082826224ca") {
-    bracketId = "mid";
-  } else if (contractAddress.toHexString() == "0x757bccee1aaf9fb7c44ac1ce8bedd434f71a2c0e") {
-    bracketId = "high";
-  } else {
-    log.error("Unknown gauntlet contract address for queue clearing: {}", [contractAddress.toHexString()]);
-    return;
-  }
-
+// Helper function to clear all queued players for a specific bracket
+function _clearQueuedPlayersForBracket(bracketId: string, contractAddress: Address, timestamp: BigInt): void {
   log.info("Clearing all queued players for bracket: {}", [bracketId]);
 
   // Clear individual player statuses
@@ -1413,16 +1415,16 @@ export function handleGauntletCombatResultLow(event: CombatResultEvent): void { 
 export function handleGauntletSizeSetLow(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event, 4); }
 export function handleGameEnabledUpdatedLow(event: GameEnabledUpdatedEvent): void { handleGameEnabledUpdated(event, 4); }
 export function handleGameEngineUpdatedLow(event: GameEngineUpdatedEvent): void { handleGameEngineUpdated(event); }
-export function handleQueuePartiallyClearedLow(event: QueuePartiallyClearedEvent): void { handleQueuePartiallyCleared(event); }
+export function handleQueuePartiallyClearedLow(event: QueuePartiallyClearedEvent): void { handleQueuePartiallyClearedForBracket(event, "low"); }
 export function handleMinTimeBetweenGauntletsSetLow(event: MinTimeBetweenGauntletsSetEvent): void { handleMinTimeBetweenGauntletsSet(event, 4); }
 export function handleDefaultPlayerContractSetLow(event: DefaultPlayerContractSetEvent): void { handleDefaultPlayerContractSet(event); }
 export function handleQueueCommittedLow(event: QueueCommittedEvent): void { handleQueueCommitted(event); }
+export function handleQueueRecoveredLow(event: QueueRecoveredEvent): void { handleQueueRecovered(event); }
 export function handleParticipantsSelectedLow(event: ParticipantsSelectedEvent): void { handleParticipantsSelected(event, 4); }
-export function handleGauntletAutoRecoveredLow(event: GauntletAutoRecoveredEvent): void { handleGauntletAutoRecovered(event); }
 export function handlePlayerReplacedLow(event: PlayerReplacedEvent): void { handlePlayerReplaced(event, 4); }
 export function handleFutureBlocksForSelectionSetLow(event: FutureBlocksForSelectionSetEvent): void { handleFutureBlocksForSelectionSet(event); }
 export function handleFutureBlocksForTournamentSetLow(event: FutureBlocksForTournamentSetEvent): void { handleFutureBlocksForTournamentSet(event); }
-export function handleEmergencyQueueClearedLow(event: EmergencyQueueClearedEvent): void { handleEmergencyQueueCleared(event); }
+export function handleEmergencyQueueClearedLow(event: EmergencyQueueClearedEvent): void { handleEmergencyQueueClearedForBracket(event, "low"); }
 export function handleGauntletXPAwardedLow(event: GauntletXPAwardedEvent): void { handleGauntletXPAwarded(event); }
 export function handleDailyLimitResetLow(event: DailyLimitResetEvent): void { handleDailyLimitReset(event); }
 export function handleDailyResetCostUpdatedLow(event: DailyResetCostUpdatedEvent): void { handleDailyResetCostUpdated(event, 4); }
@@ -1438,16 +1440,16 @@ export function handleGauntletCombatResultMid(event: CombatResultEvent): void { 
 export function handleGauntletSizeSetMid(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event, 9); }
 export function handleGameEnabledUpdatedMid(event: GameEnabledUpdatedEvent): void { handleGameEnabledUpdated(event, 9); }
 export function handleGameEngineUpdatedMid(event: GameEngineUpdatedEvent): void { handleGameEngineUpdated(event); }
-export function handleQueuePartiallyClearedMid(event: QueuePartiallyClearedEvent): void { handleQueuePartiallyCleared(event); }
+export function handleQueuePartiallyClearedMid(event: QueuePartiallyClearedEvent): void { handleQueuePartiallyClearedForBracket(event, "mid"); }
 export function handleMinTimeBetweenGauntletsSetMid(event: MinTimeBetweenGauntletsSetEvent): void { handleMinTimeBetweenGauntletsSet(event, 9); }
 export function handleDefaultPlayerContractSetMid(event: DefaultPlayerContractSetEvent): void { handleDefaultPlayerContractSet(event); }
 export function handleQueueCommittedMid(event: QueueCommittedEvent): void { handleQueueCommitted(event); }
+export function handleQueueRecoveredMid(event: QueueRecoveredEvent): void { handleQueueRecovered(event); }
 export function handleParticipantsSelectedMid(event: ParticipantsSelectedEvent): void { handleParticipantsSelected(event, 9); }
-export function handleGauntletAutoRecoveredMid(event: GauntletAutoRecoveredEvent): void { handleGauntletAutoRecovered(event); }
 export function handlePlayerReplacedMid(event: PlayerReplacedEvent): void { handlePlayerReplaced(event, 9); }
 export function handleFutureBlocksForSelectionSetMid(event: FutureBlocksForSelectionSetEvent): void { handleFutureBlocksForSelectionSet(event); }
 export function handleFutureBlocksForTournamentSetMid(event: FutureBlocksForTournamentSetEvent): void { handleFutureBlocksForTournamentSet(event); }
-export function handleEmergencyQueueClearedMid(event: EmergencyQueueClearedEvent): void { handleEmergencyQueueCleared(event); }
+export function handleEmergencyQueueClearedMid(event: EmergencyQueueClearedEvent): void { handleEmergencyQueueClearedForBracket(event, "mid"); }
 export function handleGauntletXPAwardedMid(event: GauntletXPAwardedEvent): void { handleGauntletXPAwarded(event); }
 export function handleDailyLimitResetMid(event: DailyLimitResetEvent): void { handleDailyLimitReset(event); }
 export function handleDailyResetCostUpdatedMid(event: DailyResetCostUpdatedEvent): void { handleDailyResetCostUpdated(event, 9); }
@@ -1463,16 +1465,16 @@ export function handleGauntletCombatResultHigh(event: CombatResultEvent): void {
 export function handleGauntletSizeSetHigh(event: GauntletSizeSetEvent): void { handleGauntletSizeSet(event, 10); }
 export function handleGameEnabledUpdatedHigh(event: GameEnabledUpdatedEvent): void { handleGameEnabledUpdated(event, 10); }
 export function handleGameEngineUpdatedHigh(event: GameEngineUpdatedEvent): void { handleGameEngineUpdated(event); }
-export function handleQueuePartiallyClearedHigh(event: QueuePartiallyClearedEvent): void { handleQueuePartiallyCleared(event); }
+export function handleQueuePartiallyClearedHigh(event: QueuePartiallyClearedEvent): void { handleQueuePartiallyClearedForBracket(event, "high"); }
 export function handleMinTimeBetweenGauntletsSetHigh(event: MinTimeBetweenGauntletsSetEvent): void { handleMinTimeBetweenGauntletsSet(event, 10); }
 export function handleDefaultPlayerContractSetHigh(event: DefaultPlayerContractSetEvent): void { handleDefaultPlayerContractSet(event); }
 export function handleQueueCommittedHigh(event: QueueCommittedEvent): void { handleQueueCommitted(event); }
+export function handleQueueRecoveredHigh(event: QueueRecoveredEvent): void { handleQueueRecovered(event); }
 export function handleParticipantsSelectedHigh(event: ParticipantsSelectedEvent): void { handleParticipantsSelected(event, 10); }
-export function handleGauntletAutoRecoveredHigh(event: GauntletAutoRecoveredEvent): void { handleGauntletAutoRecovered(event); }
 export function handlePlayerReplacedHigh(event: PlayerReplacedEvent): void { handlePlayerReplaced(event, 10); }
 export function handleFutureBlocksForSelectionSetHigh(event: FutureBlocksForSelectionSetEvent): void { handleFutureBlocksForSelectionSet(event); }
 export function handleFutureBlocksForTournamentSetHigh(event: FutureBlocksForTournamentSetEvent): void { handleFutureBlocksForTournamentSet(event); }
-export function handleEmergencyQueueClearedHigh(event: EmergencyQueueClearedEvent): void { handleEmergencyQueueCleared(event); }
+export function handleEmergencyQueueClearedHigh(event: EmergencyQueueClearedEvent): void { handleEmergencyQueueClearedForBracket(event, "high"); }
 export function handleGauntletRewardDistributedHigh(event: GauntletRewardDistributedEvent): void { handleGauntletRewardDistributed(event, 10); }
 export function handleDailyLimitResetHigh(event: DailyLimitResetEvent): void { handleDailyLimitReset(event); }
 export function handleDailyResetCostUpdatedHigh(event: DailyResetCostUpdatedEvent): void { handleDailyResetCostUpdated(event, 10); }

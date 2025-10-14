@@ -1379,11 +1379,12 @@ type GauntletCompleted @entity(immutable: true) {
 
 type GauntletRecovered @entity(immutable: true) {
   id: Bytes!               # Transaction hash
-  commitTimestamp: BigInt! # uint256 commitTimestamp (only param in event)
+  gauntletId: BigInt!      # uint256 gauntletId (indexed)
+  targetBlock: BigInt!     # uint256 targetBlock  
+  participantIds: [String!]! # uint32[] participantIds
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
-  # TODO: Cannot link to gauntlet without gauntletId in event
 }
 
 type QueuePartiallyCleared @entity(immutable: true) {
@@ -1695,11 +1696,9 @@ type RewardConfigUpdated @entity(immutable: true) {
 }
 
 # v1.0.1 New Gauntlet Events
-type GauntletAutoRecovered @entity(immutable: true) {
+type QueueRecovered @entity(immutable: true) {
   id: Bytes!               # Transaction hash + log index
-  gauntletId: BigInt!      # uint256 gauntletId
-  randomness: BigInt!      # uint256 randomness
-  reason: Int!             # uint8 reason
+  targetBlock: BigInt!     # uint256 targetBlock
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
