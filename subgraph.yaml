@@ -262,23 +262,22 @@ dataSources:
         - DuelChallenge
         - ChallengeCreated
         - ChallengeAccepted
-        - ChallengeCancelled
         - DuelComplete
         - CombatResult
         - GameEnabledUpdated
-        - TimeUntilExpireUpdated
         - VrfRequestTimeoutUpdated
         - ChallengeRecovered
+        - GasProtectionUpdated
+        - MaxAcceptGasPriceUpdated
+        - DuelFeeAmountUpdated
       abis:
         - name: DuelGame
           file: ./abis/DuelGame.json
       eventHandlers:
-        - event: ChallengeCreated(indexed uint256,indexed uint32,indexed uint32,uint32,uint16,uint8)
+        - event: ChallengeCreated(indexed uint256,indexed uint32,indexed uint32,uint32,uint16,uint8,bool)
           handler: handleChallengeCreated
         - event: ChallengeAccepted(indexed uint256,indexed uint32,uint32,uint16,uint8)
           handler: handleChallengeAccepted
-        - event: ChallengeCancelled(indexed uint256)
-          handler: handleChallengeCancelled
         - event: DuelComplete(indexed uint256,indexed uint32,uint256)
           handler: handleDuelComplete
         - event: CombatResult(indexed bytes32,indexed bytes32,indexed uint32,bytes)
@@ -287,12 +286,16 @@ dataSources:
           handler: handleGameEnabledUpdated
         - event: GameEngineUpdated(indexed address,indexed address)
           handler: handleGameEngineUpdated
-        - event: TimeUntilExpireUpdated(uint256,uint256)
-          handler: handleTimeUntilExpireUpdated
         - event: ChallengeRecovered(indexed uint256)
           handler: handleChallengeRecovered
         - event: VrfRequestTimeoutUpdated(uint256,uint256)
           handler: handleVrfRequestTimeoutUpdated
+        - event: GasProtectionUpdated(bool)
+          handler: handleGasProtectionUpdated
+        - event: MaxAcceptGasPriceUpdated(uint256,uint256)
+          handler: handleMaxAcceptGasPriceUpdated
+        - event: DuelFeeAmountUpdated(uint256,uint256)
+          handler: handleDuelFeeAmountUpdated
       file: ./src/duel-game.ts
 
   # Add GauntletGame data sources (3 brackets for v1.0.0)

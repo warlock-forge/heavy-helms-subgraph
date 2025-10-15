@@ -2,33 +2,34 @@ import { BigInt } from "@graphprotocol/graph-ts";
 import {
   ChallengeCreated as ChallengeCreatedEvent,
   ChallengeAccepted as ChallengeAcceptedEvent,
-  ChallengeCancelled as ChallengeCancelledEvent,
   DuelComplete as DuelCompleteEvent,
   CombatResult as CombatResultEvent,
   GameEnabledUpdated as GameEnabledUpdatedEvent,
-  TimeUntilExpireUpdated as TimeUntilExpireUpdatedEvent,
   ChallengeRecovered as ChallengeRecoveredEvent,
   GameEngineUpdated as GameEngineUpdatedEvent,
   VrfRequestTimeoutUpdated as VrfRequestTimeoutUpdatedEvent,
+  GasProtectionUpdated as GasProtectionUpdatedEvent,
+  MaxAcceptGasPriceUpdated as MaxAcceptGasPriceUpdatedEvent,
+  DuelFeeAmountUpdated as DuelFeeAmountUpdatedEvent,
 } from "../generated/DuelGame/DuelGame";
 import {
   DuelChallenge,
   ChallengeCreated,
   ChallengeAccepted,
-  ChallengeCancelled,
   DuelComplete,
   CombatResult,
   GameEnabledUpdated,
-  TimeUntilExpireUpdated,
   ChallengeRecovered,
   GameEngineUpdated,
   VrfRequestTimeoutUpdated,
+  GasProtectionUpdated,
+  MaxAcceptGasPriceUpdated,
+  DuelFeeAmountUpdated,
   Player
 } from "../generated/schema";
 import { log } from "@graphprotocol/graph-ts";
 import {
   updateStatsForChallengeCreation,
-  updateStatsForChallengeCancellation,
   updateSeasonalDuelStats
 } from "./utils/stats-utils";
 import { getOrCreateFighterParticipant, processCombatResultEvent } from "./utils/fighter-utils";
@@ -48,6 +49,7 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
   createdEvent.challengerSkinIndex = event.params.challengerSkinIndex;
   createdEvent.challengerSkinTokenId = BigInt.fromI32(event.params.challengerSkinTokenId);
   createdEvent.challengerStance = BigInt.fromI32(event.params.challengerStance);
+  createdEvent.paidWithTicket = event.params.paidWithTicket;
   createdEvent.createdAtBlock = event.block.number;
   createdEvent.blockNumber = event.block.number;
   createdEvent.blockTimestamp = event.block.timestamp;
@@ -63,6 +65,7 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
   challenge.createdBlock = event.block.number;
   challenge.createdAt = event.block.timestamp;
   challenge.state = "OPEN";
+  challenge.paidWithTicket = event.params.paidWithTicket;
   
   // Create FighterParticipant for challenger's locked loadout
   const challengerParticipant = getOrCreateFighterParticipant(
@@ -106,14 +109,8 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
     log.info("Linked defender player {} to challenge {}", [defenderId, challengeId]);
   }
   
-  // Get current expiry time from contract state
-  const duelGame = DuelGame.bind(event.address);
-  const timeUntilExpire = duelGame.try_timeUntilExpire();
-  
-  // Calculate expiry timestamps
-  if (!timeUntilExpire.reverted) {
-    challenge.expiresTimestamp = event.block.timestamp.plus(timeUntilExpire.value);
-  }
+  // Note: timeUntilExpire function removed in new contract version
+  // expiresTimestamp will remain null for now
   
   challenge.save();
   
@@ -188,37 +185,6 @@ export function handleChallengeAccepted(event: ChallengeAcceptedEvent): void {
   acceptedEvent.save();
 }
 
-/**
- * Handle ChallengeCancelled events
- */
-export function handleChallengeCancelled(event: ChallengeCancelledEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const cancelledEvent = new ChallengeCancelled(eventId);
-  
-  cancelledEvent.challengeId = event.params.challengeId;
-  cancelledEvent.blockNumber = event.block.number;
-  cancelledEvent.blockTimestamp = event.block.timestamp;
-  cancelledEvent.transactionHash = event.transaction.hash;
-  
-  // Update the DuelChallenge entity
-  const challengeId = event.params.challengeId.toString();
-  const challenge = DuelChallenge.load(challengeId);
-  
-  if (challenge) {
-    challenge.state = "CANCELLED";
-    challenge.save();
-    
-    // Set reference from event to challenge
-    cancelledEvent.challenge = challengeId;
-  } else {
-    log.warning("Challenge not found for cancel event: {}", [challengeId]);
-  }
-  
-  cancelledEvent.save();
-  
-  // Update stats
-  updateStatsForChallengeCancellation(event.block.timestamp);
-}
 
 /**
  * Handle ChallengeForfeited events
@@ -322,21 +288,6 @@ export function handleGameEnabledUpdated(event: GameEnabledUpdatedEvent): void {
   gameEnabledUpdated.save();
 }
 
-/**
- * Handle TimeUntilExpireUpdated events
- */
-export function handleTimeUntilExpireUpdated(event: TimeUntilExpireUpdatedEvent): void {
-  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const timeUntilExpireUpdated = new TimeUntilExpireUpdated(eventId);
-  
-  timeUntilExpireUpdated.oldValue = event.params.oldValue;
-  timeUntilExpireUpdated.newValue = event.params.newValue;
-  timeUntilExpireUpdated.blockNumber = event.block.number;
-  timeUntilExpireUpdated.blockTimestamp = event.block.timestamp;
-  timeUntilExpireUpdated.transactionHash = event.transaction.hash;
-  
-  timeUntilExpireUpdated.save();
-}
 
 /**
  * Handle ChallengeRecovered events
@@ -404,5 +355,64 @@ export function handleVrfRequestTimeoutUpdated(event: VrfRequestTimeoutUpdatedEv
   vrfRequestTimeoutUpdated.transactionHash = event.transaction.hash;
   
   vrfRequestTimeoutUpdated.save();
+}
+
+/**
+ * Handle GasProtectionUpdated events
+ */
+export function handleGasProtectionUpdated(event: GasProtectionUpdatedEvent): void {
+  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
+  const gasProtectionUpdated = new GasProtectionUpdated(eventId);
+  
+  gasProtectionUpdated.enabled = event.params.enabled;
+  gasProtectionUpdated.blockNumber = event.block.number;
+  gasProtectionUpdated.blockTimestamp = event.block.timestamp;
+  gasProtectionUpdated.transactionHash = event.transaction.hash;
+  
+  gasProtectionUpdated.save();
+  
+  log.info("Gas protection updated: enabled={}", [event.params.enabled.toString()]);
+}
+
+/**
+ * Handle MaxAcceptGasPriceUpdated events
+ */
+export function handleMaxAcceptGasPriceUpdated(event: MaxAcceptGasPriceUpdatedEvent): void {
+  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
+  const maxAcceptGasPriceUpdated = new MaxAcceptGasPriceUpdated(eventId);
+  
+  maxAcceptGasPriceUpdated.oldValue = event.params.oldValue;
+  maxAcceptGasPriceUpdated.newValue = event.params.newValue;
+  maxAcceptGasPriceUpdated.blockNumber = event.block.number;
+  maxAcceptGasPriceUpdated.blockTimestamp = event.block.timestamp;
+  maxAcceptGasPriceUpdated.transactionHash = event.transaction.hash;
+  
+  maxAcceptGasPriceUpdated.save();
+  
+  log.info("Max accept gas price updated from {} to {}", [
+    event.params.oldValue.toString(),
+    event.params.newValue.toString()
+  ]);
+}
+
+/**
+ * Handle DuelFeeAmountUpdated events
+ */
+export function handleDuelFeeAmountUpdated(event: DuelFeeAmountUpdatedEvent): void {
+  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
+  const duelFeeAmountUpdated = new DuelFeeAmountUpdated(eventId);
+  
+  duelFeeAmountUpdated.oldValue = event.params.oldValue;
+  duelFeeAmountUpdated.newValue = event.params.newValue;
+  duelFeeAmountUpdated.blockNumber = event.block.number;
+  duelFeeAmountUpdated.blockTimestamp = event.block.timestamp;
+  duelFeeAmountUpdated.transactionHash = event.transaction.hash;
+  
+  duelFeeAmountUpdated.save();
+  
+  log.info("Duel fee amount updated from {} to {}", [
+    event.params.oldValue.toString(),
+    event.params.newValue.toString()
+  ]);
 }
 

@@ -787,6 +787,9 @@ type DuelChallenge @entity(immutable: false) {
 
   state: DuelChallengeState!
   
+  # Payment method tracking
+  paidWithTicket: Boolean!                      # true if paid with ticket, false if paid with ETH
+  
   # Fields for completed duels
   winnerId: BigInt
   randomness: BigInt
@@ -812,6 +815,7 @@ type ChallengeCreated @entity(immutable: true) {
   challengerSkinIndex: BigInt!
   challengerSkinTokenId: BigInt!
   challengerStance: BigInt!
+  paidWithTicket: Boolean!                      # true if paid with ticket, false if paid with ETH
   createdAtBlock: BigInt!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
@@ -1163,6 +1167,34 @@ type PlayerContractUpdated @entity(immutable: true) {
 }
 
 type VrfRequestTimeoutUpdated @entity(immutable: true) {
+  id: Bytes!
+  oldValue: BigInt!
+  newValue: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+# Gas Protection Events
+type GasProtectionUpdated @entity(immutable: true) {
+  id: Bytes!
+  enabled: Boolean!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type MaxAcceptGasPriceUpdated @entity(immutable: true) {
+  id: Bytes!
+  oldValue: BigInt!
+  newValue: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+# Fee Management Events
+type DuelFeeAmountUpdated @entity(immutable: true) {
   id: Bytes!
   oldValue: BigInt!
   newValue: BigInt!
