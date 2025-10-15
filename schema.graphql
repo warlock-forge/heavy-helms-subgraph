@@ -2,7 +2,7 @@
 #                   SINGLETON ENTITIES                       
 # ==========================================================
 # Counter for generating sequential snapshot IDs
-type SnapshotCounter @entity {
+type SnapshotCounter @entity(immutable: false) {
   id: ID!          # Always "counter"
   nextId: BigInt!  # Next available ID number
 }
@@ -57,7 +57,7 @@ interface Fighter {
 # ==========================================================
 #                   PLAYER GAUNTLET STATS
 # ==========================================================
-type PlayerGauntletStat @entity {
+type PlayerGauntletStat @entity(immutable: false) {
   id: ID!                    # Unique identifier (playerId for now, but allows future expansion)
   playerId: BigInt!          # Player ID for efficient filtering and sorting
   player: Player!
@@ -86,7 +86,7 @@ type PlayerGauntletStat @entity {
 #                   CORE ENTITIES
 # ==========================================================
 # Keep your existing Player entity but implement the Fighter interface
-type Player implements Fighter @entity {
+type Player implements Fighter @entity(immutable: false) {
   id: ID!
   fighterId: BigInt!
   fighterType: String!    # Will always be "Player"
@@ -148,7 +148,7 @@ type Player implements Fighter @entity {
 
 
 # DefaultPlayer entities implement Fighter directly - no more separate "Progression" entities
-type DefaultPlayer implements Fighter @entity {
+type DefaultPlayer implements Fighter @entity(immutable: false) {
   id: ID!                    # "{playerId}-{level}"
   fighterId: BigInt!         # The base player ID (same for all levels)
   fighterType: String!       # "DefaultPlayer"
@@ -189,7 +189,7 @@ type DefaultPlayer implements Fighter @entity {
 }
 
 # Monster entities implement Fighter directly - no more separate "Progression" entities
-type Monster implements Fighter @entity {
+type Monster implements Fighter @entity(immutable: false) {
   id: ID!                    # "{monsterId}-{level}"
   fighterId: BigInt!         # The base monster ID (same for all levels)
   fighterType: String!       # "Monster"
@@ -232,7 +232,7 @@ type Monster implements Fighter @entity {
 # ==========================================================
 #                   SUPPORTING ENTITIES                      
 # ==========================================================
-type Owner @entity {
+type Owner @entity(immutable: false) {
   id: ID!
   address: Bytes!
   totalPlayers: Int!
@@ -244,7 +244,7 @@ type Owner @entity {
 }
 
 # Entity to track pending player creation requests
-type PendingPlayerCreation @entity {
+type PendingPlayerCreation @entity(immutable: false) {
   id: ID! # requestId
   owner: Bytes! # address of the owner requesting the player
   fulfilled: Boolean!
@@ -253,7 +253,7 @@ type PendingPlayerCreation @entity {
 }
 
 # Entity to store player attributes temporarily between handlers
-type PlayerAttributes @entity {
+type PlayerAttributes @entity(immutable: false) {
   id: ID! # playerId
   firstNameIndex: Int!
   surnameIndex: Int!
@@ -265,7 +265,7 @@ type PlayerAttributes @entity {
   luck: Int!
 }
 
-type Name @entity {
+type Name @entity(immutable: false) {
   id: ID!
   index: Int!
   nameType: Int!  # 0: nameSetA, 1: nameSetB, 2: surname
@@ -279,7 +279,7 @@ enum ContractType {
   GAME_OWNED
 }
 
-type SkinCollection @entity {
+type SkinCollection @entity(immutable: false) {
   id: ID!
   registryId: BigInt!
   contractAddress: Bytes!
@@ -290,7 +290,7 @@ type SkinCollection @entity {
   skins: [Skin!]! @derivedFrom(field: "collection")
 }
 
-type Skin @entity {
+type Skin @entity(immutable: false) {
   id: ID!
   collection: SkinCollection!
   tokenId: Int!
@@ -749,7 +749,7 @@ type FighterSnapshot @entity(immutable: true) {
 # ==========================================================
 # Represents a locked loadout commitment (skin + stance)
 # Reusable across duels, gauntlets, tournaments
-type FighterParticipant @entity {
+type FighterParticipant @entity(immutable: false) {
   id: ID!                    # Counter-based unique ID
   
   # Core fighter reference
@@ -768,7 +768,7 @@ type FighterParticipant @entity {
 # ==========================================================
 #                   DUEL GAME ENTITIES                       
 # ==========================================================
-type DuelChallenge @entity {
+type DuelChallenge @entity(immutable: false) {
   id: ID!
   challengerId: BigInt!
   defenderId: BigInt!
@@ -974,7 +974,7 @@ type TimeUntilExpireUpdated @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
-type Stats @entity {
+type Stats @entity(immutable: false) {
   id: ID!  # Use "all" as the ID for a singleton
   
   # Fighter counts
@@ -1028,7 +1028,7 @@ type Stats @entity {
 # ==========================================================
 # Efficiently tracks daily gauntlet participation per player per bracket
 # Uses STATIC ID approach - same entity gets updated daily (zero garbage!)
-type PlayerDailyGauntletStats @entity {
+type PlayerDailyGauntletStats @entity(immutable: false) {
   id: ID!                     # "{playerId}-{bracketId}" (STATIC - no dayNumber!)
   player: Player!             # Reference to Player entity
   playerId: BigInt!           # uint32 player ID for fast filtering
@@ -1058,7 +1058,7 @@ type PlayerDailyGauntletStats @entity {
 # ==========================================================
 #                   GAUNTLET BRACKET ENTITY                  
 # ==========================================================
-type GauntletBracket @entity {
+type GauntletBracket @entity(immutable: false) {
   id: ID!                           # "low", "mid", or "high"
   bracketType: String!              # "LEVELS_1_TO_4", "LEVELS_5_TO_9", "LEVEL_10"
   levelBracket: Int!                # 0, 1, 2 (for filtering)
@@ -1092,7 +1092,7 @@ type GauntletBracket @entity {
 # ==========================================================
 #                   ACCOUNTING ENTITY                        
 # ==========================================================
-type Accounting @entity {
+type Accounting @entity(immutable: false) {
   id: ID!  # Use "all" as the ID for a singleton
   
   # Current fee amounts (tracked from fee update events)
@@ -1129,7 +1129,7 @@ type Accounting @entity {
 }
 
 # Helper entity for mapping addresses to collection IDs
-type SkinAddressMapping @entity {
+type SkinAddressMapping @entity(immutable: false) {
   id: ID!
   registryId: BigInt!
   contractAddress: Bytes!
@@ -1173,7 +1173,7 @@ type VrfRequestTimeoutUpdated @entity(immutable: true) {
 
 
 
-type SkinCombatStat @entity {
+type SkinCombatStat @entity(immutable: false) {
   id: ID!
   skin: Skin
   skinCollectionId: BigInt!
@@ -1209,7 +1209,7 @@ type SkinCombatStat @entity {
   lastUpdated: BigInt!
 }
 
-type PlayerSkinCombatStat @entity {
+type PlayerSkinCombatStat @entity(immutable: false) {
   id: ID!  # Format: "playerId-skinCollectionId-tokenId-stance"
   
   # Entity references + raw IDs for fast lookups
@@ -1273,7 +1273,7 @@ enum PlayerTournamentStatus {
 }
 
 # Represents a single Gauntlet run
-type Gauntlet @entity {
+type Gauntlet @entity(immutable: false) {
   id: ID!                  # Composite ID: "{bracketId}-{gauntletId}" (e.g., "low-5", "mid-12", "high-3")
   size: Int!               # 4, 8, 16, or 32
   state: GauntletState!    # PENDING or COMPLETED
@@ -1291,7 +1291,7 @@ type Gauntlet @entity {
 }
 
 # Represents a player's participation in a specific Gauntlet
-type GauntletParticipant @entity {
+type GauntletParticipant @entity(immutable: false) {
   id: ID!                  # Composite ID: "{bracketId}-{gauntletId}-{playerId}" (e.g., "low-5-123")
   gauntlet: Gauntlet!      # Link back to the Gauntlet (uses composite bracket-aware ID)
   participant: FighterParticipant! # Locked loadout commitment when joining gauntlet
@@ -1300,7 +1300,7 @@ type GauntletParticipant @entity {
 # ==========================================================
 #                   TOURNAMENT GAME ENTITIES                  
 # ==========================================================
-type Tournament @entity {
+type Tournament @entity(immutable: false) {
   id: ID!                  # Tournament ID (uint256 from contract)
   size: Int!               # 16, 32, or 64
   state: TournamentState!  # PENDING or COMPLETED
@@ -1323,7 +1323,7 @@ enum TournamentState {
 }
 
 # Represents a player's participation in a specific Tournament
-type TournamentParticipant @entity {
+type TournamentParticipant @entity(immutable: false) {
   id: ID!                  # Composite ID: "{tournamentId}-{playerId}"
   tournament: Tournament!  # Link back to the Tournament
   participant: FighterParticipant! # Locked loadout commitment when joining tournament
@@ -1643,7 +1643,7 @@ type GauntletSizeSet @entity(immutable: true) {
 #                   v1.0.0 PLAYERTICKETS & TOURNAMENT EVENTS                       
 # ==========================================================
 
-type PlayerTicket @entity {
+type PlayerTicket @entity(immutable: false) {
   id: ID!                  # Token ID as string
   tokenId: BigInt!         # uint256 token ID
   ticketType: Int!         # Type of ticket (CREATE_PLAYER_TICKET, etc.)
@@ -1902,7 +1902,7 @@ type TournamentGameEnabledChanged @entity(immutable: true) {
 #                   SEASONAL TRACKING ENTITIES                       
 # ==========================================================
 
-type Season @entity {
+type Season @entity(immutable: false) {
   id: ID!                     # Season ID as string
   seasonId: BigInt!           # uint256 season ID from contract
   startTimestamp: BigInt!     # When season started
@@ -1915,7 +1915,7 @@ type Season @entity {
   lastUpdatedAt: BigInt!
 }
 
-type PlayerSeasonalStats @entity {
+type PlayerSeasonalStats @entity(immutable: false) {
   id: ID!                     # "{seasonId}-{playerId}"
   season: Season!             # Reference to Season
   seasonId: BigInt!           # uint256 season ID for easy filtering
