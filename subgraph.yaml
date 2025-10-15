@@ -7,11 +7,11 @@ schema:
 dataSources:
   - kind: ethereum
     name: Player
-    network: base-sepolia
+    network: base-mainnet
     source:
       address: "0xb19f2D8e0f3Fd0111CA49dc5ae2f656972B6Df4c"
       abi: Player
-      startBlock: 32265856
+      startBlock: 36880420
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -108,11 +108,11 @@ dataSources:
 
   - kind: ethereum
     name: PlayerNameRegistry
-    network: base-sepolia
+    network: base-mainnet
     source:
       address: "0x6106E1f3De585b968CEAa4b9f732cCd201aD9811"
       abi: PlayerNameRegistry
-      startBlock: 32265856
+      startBlock: 36880420
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -130,11 +130,11 @@ dataSources:
 
   - kind: ethereum
     name: PlayerSkinRegistry
-    network: base-sepolia
+    network: base-mainnet
     source:
       address: "0xA308ECAD719A4d8708462318727a6001e6604f10"
       abi: PlayerSkinRegistry
-      startBlock: 32265856
+      startBlock: 36880420
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -170,11 +170,11 @@ dataSources:
   # Add DefaultPlayer data source
   - kind: ethereum
     name: DefaultPlayer
-    network: base-sepolia
+    network: base-mainnet
     source:
       address: "0xc520795Cb19aE57A1aF91EdDDA637Ea852E262B9"
       abi: DefaultPlayer
-      startBlock: 32265856
+      startBlock: 36880420
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -198,11 +198,11 @@ dataSources:
   # Add Monster data source
   - kind: ethereum
     name: Monster
-    network: base-sepolia
+    network: base-mainnet
     source:
       address: "0x9c586B69b63c775f05d3c2590c4C2C06D2D6ABE1"
       abi: Monster
-      startBlock: 32265856
+      startBlock: 36880420
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -226,11 +226,11 @@ dataSources:
   # Add MonsterNameRegistry data source if needed
   - kind: ethereum
     name: MonsterNameRegistry
-    network: base-sepolia
+    network: base-mainnet
     source:
       address: "0xFB1C764754BD6D32DF5FAaf9378e3e969AF57535"
       abi: MonsterNameRegistry
-      startBlock: 32265856
+      startBlock: 36880420
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -249,11 +249,11 @@ dataSources:
   # Add DuelGame data source
   - kind: ethereum
     name: DuelGame
-    network: base-sepolia
+    network: base-mainnet
     source:
-      address: "0xEeCF7f20D836744621EB881ABAC7Fb20fF965d5b"
+      address: "0x595C77EFce088936e7E1E94432732984b30a1CAc"
       abi: DuelGame
-      startBlock: 32265856
+      startBlock: 36880420
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -302,11 +302,11 @@ dataSources:
   # Levels 1-4 Gauntlet
   - kind: ethereum
     name: GauntletGameLow
-    network: base-sepolia
+    network: base-mainnet
     source:
-      address: "0xe76A989546397270EaeAF69412F3D703D975BFaE" # Levels 1-4
+      address: "0x005744D889870E6de3c5cC0a4537B88034620416" # Levels 1-4
       abi: GauntletGame
-      startBlock: 32265856
+      startBlock: 36880420
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -399,11 +399,11 @@ dataSources:
   # Levels 5-9 Gauntlet
   - kind: ethereum
     name: GauntletGameMid
-    network: base-sepolia
+    network: base-mainnet
     source:
-      address: "0xd088bb2e9F47cb3175E44E95F0d30Bdd8b3A3307" # Levels 5-9
+      address: "0x4D31cA1dC8664d26e9AC4A50B4483Ce715BD6EBc" # Levels 5-9
       abi: GauntletGame
-      startBlock: 32265856
+      startBlock: 36880420
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -496,11 +496,11 @@ dataSources:
   # Level 10 Gauntlet
   - kind: ethereum
     name: GauntletGameHigh
-    network: base-sepolia
+    network: base-mainnet
     source:
-      address: "0xC1773261B5410BF16050621FB18b9de97B63Cb50" # Level 10
+      address: "0x2Ff94A1F55fE00bE2b540CB1e6BEDb0712f7E73E" # Level 10
       abi: GauntletGame
-      startBlock: 32265856
+      startBlock: 36880420
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -595,11 +595,11 @@ dataSources:
   # Add PracticeGame data source
   - kind: ethereum
     name: PracticeGame
-    network: base-sepolia
+    network: base-mainnet
     source:
-      address: "0xcCC01A2b34aecde9d4a4BDA88D71c117e1A82dC4"
+      address: "0x4A72CD0d147Af3923bCa35a0097Be9e8711789ac"
       abi: PracticeGame
-      startBlock: 32265856
+      startBlock: 36880420
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -623,11 +623,11 @@ dataSources:
   # TournamentGame contract data source
   # - kind: ethereum
   #   name: TournamentGame
-  #   network: base-sepolia
+  #   network: base-mainnet
   #   source:
   #     address: "0x0Fda98b3167e35A6c01d2D38DEa4945CaEc908da"
   #     abi: TournamentGame
-  #     startBlock: 32265856
+  #     startBlock: 36880420
   #   mapping:
   #     kind: ethereum/events
   #     apiVersion: 0.0.9
@@ -711,11 +711,11 @@ dataSources:
   # TODO: Add PlayerTickets contract data source when player-tickets.ts is implemented
   # - kind: ethereum
   #   name: PlayerTickets
-  #   network: base-sepolia
+  #   network: base-mainnet
   #   source:
-  #     address: "0x73c6149A5AEA3569516dB6FCD87D4dc4AA143054"
+  #     address: "0x19AAb75Dc28340a163b3856Ae3Ce698277dfD339"
   #     abi: PlayerTickets
-  #     startBlock: 30203920
+  #     startBlock: 36880420
   #   mapping:
   #     kind: ethereum/events
   #     apiVersion: 0.0.9
@@ -738,7 +738,7 @@ dataSources:
 templates:
   - name: PlayerSkinNFT
     kind: ethereum/contract
-    network: base-sepolia
+    network: base-mainnet
     source:
       abi: PlayerSkinNFT
     mapping:
@@ -756,7 +756,7 @@ templates:
           file: ./abis/PlayerSkinNFT.json
   - name: GameOwnedNFT
     kind: ethereum/contract
-    network: base-sepolia
+    network: base-mainnet
     source:
       abi: GameOwnedNFT
     mapping:
