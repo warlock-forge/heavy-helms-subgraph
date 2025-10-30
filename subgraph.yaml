@@ -304,7 +304,7 @@ dataSources:
     name: GauntletGameLow
     network: base
     source:
-      address: "0x005744D889870E6de3c5cC0a4537B88034620416" # Levels 1-4
+      address: "0x15F0a1b8F27e2D7D40Ca9BADeE3e19930c4F70e5" # Levels 1-4
       abi: GauntletGame
       startBlock: 36880420
     mapping:
@@ -401,7 +401,7 @@ dataSources:
     name: GauntletGameMid
     network: base
     source:
-      address: "0x4D31cA1dC8664d26e9AC4A50B4483Ce715BD6EBc" # Levels 5-9
+      address: "0x3E4E56F12Cbd7281493945852b6a146596488765" # Levels 5-9
       abi: GauntletGame
       startBlock: 36880420
     mapping:
@@ -498,7 +498,7 @@ dataSources:
     name: GauntletGameHigh
     network: base
     source:
-      address: "0x2Ff94A1F55fE00bE2b540CB1e6BEDb0712f7E73E" # Level 10
+      address: "0x39732fe8DEfb7A9f7FD251586299DaacAFE7614E" # Level 10
       abi: GauntletGame
       startBlock: 36880420
     mapping:

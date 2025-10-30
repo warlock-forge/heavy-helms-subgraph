@@ -1951,6 +1951,7 @@ type PlayerSeasonalStats @entity(immutable: false) {
   id: ID!                     # "{seasonId}-{playerId}"
   season: Season!             # Reference to Season
   seasonId: BigInt!           # uint256 season ID for easy filtering
+  player: Player!             # Reference to Player entity
   playerId: BigInt!           # uint32 player ID for easy filtering
   
   # Seasonal combat records
