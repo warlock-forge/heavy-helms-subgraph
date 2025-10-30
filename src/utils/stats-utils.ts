@@ -233,6 +233,7 @@ export function getOrCreatePlayerSeasonalStats(
     stats = new PlayerSeasonalStats(statsId);
     stats.season = seasonId;
     stats.seasonId = BigInt.fromString(seasonId);
+    stats.player = playerId;
     stats.playerId = BigInt.fromString(playerId);
     stats.wins = 0;
     stats.losses = 0;
