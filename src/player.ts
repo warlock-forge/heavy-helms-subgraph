@@ -71,6 +71,7 @@ import {
   updateStatsForWinLoss, 
   updateStatsForKills,
   getOrCreatePlayerSeasonalStats,
+  updatePlayerSeasonalCalculatedFields,
   getOrCreateAccounting
 } from "./utils/stats-utils";
 
@@ -941,6 +942,7 @@ export function handlePlayerWinRecorded(event: PlayerWinRecordedEvent): void {
   
   seasonalStats.wins += 1;
   seasonalStats.lastUpdatedAt = event.block.timestamp;
+  updatePlayerSeasonalCalculatedFields(seasonalStats);
   seasonalStats.save();
   
   // Update global stats
@@ -974,6 +976,7 @@ export function handlePlayerLossRecorded(event: PlayerLossRecordedEvent): void {
   
   seasonalStats.losses += 1;
   seasonalStats.lastUpdatedAt = event.block.timestamp;
+  updatePlayerSeasonalCalculatedFields(seasonalStats);
   seasonalStats.save();
   
   // Update global stats

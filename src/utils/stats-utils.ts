@@ -1,5 +1,5 @@
 import { BigInt, Address, Bytes, BigDecimal } from "@graphprotocol/graph-ts"
-import { Stats, Owner, Player, SkinCombatStat, PlayerSkinCombatStat, Skin, PlayerSeasonalStats, Accounting, GauntletBracket, PlayerGauntletStat } from "../../generated/schema"
+import { Stats, Owner, Player, SkinCombatStat, PlayerSkinCombatStat, Skin, PlayerSeasonalStat, Accounting, GauntletBracket, PlayerGauntletStat } from "../../generated/schema"
 import { log } from "@graphprotocol/graph-ts"
 
 // Weapon class enum (matches contract)
@@ -225,12 +225,12 @@ export function getOrCreatePlayerSeasonalStats(
   playerId: string, 
   seasonId: string,
   timestamp: BigInt
-): PlayerSeasonalStats {
+): PlayerSeasonalStat {
   const statsId = seasonId + "-" + playerId;
-  let stats = PlayerSeasonalStats.load(statsId);
+  let stats = PlayerSeasonalStat.load(statsId);
   
   if (!stats) {
-    stats = new PlayerSeasonalStats(statsId);
+    stats = new PlayerSeasonalStat(statsId);
     stats.season = seasonId;
     stats.seasonId = BigInt.fromString(seasonId);
     stats.player = playerId;
@@ -245,11 +245,38 @@ export function getOrCreatePlayerSeasonalStats(
     stats.gauntletWins = 0;
     stats.duelsPlayed = 0;
     stats.duelWins = 0;
+    
+    // Initialize calculated fields
+    stats.totalFights = 0;
+    stats.winPercentage = BigDecimal.zero();
+    
     stats.createdAt = timestamp;
     stats.lastUpdatedAt = timestamp;
   }
   
   return stats;
+}
+
+// Helper function to update calculated fields for PlayerSeasonalStats
+export function updatePlayerSeasonalCalculatedFields(stats: PlayerSeasonalStat): void {
+  // Calculate total fights
+  stats.totalFights = stats.wins + stats.losses;
+  
+  // Calculate win percentage
+  if (stats.totalFights > 0) {
+    stats.winPercentage = BigDecimal.fromString(stats.wins.toString())
+      .div(BigDecimal.fromString(stats.totalFights.toString()))
+      .times(BigDecimal.fromString("100"));
+  } else {
+    stats.winPercentage = BigDecimal.zero();
+  }
+  
+  log.info("[updatePlayerSeasonalCalculatedFields] Player {} Season {}: {} fights, {}% win rate", [
+    stats.playerId.toString(),
+    stats.seasonId.toString(), 
+    stats.totalFights.toString(),
+    stats.winPercentage.toString()
+  ]);
 }
 
 // Player-related update methods

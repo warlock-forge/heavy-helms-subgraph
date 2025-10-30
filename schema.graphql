@@ -1942,12 +1942,12 @@ type Season @entity(immutable: false) {
   endTimestamp: BigInt        # When season ended (null if current)
   endBlock: BigInt           # Block when season ended (null if current)
   isActive: Boolean!          # Whether this is the current season
-  playerStats: [PlayerSeasonalStats!]! @derivedFrom(field: "season")
+  playerStats: [PlayerSeasonalStat!]! @derivedFrom(field: "season")
   createdAt: BigInt!
   lastUpdatedAt: BigInt!
 }
 
-type PlayerSeasonalStats @entity(immutable: false) {
+type PlayerSeasonalStat @entity(immutable: false) {
   id: ID!                     # "{seasonId}-{playerId}"
   season: Season!             # Reference to Season
   seasonId: BigInt!           # uint256 season ID for easy filtering
@@ -1971,6 +1971,10 @@ type PlayerSeasonalStats @entity(immutable: false) {
   # Duel-specific seasonal data
   duelsPlayed: Int!           # Number of duels participated in this season
   duelWins: Int!              # Number of duels won this season
+  
+  # Calculated fields for leaderboards
+  totalFights: Int!           # wins + losses (for activity filtering)
+  winPercentage: BigDecimal!  # (wins / totalFights) * 100 (for proper sorting)
   
   createdAt: BigInt!
   lastUpdatedAt: BigInt!
