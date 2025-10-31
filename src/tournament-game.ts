@@ -39,8 +39,7 @@ import {
   TournamentGameEnabledChanged
 } from "../generated/schema";
 
-import { getOrCreatePlayerSeasonalStats } from "./utils/stats-utils";
-import { updateStatsForTournamentWin } from "./utils/stats-utils";
+import { getOrCreatePlayerSeasonalStats, updateStatsForTournamentWin } from "./utils/stats-utils";
 import { getOrCreateFighterSnapshotById, processCombatResultEvent, getOrCreateFighterParticipant } from "./utils/fighter-utils";
 
 // Define ZERO_BI directly

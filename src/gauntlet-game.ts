@@ -60,7 +60,7 @@ import {
   PlayerDailyGauntletStats
 } from "../generated/schema";
 
-import { getOrCreateStats, getOrCreateAccounting, getOrCreateGauntletBracket, getOrCreatePlayerGauntletStats } from "./utils/stats-utils";
+import { getOrCreateStats, getOrCreateAccounting, getOrCreateGauntletBracket, getOrCreatePlayerGauntletStats, getOrCreatePlayerSeasonalStats } from "./utils/stats-utils";
 import { getOrCreateFighterSnapshotById, processCombatResultEvent, getOrCreateFighterParticipant } from "./utils/fighter-utils";
 
 // Define ZERO_BI directly
@@ -493,11 +493,23 @@ export function handleGauntletCompleted(event: GauntletCompletedEvent, defaultPl
             gauntletStats.highBracketWins += 1;
           }
 
-          log.info("[GauntletCompleted {}] Updated champion {} wins: total={}, bracket={}", [
+          // Update seasonal gauntlet wins for champion
+          const currentSeasonId = "0"; // TODO: Make this dynamic when seasons are implemented
+          let championSeasonalStats = getOrCreatePlayerSeasonalStats(
+            championIdString,
+            currentSeasonId,
+            event.block.timestamp
+          );
+          championSeasonalStats.gauntletWins += 1;
+          championSeasonalStats.lastUpdatedAt = event.block.timestamp;
+          championSeasonalStats.save();
+
+          log.info("[GauntletCompleted {}] Updated champion {} wins: total={}, bracket={}, seasonal gauntlet wins={}", [
             gauntletId,
             championIdString,
             gauntletStats.totalGauntletWins.toString(),
-            bracketId
+            bracketId,
+            championSeasonalStats.gauntletWins.toString()
           ]);
         }
 
