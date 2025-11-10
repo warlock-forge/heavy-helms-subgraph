@@ -251,7 +251,7 @@ dataSources:
     name: DuelGame
     network: base-sepolia
     source:
-      address: "0xEeCF7f20D836744621EB881ABAC7Fb20fF965d5b"
+      address: "0xF335B1a3dA8F549D7E961860863fEA4C9e45Bc59"
       abi: DuelGame
       startBlock: 32265856
     mapping:

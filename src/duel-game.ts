@@ -32,7 +32,7 @@ import {
   updateStatsForChallengeCreation,
   updateSeasonalDuelStats
 } from "./utils/stats-utils";
-import { getOrCreateFighterParticipant, processCombatResultEvent } from "./utils/fighter-utils";
+import { getOrCreateFighterParticipant, processCombatResultEvent, getOrCreateFighterSnapshotById } from "./utils/fighter-utils";
 import { DuelGame } from "../generated/DuelGame/DuelGame";
 
 /**
@@ -67,16 +67,17 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
   challenge.state = "OPEN";
   challenge.paidWithTicket = event.params.paidWithTicket;
   
-  // Create FighterParticipant for challenger's locked loadout
-  const challengerParticipant = getOrCreateFighterParticipant(
-    event.params.challengerId,
-    event.params.challengerSkinIndex,
-    event.params.challengerSkinTokenId,
-    event.params.challengerStance,
+  // Create FighterSnapshot for challenger's current state
+  const challengerSnapshotId = getOrCreateFighterSnapshotById(
+    event.params.challengerId.toString(),
     event.block.timestamp
   );
-  challengerParticipant.save();
-  challenge.challengerParticipant = challengerParticipant.id;
+  if (challengerSnapshotId) {
+    challenge.challengerSnapshot = challengerSnapshotId;
+  } else {
+    log.error("Failed to create challenger snapshot for player {}, skipping challenge creation", [event.params.challengerId.toString()]);
+    return; // Exit early if we can't create required snapshot
+  }
   
   // Get the Player entity for challenger
   const challengerId = event.params.challengerId.toString();
@@ -91,6 +92,18 @@ export function handleChallengeCreated(event: ChallengeCreatedEvent): void {
     log.info("Linked challenger player {} to challenge {}", [challengerId, challengeId]);
   } else {
     log.warning("Challenger player {} not found for challenge {}", [challengerId, challengeId]);
+  }
+  
+  // Create FighterSnapshot for defender's current state (for UI list display)
+  const defenderSnapshotId = getOrCreateFighterSnapshotById(
+    event.params.defenderId.toString(),
+    event.block.timestamp
+  );
+  if (defenderSnapshotId) {
+    challenge.defenderSnapshot = defenderSnapshotId;
+  } else {
+    log.error("Failed to create defender snapshot for player {}, skipping challenge creation", [event.params.defenderId.toString()]);
+    return; // Exit early if we can't create required snapshot
   }
   
   // Get the Player entity for defender
@@ -163,16 +176,8 @@ export function handleChallengeAccepted(event: ChallengeAcceptedEvent): void {
       log.warning("Defender player {} not found for challenge {}", [defenderId, challengeId]);
     }
     
-    // Create FighterParticipant for defender's locked loadout
-    const defenderParticipant = getOrCreateFighterParticipant(
-      event.params.defenderId,
-      event.params.defenderSkinIndex,
-      event.params.defenderSkinTokenId,
-      event.params.defenderStance,
-      event.block.timestamp
-    );
-    defenderParticipant.save();
-    challenge.defenderParticipant = defenderParticipant.id;
+    // Note: Defender snapshot already created at challenge creation time for UI purposes
+    // The actual loadout commitment is tracked via the event parameters
     
     challenge.state = "PENDING";
     challenge.save();
@@ -224,7 +229,7 @@ export function handleDuelComplete(event: DuelCompleteEvent): void {
     challenge.randomness = event.params.randomness;
     
     // Note: Historical snapshots are accessible via duelComplete.combatResult.player1Snapshot/player2Snapshot
-    // Locked loadouts are stored in challenge.challengerParticipant/defenderParticipant
+    // Fighter snapshots are stored in challenge.challengerSnapshot/defenderSnapshot
     
     // Track seasonal duel stats (for fun, doesn't affect official records)
     // Both players get duelsPlayed increment, winner gets duelWins increment

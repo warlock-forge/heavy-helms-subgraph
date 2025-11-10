@@ -777,9 +777,9 @@ type DuelChallenge @entity(immutable: false) {
   challengerOwner: Owner
   defenderOwner: Owner
   
-  # Locked loadout commitments
-  challengerParticipant: FighterParticipant!    # Created at challenge creation
-  defenderParticipant: FighterParticipant       # Created at challenge acceptance
+  # Fighter snapshots for rich UI data (created at challenge time)
+  challengerSnapshot: FighterSnapshot!          # Challenger's state when challenge created
+  defenderSnapshot: FighterSnapshot!            # Defender's state when challenge created (even though may change before acceptance)
   
   createdBlock: BigInt!
   createdAt: BigInt!
