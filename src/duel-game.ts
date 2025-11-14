@@ -199,25 +199,17 @@ export function handleChallengeAccepted(event: ChallengeAcceptedEvent): void {
  * Handle DuelComplete events
  */
 export function handleDuelComplete(event: DuelCompleteEvent): void {
-  // Use transaction hash directly as the ID
-  const duelComplete = new DuelComplete(event.transaction.hash);
+  // Use transaction hash + log index as unique ID (fixes collision bug)
+  const entityId = event.transaction.hash.concatI32(event.logIndex.toI32());
+  const duelComplete = new DuelComplete(entityId);
   
   duelComplete.challengeId = event.params.challengeId;
   duelComplete.winnerId = event.params.winnerId;
   duelComplete.randomness = event.params.randomness;
+  duelComplete.logIndex = event.logIndex;  // Store for frontend matching
   duelComplete.blockNumber = event.block.number;
   duelComplete.blockTimestamp = event.block.timestamp;
   duelComplete.transactionHash = event.transaction.hash;
-  
-  // Link to CombatResult (same transaction hash)
-  const combatResultId = event.transaction.hash.toHex() + "-0"; // Duels have logIndex 0
-  const combatResult = CombatResult.load(combatResultId);
-  if (combatResult) {
-    duelComplete.combatResult = combatResultId;
-    log.info("handleDuelComplete: Linked CombatResult {}", [combatResultId]);
-  } else {
-    log.warning("handleDuelComplete: CombatResult {} not found for duel", [combatResultId]);
-  }
   
   // Update the DuelChallenge entity
   const challengeId = event.params.challengeId.toString();
@@ -272,8 +264,11 @@ export function handleCombatResult(event: CombatResultEvent): void {
     event.block.number,
     event.block.timestamp,
     false,  // updateSkinStats: false for exhibition duels
+    "DUEL", // gameType
     0       // defaultPlayerLevel: 0 (no default player injection for duels)
   );
+  
+  // Note: No linking required - frontend will match by txHash + gameType + logIndex ordering
   
   log.info("[DUEL] Completed CombatResult processing for tx {}", [event.transaction.hash.toHex()]);
 }

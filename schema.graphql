@@ -861,9 +861,7 @@ type DuelComplete @entity(immutable: true) {
   winnerId: BigInt!
   randomness: BigInt!
   challenge: DuelChallenge!
-  
-  # Direct link to combat result for detailed analysis
-  combatResult: CombatResult            # Same transaction combat data
+  logIndex: BigInt!                      # For matching with CombatResult by logIndex ordering
   
   blockNumber: BigInt!
   blockTimestamp: BigInt!
@@ -874,6 +872,7 @@ type CombatResult @entity(immutable: true) {
   id: ID!                  
   transactionHash: Bytes! @index
   logIndex: Int!           
+  gameType: String!        # "DUEL", "GAUNTLET", "TOURNAMENT" for filtering by game mode
   
   # Player IDs for efficient querying and role mapping
   player1Id: BigInt!       # Extracted from player1Data bytes [0-3]

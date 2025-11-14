@@ -572,6 +572,7 @@ function createFighterSnapshotFromDefaultPlayer(
  * @param blockNumber Block number from event
  * @param blockTimestamp Block timestamp from event
  * @param updateSkinStats Whether to update skin combat analytics (false for exhibition duels)
+ * @param gameType Game mode identifier ("DUEL", "GAUNTLET", "TOURNAMENT")
  * @param defaultPlayerLevel Optional: level for default player snapshots (0 = no injection)
  * @returns The created and saved CombatResult entity
  */
@@ -585,6 +586,7 @@ export function processCombatResultEvent(
   blockNumber: BigInt,
   blockTimestamp: BigInt,
   updateSkinStats: boolean,
+  gameType: string,  // "DUEL", "GAUNTLET", "TOURNAMENT"
   defaultPlayerLevel: i32 = 0  // Optional: level for default player snapshots (0 = auto-detect)
 ): CombatResult {
   // Generate the ID using txHash-logIndex string format
@@ -594,6 +596,7 @@ export function processCombatResultEvent(
   // Populate the reordered fields
   combatResult.transactionHash = transactionHash;
   combatResult.logIndex = logIndex.toI32();
+  combatResult.gameType = gameType;
 
   // Extract player IDs from encoded data for efficient querying
   const p1Data = decodePlayerData(player1Data);

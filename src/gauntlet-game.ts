@@ -638,6 +638,7 @@ function handleGauntletCombatResultWithLevel(event: CombatResultEvent, defaultPl
     event.block.number,
     event.block.timestamp,
     true,  // updateSkinStats: true for official gauntlet combats
+    "GAUNTLET", // gameType
     defaultPlayerLevel  // Pass the default player level for snapshot injection
   );
   
