@@ -10,7 +10,8 @@ import {
   PlayerRetiredInTournament as PlayerRetiredInTournamentEvent,
   RewardDistributed as RewardDistributedEvent,
   PlayerReplaced as PlayerReplacedEvent,
-  TournamentAutoRecovered as TournamentAutoRecoveredEvent,
+  QueueRecovered as QueueRecoveredEvent,
+  TournamentRecovered as TournamentRecoveredEvent,
   TournamentSizeSet as TournamentSizeSetEvent,
   LethalityFactorSet as LethalityFactorSetEvent,
   RewardConfigUpdated as RewardConfigUpdatedEvent,
@@ -32,7 +33,8 @@ import {
   PlayerRetiredInTournament,
   RewardDistributed,
   PlayerReplaced,
-  TournamentAutoRecovered,
+  QueueRecovered,
+  TournamentRecovered,
   TournamentSizeSet,
   LethalityFactorSet,
   TournamentRewardConfigUpdated,
@@ -534,26 +536,73 @@ export function handlePlayerReplaced(event: PlayerReplacedEvent): void {
 }
 
 /**
- * Handle TournamentAutoRecovered events
+ * Handle QueueRecovered events
  */
-export function handleTournamentAutoRecovered(event: TournamentAutoRecoveredEvent): void {
+export function handleQueueRecovered(event: QueueRecoveredEvent): void {
   // Create event entity
   const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
-  const eventEntity = new TournamentAutoRecovered(eventId);
+  const eventEntity = new QueueRecovered(eventId);
   
-  eventEntity.commitBlock = event.params.commitBlock;
-  eventEntity.currentBlock = event.params.currentBlock;
-  eventEntity.phase = event.params.phase;
+  eventEntity.targetBlock = event.params.targetBlock;
   eventEntity.blockNumber = event.block.number;
   eventEntity.blockTimestamp = event.block.timestamp;
   eventEntity.transactionHash = event.transaction.hash;
   
   eventEntity.save();
   
-  log.info("[TournamentGame] TournamentAutoRecovered: Commit block {} recovered at block {} (phase: {})", [
-    event.params.commitBlock.toString(), 
-    event.params.currentBlock.toString(),
-    event.params.phase.toString()
+  log.info("[TournamentGame] QueueRecovered: Queue phase timed out at target block {}", [
+    event.params.targetBlock.toString()
+  ]);
+}
+
+/**
+ * Handle TournamentRecovered events
+ */
+export function handleTournamentRecovered(event: TournamentRecoveredEvent): void {
+  const tournamentId = event.params.tournamentId.toString();
+  
+  // Load tournament
+  let tournament = Tournament.load(tournamentId);
+  if (tournament) {
+    tournament.state = "RECOVERED";
+    tournament.recoveredAt = event.block.timestamp;
+    tournament.recoveredTx = event.transaction.hash;
+    tournament.save();
+  }
+  
+  // Update player statuses for returned participants
+  const participantIds = event.params.participantIds;
+  for (let i = 0; i < participantIds.length; i++) {
+    let playerId = participantIds[i];
+    if (playerId.gt(BigInt.fromI32(10000))) { // Only real players
+      let player = Player.load(playerId.toString());
+      if (player && player.tournamentStatus == "IN_TOURNAMENT") {
+        player.tournamentStatus = "NONE";
+        player.currentTournament = null;
+        player.lastUpdatedAt = event.block.timestamp;
+        player.save();
+      }
+    }
+  }
+  
+  // Create event entity
+  const eventId = event.transaction.hash.concatI32(event.logIndex.toI32());
+  const eventEntity = new TournamentRecovered(eventId);
+  
+  eventEntity.tournamentId = event.params.tournamentId;
+  eventEntity.targetBlock = event.params.targetBlock;
+  eventEntity.participantIds = event.params.participantIds;
+  eventEntity.tournament = tournamentId;
+  eventEntity.blockNumber = event.block.number;
+  eventEntity.blockTimestamp = event.block.timestamp;
+  eventEntity.transactionHash = event.transaction.hash;
+  
+  eventEntity.save();
+  
+  log.info("[TournamentGame] TournamentRecovered: Tournament {} recovered at target block {}, returned {} participants to queue", [
+    event.params.tournamentId.toString(),
+    event.params.targetBlock.toString(),
+    event.params.participantIds.length.toString()
   ]);
 }
 

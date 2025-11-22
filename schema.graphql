@@ -1343,14 +1343,15 @@ type Tournament @entity(immutable: false) {
   startedTx: Bytes!        # Transaction hash of TournamentStarted
   completedAt: BigInt      # Timestamp TournamentCompleted event occurred
   completedTx: Bytes       # Transaction hash of TournamentCompleted
-  recoveredAt: BigInt      # Timestamp TournamentAutoRecovered event occurred
-  recoveredTx: Bytes       # Transaction hash of TournamentAutoRecovered
+  recoveredAt: BigInt      # Timestamp TournamentRecovered event occurred
+  recoveredTx: Bytes       # Transaction hash of TournamentRecovered
   finalParticipantIds: [String!] # List of final participant IDs (INCLUDING SUBSTITUTIONS)
 }
 
 enum TournamentState {
   PENDING
   COMPLETED
+  RECOVERED
 }
 
 # Represents a player's participation in a specific Tournament
@@ -1875,11 +1876,12 @@ type PlayerReplaced @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
-type TournamentAutoRecovered @entity(immutable: true) {
+type TournamentRecovered @entity(immutable: true) {
   id: Bytes!
-  commitBlock: BigInt!
-  currentBlock: BigInt!
-  phase: Int! # TournamentPhase enum as int
+  tournamentId: BigInt!    # indexed uint256 tournamentId
+  targetBlock: BigInt!     # uint256 targetBlock
+  participantIds: [BigInt!]! # uint32[] participantIds
+  tournament: Tournament   # Link to Tournament entity
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
