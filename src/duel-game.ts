@@ -199,8 +199,8 @@ export function handleChallengeAccepted(event: ChallengeAcceptedEvent): void {
  * Handle DuelComplete events
  */
 export function handleDuelComplete(event: DuelCompleteEvent): void {
-  // Use transaction hash + log index as unique ID (fixes collision bug)
-  const entityId = event.transaction.hash.concatI32(event.logIndex.toI32());
+  // Use transaction hash as unique ID (only one duel completes per transaction)
+  const entityId = event.transaction.hash;
   const duelComplete = new DuelComplete(entityId);
   
   duelComplete.challengeId = event.params.challengeId;
